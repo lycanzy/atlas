@@ -35,24 +35,20 @@
         <tbody>
             {% for flow in experiment.flow.all %}
             <tr>
-                <td style="padding:10px; border-bottom:1px solid #e5e7eb;">{{ experiment.exp_name }}</td>
+                <td style="padding:10px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; gap:5px;">
+                    <!-- Expand/Collapse button -->
+                    <button class="expand-btn" data-flow-id="{{ flow.id }}" style="width:20px; height:20px; padding:0; font-size:14px; cursor:pointer;">></button>
+                    <!-- Experiment name -->
+                    <span>{{ experiment.exp_name }}</span>
+                </td>
                 <td style="padding:10px; border-bottom:1px solid #e5e7eb;">{{ flow.flow_name }}</td>
                 <td style="padding:10px; border-bottom:1px solid #e5e7eb;">{{ experiment.exp_name }}{{ flow.flow_name }}</td>
                 <td style="padding:10px; border-bottom:1px solid #e5e7eb;">
                     <span class="flow-desc" data-flow-id="{{ flow.id }}">{{ flow.flow_description|default:"Click to add description" }}</span>
                 </td>
-<style>
-    .flow-desc {
-        cursor: pointer;
-        color: #222;
-    }
-    .flow-desc:empty::before {
-        content: "Click to add description";
-        color: #888;
-    }
-</style>
-                <td style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:center;">
-                    <button title="Add" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:#007bff;">+</button>
+                <td style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:center; display:flex; justify-content:center; gap:5px;">
+                    <button onclick="location.href='{% url 'add_step' experiment.id flow.id %}'" title="Add Step" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:#007bff;">+</button>
+                    <button onclick="location.href='{% url 'delete_flow' experiment.id flow.id %}'" title="Delete Flow" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:#007bff;">-</button>
                 </td>
             </tr>
             {% empty %}

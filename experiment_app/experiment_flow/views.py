@@ -18,6 +18,14 @@ def experiment_detail(request, exp_id):
     
     return render(request, 'experiment_flow/experiment_detail.html', {'experiment': experiment}) 
 
+def delete_flow(request, exp_id, flow_id):
+
+    experiment = Exp.objects.get(id=exp_id)
+    flow = ExpFlow.objects.get(id=flow_id)
+    flow.delete()
+
+    return redirect('experiment_detail', exp_id=exp_id)
+
 def add_experiment(request):
     if request.method == 'POST':
         exp_name = request.POST.get('exp_name')
@@ -41,6 +49,22 @@ def add_flow(request, exp_id):
 
     return render(request, 'experiment_flow/add_flow.html', {'experiment': experiment})
 
+def add_step(request, exp_id, flow_id):
+    
+    if request.method == 'POST':
+        step_name = request.POST.get('step_name')
+        if step_name:
+            flow = ExpFlow.objects.get(id=flow_id)
+            new_step = ExpStep(step_name=step_name, flow=flow)
+            new_step.save()
+            return redirect('experiment_detail', exp_id=exp_id)
+        
+    experiment = Exp.objects.get(id=exp_id)
+    flow = ExpFlow.objects.get(id=flow_id)
+
+    return render(request, 'experiment_flow/add_step.html', {'experiment': experiment, 'flow': flow})
+
+
 @csrf_exempt
 def update_flow_desc(request, flow_id):
     if request.method == 'POST':
@@ -54,3 +78,4 @@ def update_flow_desc(request, flow_id):
         except ExpFlow.DoesNotExist:
             return JsonResponse({'success': False}, status=404)
     return JsonResponse({'success': False}, status=400)
+

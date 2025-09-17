@@ -23,6 +23,8 @@ urlpatterns = [
     path('experiment/<int:exp_id>/', views.experiment_detail, name='experiment_detail'),
     path('add_experiment/', views.add_experiment, name='add_experiment'),
     path('experiment/<int:exp_id>/add_flow/', views.add_flow, name='add_flow'),
+    path('experiment/<int:exp_id>/delete_flow/<int:flow_id>/', views.delete_flow, name='delete_flow'),
+    path('experiment/<int:exp_id>/flow/<int:flow_id>/add_step/', views.add_step, name='add_step'),
     path('update_flow_desc/<int:flow_id>/', views.update_flow_desc, name='update_flow_desc'),
     path('admin/', admin.site.urls),
 ]
