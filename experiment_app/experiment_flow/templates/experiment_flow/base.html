@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experiment App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f7f7f7;
+        }
+        .navbar {
+            background: #222;
+            color: #fff;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .experiment-btn {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1.2rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .experiment-btn:hover {
+            background: #0056b3;
+        }
+        .main-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 260px;
+            background: #fff;
+            border-right: 1px solid #eee;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.2rem;
+        }
+        .add-experiment-btn {
+            background: none;
+            color: #222;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 8px;
+            line-height: 1;
+        }
+        .add-experiment-btn:hover {
+            color: #007bff;
+        }
+        .experiment-card {
+            background: #f0f4ff;
+            border: 1px solid #dbeafe;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            transition: box-shadow 0.2s;
+            position: relative;
+        }
+        .experiment-date {
+            position: absolute;
+            right: 10px;
+            bottom: 8px;
+            font-size: 0.75rem;
+            color: #888;
+        }
+        .experiment-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .container {
+            flex: 1;
+            padding: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div>Experiment App</div>
+        <button onclick="location.href='{% url 'index' %}'" class="experiment-btn">Experiment</button>
+    </div>
+    <div class="main-layout">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h3 style="margin:0;">Experiments</h3>
+                <button onclick="location.href='{% url 'add_experiment' %}'" class="add-experiment-btn" title="Add Experiment">+</button>
+            </div>
+            {% for experiment in experiments %}
+                    <a href="{% url 'experiment_detail' experiment.id %}" class="experiment-card" style="text-decoration:none; color:inherit; display:block;">
+                    <strong>{{ experiment.exp_name }}</strong>
+                    <div class="experiment-date">
+                        {{ experiment.created_at|date:"M d, Y" }}
+                    </div>
+                </a>
+            {% empty %}
+                <p>No experiments found.</p>
+            {% endfor %}
+        </div>
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</body>
+</html>

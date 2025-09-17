@@ -1,0 +1,18 @@
+{% extends "experiment_flow/base.html" %}
+
+{% block content %}
+<div class="main-section">
+    <h2>{{ experiment.exp_name }}</h2>
+    <h3>Process Flows</h3>
+    <ul style="list-style:none; padding:0;">
+        {% for flow in experiment.flow.all %}
+        <li style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:10px; padding:12px;">
+            <strong>{{ flow.name }}</strong><br>
+            <span>{{ flow.description }}</span>
+        </li>
+        {% empty %}
+        <li>No process flows found for this experiment.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

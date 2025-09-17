@@ -1,0 +1,172 @@
+{% extends "experiment_flow/base.html" %}
+
+{% block content %}
+<div class="main-section">
+    <h2>{{ experiment.exp_name }}</h2>
+    <h3>Process Flows</h3>
+    <table style="width:100%; border-collapse:collapse; background:#fff;">
+        <thead>
+            <tr style="background:#f3f4f6;">
+                <th style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:left;">Experiment</th>
+                <th style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:left;">Flow</th>
+                <th style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:left;">Process Flow</th>
+                <th style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:left;">Description</th>
+                <th style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:center; width:40px;">
+                    <button onclick="location.href='{% url 'add_flow' experiment.id %}'" class="add-flow-btn" title="Add">+</button>
+<style>
+    .add-flow-btn {
+        background: none;
+        border: none;
+        font-size: 1.3rem;
+        cursor: pointer;
+        color: #222;
+        padding: 0;
+        margin: 0;
+        line-height: 1;
+        transition: color 0.2s;
+    }
+    .add-flow-btn:hover {
+        color: #007bff;
+    }
+</style>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for flow in experiment.flow.all %}
+            <tr>
+                <td style="padding:10px; border-bottom:1px solid #e5e7eb;">{{ experiment.exp_name }}</td>
+                <td style="padding:10px; border-bottom:1px solid #e5e7eb;">{{ flow.flow_name }}</td>
+                <td style="padding:10px; border-bottom:1px solid #e5e7eb;">{{ experiment.exp_name }}{{ flow.flow_name }}</td>
+                <td style="padding:10px; border-bottom:1px solid #e5e7eb;">
+                    <span class="flow-desc" data-flow-id="{{ flow.id }}">{{ flow.flow_description|default:"Click to add description" }}</span>
+                </td>
+<style>
+    .flow-desc {
+        cursor: pointer;
+        color: #222;
+    }
+    .flow-desc:empty::before {
+        content: "Click to add description";
+        color: #888;
+    }
+</style>
+                <td style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:center;">
+                    <button title="Add" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:#007bff;">+</button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" style="padding:10px; text-align:center; color:#888;">No process flows found for this experiment.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+<script>
+document.querySelectorAll('.flow-desc').forEach(function(span) {
+    span.addEventListener('click', function() {
+        var flowId = this.getAttribute('data-flow-id');
+        var currentDesc = this.textContent;
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentDesc;
+        input.style.width = '90%';
+        this.replaceWith(input);
+        input.focus();
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                var newDesc = input.value;
+                fetch('/update_flow_desc/' + flowId + '/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({description: newDesc})
+                }).then(function(response) {
+                    console.log('Response status:', response.status);
+                    response.json().then(function(data) {
+                        console.log('Response data:', data);
+                        if (response.ok && data.success) {
+                            var newSpan = document.createElement('span');
+                            newSpan.className = 'flow-desc';
+                            newSpan.setAttribute('data-flow-id', flowId);
+                            newSpan.textContent = newDesc;
+                            input.replaceWith(newSpan);
+                            attachFlowDescHandler(newSpan);
+                        } else {
+                            alert('Failed to update description: ' + (data && data.error ? data.error : 'Unknown error'));
+                        }
+                    }).catch(function(err) {
+                        alert('Failed to parse response: ' + err);
+                    });
+                }).catch(function(error) {
+                    alert('Network error: ' + error);
+                });
+            }
+        });
+    });
+
+        function attachFlowDescHandler(span) {
+            span.addEventListener('click', function() {
+                var flowId = this.getAttribute('data-flow-id');
+                var currentDesc = this.textContent;
+                var input = document.createElement('input');
+                input.type = 'text';
+                input.value = currentDesc;
+                input.style.width = '90%';
+                this.replaceWith(input);
+                input.focus();
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        var newDesc = input.value;
+                        fetch('/update_flow_desc/' + flowId + '/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCookie('csrftoken')
+                            },
+                            body: JSON.stringify({description: newDesc})
+                        }).then(function(response) {
+                            console.log('Response status:', response.status);
+                            response.json().then(function(data) {
+                                console.log('Response data:', data);
+                                if (response.ok && data.success) {
+                                    var newSpan = document.createElement('span');
+                                    newSpan.className = 'flow-desc';
+                                    newSpan.setAttribute('data-flow-id', flowId);
+                                    newSpan.textContent = newDesc;
+                                    input.replaceWith(newSpan);
+                                    attachFlowDescHandler(newSpan);
+                                } else {
+                                    alert('Failed to update description: ' + (data && data.error ? data.error : 'Unknown error'));
+                                }
+                            }).catch(function(err) {
+                                alert('Failed to parse response: ' + err);
+                            });
+                        }).catch(function(error) {
+                            alert('Network error: ' + error);
+                        });
+                    }
+                });
+            });
+        }
+
+        document.querySelectorAll('.flow-desc').forEach(attachFlowDescHandler);
+});
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+</div>
+{% endblock %}
