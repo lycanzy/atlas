@@ -1,18 +1,36 @@
 {% extends "experiment_flow/base.html" %}
 
 {% block content %}
+<style>
+/* Style for all icon-like buttons (expand, add, delete) */
+.btn-no-style {
+    background: none !important;
+    border: none !important;
+    padding: 0.25rem 0.5rem;
+    font-size: 1rem;
+    color: #007bff;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.btn-no-style:hover {
+    color: #0056b3;
+    text-decoration: none;
+}
+</style>
+
 <div class="main-section">
     <h2>{{ experiment.exp_name }}</h2>
     <h3>Process Flows</h3>
-    <table style="width:100%; border-collapse:collapse; background:#fff;">
-        <thead>
-            <tr style="background:#f3f4f6;">
-                <th style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:left; width:40px;"></th>
-                <th style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:left;">Experiment</th>
-                <th style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:left;">Flow</th>
-                <th style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:left;">Description</th>
-                <th style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:center; width:80px;">
-                    <button onclick="location.href='{% url 'add_flow' experiment.id %}'" class="add-flow-btn" title="Add Flow">+</button>
+    <table class="table table-striped table-bordered align-middle">
+        <thead class="table-light">
+            <tr>
+                <th style="width:40px;"></th>
+                <th>Experiment</th>
+                <th>Flow</th>
+                <th>Description</th>
+                <th style="width:120px; text-align:center;">
+                    <a href="{% url 'add_flow' experiment.id %}" class="btn-no-style" title="Add Flow">+</a>
                 </th>
             </tr>
         </thead>
@@ -21,47 +39,54 @@
             <!-- Flow row -->
             <tr>
                 <!-- Expand/collapse button -->
-                <td style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:center;">
-                    <button class="expand-btn" data-flow-id="{{ flow.id }}" style="width:20px; height:20px; padding:0; font-size:14px; cursor:pointer;">+</button>
+                <td class="text-center">
+                    <button type="button" class="btn-no-style expand-btn" data-flow-id="{{ flow.id }}">+</button>
                 </td>
-                <td style="padding:5px; border-bottom:1px solid #e5e7eb;">{{ experiment.exp_name }}</td>
-                <td style="padding:5px; border-bottom:1px solid #e5e7eb;">{{ flow.flow_name }}</td>
-                <td style="padding:5px; border-bottom:1px solid #e5e7eb;">
+                <td>{{ experiment.exp_name }}</td>
+                <td>{{ flow.flow_name }}</td>
+                <td>
                     <span class="flow-desc" data-flow-id="{{ flow.id }}">{{ flow.flow_description|default:"Click to add description" }}</span>
                 </td>
-                <td style="padding:5px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:center; gap:5px;">
-                    <button onclick="location.href='{% url 'add_step' experiment.id flow.id %}'" title="Add Step" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:#007bff;">+</button>
-                    <button onclick="location.href='{% url 'delete_flow' experiment.id flow.id %}'" title="Delete Flow" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:#007bff;">-</button>
+                <td class="text-center d-flex justify-content-center gap-1">
+                    <a href="{% url 'add_step' experiment.id flow.id %}" class="btn-no-style" title="Add Step">+</a>
+                    <a href="{% url 'delete_flow' experiment.id flow.id %}" class="btn-no-style" title="Delete Flow">-</a>
                 </td>
             </tr>
 
             <!-- Collapsible row for steps -->
-            <tr id="steps-{{ flow.id }}" style="display:none; background:#f9f9f9;">
-                <td colspan="5" style="padding:10px;">
-                    <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
-                        <thead>
+            <tr id="steps-{{ flow.id }}" class="bg-light" style="display:none;">
+                <td colspan="5" class="p-0">
+                    <table class="table mb-0">
+                        <thead class="table-secondary">
                             <tr>
-                                <th style="padding:5px; border-bottom:1px solid #ccc; text-align:left; width:50%;">Step Name</th>
-                                <th style="padding:5px; border-bottom:1px solid #ccc; text-align:left; width:50%;">Description</th>
-                                <th style="padding:5px; border-bottom:1px solid #ccc; text-align:left; width:50%;"></th>
+                                <th style="width:30%;">Step Name</th>
+                                <th style="width:10%;">Step Num</th>
+                                <th style="width:50%;">Description</th>
+                                <th style="width:5%;"></th>
+                                <th style="width:5%;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for step in flow.step.all %}
                             <tr>
-                                <td style="padding:5px; border-bottom:1px solid #eee; text-align:left;">{{ step.step_name }}</td>
-                                <td style="padding:5px; border-bottom:1px solid #eee; text-align:left;">
+                                <td>{{ step.step_name }}</td>
+                                <td>{{ step.step_num }}</td>
+                                <td>
                                     <span class="step-desc" data-step-id="{{ step.id }}">{{ step.step_description|default:"Click to add description" }}</span>
                                 </td>
-                                <td style="padding:5px; border-bottom:1px solid #eee; text-align:right;">
-                                    <button type="button" class="btn btn-outline-primary btn-sm">
-                                    <i class="bi bi-pencil"></i>
+                                <td class="text-center d-flex justify-content-center gap-1">
+                                    <button type="button" class="btn-no-style edit-step-btn" 
+                                            data-step-id="{{ step.id }}" data-flow-id="{{ flow.id }}" data-exp-id="{{ experiment.id }}">
+                                        <i class="bi bi-pencil"></i>
                                     </button>
+                                    <a href="{% url 'delete_step' experiment.id flow.id step.id %}" class="btn-no-style">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="2" style="padding:8px; color:#888;">No steps yet</td>
+                                <td colspan="5" class="text-muted">No steps yet</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -69,14 +94,31 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" style="padding:10px; text-align:center; color:#888;">No process flows found for this experiment.</td></tr>
+            <tr>
+                <td colspan="5" class="text-center text-muted">No process flows found for this experiment.</td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 
-<!-- JS for expand/collapse and inline editing -->
+<!-- Edit Step Modal -->
+<div class="modal fade" id="editStepModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Experiment Step</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="editStepModalBody">
+                <!-- The edit form will be loaded here dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+// CSRF helper
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -116,7 +158,7 @@ function attachInlineHandler(selector, urlPrefix, dataAttr) {
             const input = document.createElement('input');
             input.type = 'text';
             input.value = currentText;
-            input.style.width = '90%';
+            input.className = 'form-control form-control-sm';
             span.replaceWith(input);
             input.focus();
 
@@ -151,8 +193,28 @@ function attachInlineHandler(selector, urlPrefix, dataAttr) {
     });
 }
 
-// Attach handlers
 attachInlineHandler('.flow-desc', '/update_flow_desc/', 'data-flow-id');
 attachInlineHandler('.step-desc', '/update_step_desc/', 'data-step-id');
+
+// Edit step modal handler
+document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const expId = btn.getAttribute('data-exp-id');
+        const flowId = btn.getAttribute('data-flow-id');
+        const stepId = btn.getAttribute('data-step-id');
+        fetch(`/experiment/${expId}/flow/${flowId}/edit_step/${stepId}/`)
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('editStepModalBody').innerHTML = html;
+                const modal = new bootstrap.Modal(document.getElementById('editStepModal'));
+                modal.show();
+            });
+    });
+});
+
+// Reset modal content when closed
+document.getElementById('editStepModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('editStepModalBody').innerHTML = '';
+});
 </script>
 {% endblock %}

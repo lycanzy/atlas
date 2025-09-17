@@ -1,8 +1,9 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404, render, redirect
 from django.http import HttpResponse
 from .models import Exp, ExpFlow, ExpStep
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
+from .forms import ExpStepForm, ExpFlowForm
 import json
 # Create your views here.
 
@@ -26,13 +27,22 @@ def delete_flow(request, exp_id, flow_id):
 
     return redirect('experiment_detail', exp_id=exp_id)
 
+def delete_step(request, exp_id, flow_id, step_id):
+
+    step = ExpStep.objects.get(id=step_id)
+    step.delete()
+
+    return redirect('experiment_detail', exp_id=exp_id)
+
 def add_experiment(request):
+
     if request.method == 'POST':
         exp_name = request.POST.get('exp_name')
         if exp_name:
             new_exp = Exp(exp_name=exp_name)
             new_exp.save()
             return redirect('index')  # Redirect to the index page after adding
+        
     return render(request, 'experiment_flow/add_experiment.html')
 
 def add_flow(request, exp_id):
@@ -43,7 +53,7 @@ def add_flow(request, exp_id):
             exp = Exp.objects.get(id=exp_id)
             new_flow = ExpFlow(flow_name=flow_name, exp=exp)
             new_flow.save()
-            return redirect('experiment_detail', exp_id=exp_id)
+            return redirect('experiment_flow/experiment_detail', exp_id=exp_id)
         
     experiment = Exp.objects.get(id=exp_id)
 
@@ -64,6 +74,21 @@ def add_step(request, exp_id, flow_id):
 
     return render(request, 'experiment_flow/add_step.html', {'experiment': experiment, 'flow': flow})
 
+def edit_step(request, exp_id, flow_id, step_id):
+
+    step = get_object_or_404(ExpStep, id=step_id)
+    
+    if request.method == 'POST':
+        form = ExpStepForm(request.POST, instance=step)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'errors': form.errors})
+    else:
+        form = ExpStepForm(instance=step)
+    
+    return render(request, 'experiment_flow/edit_step.html', {'form': form})
 
 @csrf_exempt
 def update_flow_desc(request, flow_id):

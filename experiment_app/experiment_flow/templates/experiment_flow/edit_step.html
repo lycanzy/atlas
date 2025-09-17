@@ -1,0 +1,44 @@
+<form method="post" id="expstepEditForm">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" class="btn btn-primary">Save</button>
+</form>
+
+<script>
+document.querySelector("#expstepEditForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    fetch(this.action || window.location.href, {
+        method: "POST",
+        body: new FormData(this),
+        headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": (function() {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i=0; i<cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, "csrftoken".length + 1) === ("csrftoken" + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring("csrftoken".length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            })()
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal
+            var modalEl = document.getElementById('editStepModal');
+            var modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+
+            // Reload the page or update part of the page
+            location.reload();
+        }
+    });
+});
+</script>
