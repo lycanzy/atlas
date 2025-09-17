@@ -7,153 +7,81 @@
     <table style="width:100%; border-collapse:collapse; background:#fff;">
         <thead>
             <tr style="background:#f3f4f6;">
-                <th style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:left;">Experiment</th>
-                <th style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:left;">Flow</th>
-                <th style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:left;">Process Flow</th>
-                <th style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:left;">Description</th>
-                <th style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:center; width:40px;">
-                    <button onclick="location.href='{% url 'add_flow' experiment.id %}'" class="add-flow-btn" title="Add">+</button>
-<style>
-    .add-flow-btn {
-        background: none;
-        border: none;
-        font-size: 1.3rem;
-        cursor: pointer;
-        color: #222;
-        padding: 0;
-        margin: 0;
-        line-height: 1;
-        transition: color 0.2s;
-    }
-    .add-flow-btn:hover {
-        color: #007bff;
-    }
-</style>
+                <th style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:left; width:40px;"></th>
+                <th style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:left;">Experiment</th>
+                <th style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:left;">Flow</th>
+                <th style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:left;">Description</th>
+                <th style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:center; width:80px;">
+                    <button onclick="location.href='{% url 'add_flow' experiment.id %}'" class="add-flow-btn" title="Add Flow">+</button>
                 </th>
             </tr>
         </thead>
         <tbody>
             {% for flow in experiment.flow.all %}
+            <!-- Flow row -->
             <tr>
-                <td style="padding:10px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; gap:5px;">
-                    <!-- Expand/Collapse button -->
-                    <button class="expand-btn" data-flow-id="{{ flow.id }}" style="width:20px; height:20px; padding:0; font-size:14px; cursor:pointer;">></button>
-                    <!-- Experiment name -->
-                    <span>{{ experiment.exp_name }}</span>
+                <!-- Expand/collapse button -->
+                <td style="padding:5px; border-bottom:1px solid #e5e7eb; text-align:center;">
+                    <button class="expand-btn" data-flow-id="{{ flow.id }}" style="width:20px; height:20px; padding:0; font-size:14px; cursor:pointer;">+</button>
                 </td>
-                <td style="padding:10px; border-bottom:1px solid #e5e7eb;">{{ flow.flow_name }}</td>
-                <td style="padding:10px; border-bottom:1px solid #e5e7eb;">{{ experiment.exp_name }}{{ flow.flow_name }}</td>
-                <td style="padding:10px; border-bottom:1px solid #e5e7eb;">
+                <td style="padding:5px; border-bottom:1px solid #e5e7eb;">{{ experiment.exp_name }}</td>
+                <td style="padding:5px; border-bottom:1px solid #e5e7eb;">{{ flow.flow_name }}</td>
+                <td style="padding:5px; border-bottom:1px solid #e5e7eb;">
                     <span class="flow-desc" data-flow-id="{{ flow.id }}">{{ flow.flow_description|default:"Click to add description" }}</span>
                 </td>
-                <td style="padding:10px; border-bottom:1px solid #e5e7eb; text-align:center; display:flex; justify-content:center; gap:5px;">
+                <td style="padding:5px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:center; gap:5px;">
                     <button onclick="location.href='{% url 'add_step' experiment.id flow.id %}'" title="Add Step" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:#007bff;">+</button>
                     <button onclick="location.href='{% url 'delete_flow' experiment.id flow.id %}'" title="Delete Flow" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:#007bff;">-</button>
                 </td>
             </tr>
+
+            <!-- Collapsible row for steps -->
+            <tr id="steps-{{ flow.id }}" style="display:none; background:#f9f9f9;">
+                <td colspan="5" style="padding:10px;">
+                    <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
+                        <thead>
+                            <tr>
+                                <th style="padding:5px; border-bottom:1px solid #ccc; text-align:left; width:50%;">Step Name</th>
+                                <th style="padding:5px; border-bottom:1px solid #ccc; text-align:left; width:50%;">Description</th>
+                                <th style="padding:5px; border-bottom:1px solid #ccc; text-align:left; width:50%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for step in flow.step.all %}
+                            <tr>
+                                <td style="padding:5px; border-bottom:1px solid #eee; text-align:left;">{{ step.step_name }}</td>
+                                <td style="padding:5px; border-bottom:1px solid #eee; text-align:left;">
+                                    <span class="step-desc" data-step-id="{{ step.id }}">{{ step.step_description|default:"Click to add description" }}</span>
+                                </td>
+                                <td style="padding:5px; border-bottom:1px solid #eee; text-align:right;">
+                                    <button type="button" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-pencil"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="2" style="padding:8px; color:#888;">No steps yet</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
             {% empty %}
-            <tr><td colspan="4" style="padding:10px; text-align:center; color:#888;">No process flows found for this experiment.</td></tr>
+            <tr><td colspan="5" style="padding:10px; text-align:center; color:#888;">No process flows found for this experiment.</td></tr>
             {% endfor %}
         </tbody>
     </table>
+</div>
+
+<!-- JS for expand/collapse and inline editing -->
 <script>
-document.querySelectorAll('.flow-desc').forEach(function(span) {
-    span.addEventListener('click', function() {
-        var flowId = this.getAttribute('data-flow-id');
-        var currentDesc = this.textContent;
-        var input = document.createElement('input');
-        input.type = 'text';
-        input.value = currentDesc;
-        input.style.width = '90%';
-        this.replaceWith(input);
-        input.focus();
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                var newDesc = input.value;
-                fetch('/update_flow_desc/' + flowId + '/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({description: newDesc})
-                }).then(function(response) {
-                    console.log('Response status:', response.status);
-                    response.json().then(function(data) {
-                        console.log('Response data:', data);
-                        if (response.ok && data.success) {
-                            var newSpan = document.createElement('span');
-                            newSpan.className = 'flow-desc';
-                            newSpan.setAttribute('data-flow-id', flowId);
-                            newSpan.textContent = newDesc;
-                            input.replaceWith(newSpan);
-                            attachFlowDescHandler(newSpan);
-                        } else {
-                            alert('Failed to update description: ' + (data && data.error ? data.error : 'Unknown error'));
-                        }
-                    }).catch(function(err) {
-                        alert('Failed to parse response: ' + err);
-                    });
-                }).catch(function(error) {
-                    alert('Network error: ' + error);
-                });
-            }
-        });
-    });
-
-        function attachFlowDescHandler(span) {
-            span.addEventListener('click', function() {
-                var flowId = this.getAttribute('data-flow-id');
-                var currentDesc = this.textContent;
-                var input = document.createElement('input');
-                input.type = 'text';
-                input.value = currentDesc;
-                input.style.width = '90%';
-                this.replaceWith(input);
-                input.focus();
-                input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') {
-                        var newDesc = input.value;
-                        fetch('/update_flow_desc/' + flowId + '/', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': getCookie('csrftoken')
-                            },
-                            body: JSON.stringify({description: newDesc})
-                        }).then(function(response) {
-                            console.log('Response status:', response.status);
-                            response.json().then(function(data) {
-                                console.log('Response data:', data);
-                                if (response.ok && data.success) {
-                                    var newSpan = document.createElement('span');
-                                    newSpan.className = 'flow-desc';
-                                    newSpan.setAttribute('data-flow-id', flowId);
-                                    newSpan.textContent = newDesc;
-                                    input.replaceWith(newSpan);
-                                    attachFlowDescHandler(newSpan);
-                                } else {
-                                    alert('Failed to update description: ' + (data && data.error ? data.error : 'Unknown error'));
-                                }
-                            }).catch(function(err) {
-                                alert('Failed to parse response: ' + err);
-                            });
-                        }).catch(function(error) {
-                            alert('Network error: ' + error);
-                        });
-                    }
-                });
-            });
-        }
-
-        document.querySelectorAll('.flow-desc').forEach(attachFlowDescHandler);
-});
-
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
         const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
+        for (let i=0; i<cookies.length; i++) {
             const cookie = cookies[i].trim();
             if (cookie.substring(0, name.length + 1) === (name + '=')) {
                 cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
@@ -163,6 +91,68 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// Expand/collapse flows
+document.querySelectorAll('.expand-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const flowId = btn.getAttribute('data-flow-id');
+        const row = document.getElementById('steps-' + flowId);
+        if (row.style.display === 'none') {
+            row.style.display = '';
+            btn.textContent = '−';
+        } else {
+            row.style.display = 'none';
+            btn.textContent = '+';
+        }
+    });
+});
+
+// Inline editing helper
+function attachInlineHandler(selector, urlPrefix, dataAttr) {
+    document.querySelectorAll(selector).forEach(function(span) {
+        span.addEventListener('click', function() {
+            const id = span.getAttribute(dataAttr);
+            const currentText = span.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentText;
+            input.style.width = '90%';
+            span.replaceWith(input);
+            input.focus();
+
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const newValue = input.value;
+                    fetch(urlPrefix + id + '/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken')
+                        },
+                        body: JSON.stringify({description: newValue})
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            const newSpan = document.createElement('span');
+                            newSpan.className = span.className;
+                            newSpan.setAttribute(dataAttr, id);
+                            newSpan.textContent = newValue;
+                            input.replaceWith(newSpan);
+                            attachInlineHandler('.' + span.className, urlPrefix, dataAttr);
+                        } else {
+                            alert('Failed to update: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(err => alert('Network error: ' + err));
+                }
+            });
+        });
+    });
+}
+
+// Attach handlers
+attachInlineHandler('.flow-desc', '/update_flow_desc/', 'data-flow-id');
+attachInlineHandler('.step-desc', '/update_step_desc/', 'data-step-id');
 </script>
-</div>
 {% endblock %}

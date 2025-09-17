@@ -79,3 +79,16 @@ def update_flow_desc(request, flow_id):
             return JsonResponse({'success': False}, status=404)
     return JsonResponse({'success': False}, status=400)
 
+@csrf_exempt
+def update_step_desc(request, step_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            step = ExpStep.objects.get(id=step_id)
+            step.step_description = data.get('description', '')
+            step.save()
+            return JsonResponse({'success': True})
+        except ExpStep.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Step not found'})
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
