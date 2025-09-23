@@ -46,12 +46,36 @@
             transition: box-shadow 0.2s;
             position: relative;
         }
+        .experiment-heading {
+            color: #1a56db;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+        .experiment-description {
+            color: #4b5563;
+            font-size: 0.8rem;
+            margin: 0.25rem 0;
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
         .experiment-date {
             position: absolute;
             right: 10px;
-            bottom: 8px;
+            top: 8px;
             font-size: 0.75rem;
             color: #888;
+        }
+        .project-name {
+            color: #6b7280;
+            font-size: 0.7rem;
+            margin-top: 0.25rem;
+            display: block;
         }
         .experiment-card:hover {
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -68,9 +92,14 @@
 <body>
     <div class="navbar">
         <div>Experiment App</div>
-        <!-- Bootstrap primary button -->
-        <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Experiment</button>
+        <!-- Bootstrap primary buttons with right alignment -->
+        <div class="ms-auto d-flex gap-2">
+            <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Experiment</button>
+            <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Physical Characterization</button>
+            <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Electrical Tests</button>
+        </div>
     </div>
+    
     <div class="main-layout">
         <div class="sidebar">
             <div class="sidebar-header">
@@ -82,7 +111,24 @@
                     <i class="bi bi-plus-lg"></i>
                 </button>
             </div>
+            {% if experiments %}
             {% for experiment in experiments %}
+                <a href="{% url 'experiment_detail' experiment.id %}" 
+                   class="experiment-card" 
+                   style="text-decoration:none; color:inherit; display:block;">
+                    <span class="experiment-heading">{{ experiment.exp_name }}</span>
+                    <div class="experiment-date">
+                        {{ experiment.created_on|date:"M d, Y" }}
+                    </div>
+                    {% if experiment.exp_description %}
+                    <span class="experiment-description">{{ experiment.exp_description }}</span>
+                    {% endif %}
+                    <span class="project-name">{{ experiment.project.project_name }}</span>
+                </a>
+            {% empty %}
+                <p>No experiments found.</p>
+            {% endfor %}
+            {% elif experiment %}
                 <a href="{% url 'experiment_detail' experiment.id %}" 
                    class="experiment-card" 
                    style="text-decoration:none; color:inherit; display:block;">
@@ -91,9 +137,7 @@
                         {{ experiment.created_at|date:"M d, Y" }}
                     </div>
                 </a>
-            {% empty %}
-                <p>No experiments found.</p>
-            {% endfor %}
+            {% endif %}
         </div>
         <div class="container">
             {% block content %}{% endblock %}

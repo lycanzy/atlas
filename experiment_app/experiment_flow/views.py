@@ -1,10 +1,11 @@
 from django.shortcuts import get_object_or_404, render, redirect
-from django.http import HttpResponse
-from .models import Exp, ExpFlow, ExpStep
+from django.http import HttpResponse, JsonResponse
+from django.core.exceptions import ValidationError
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+from .models import Exp, ExpFlow, ExpStep, Project
 from .forms import ExpStepForm, ExpFlowForm
 import json
+
 # Create your views here.
 
 def index(request):
@@ -16,8 +17,9 @@ def index(request):
 def experiment_detail(request, exp_id):
     
     experiment = Exp.objects.get(id=exp_id)
+    flows = ExpFlow.objects.filter(exp=experiment).order_by('created_on')
     
-    return render(request, 'experiment_flow/experiment_detail.html', {'experiment': experiment}) 
+    return render(request, 'experiment_flow/experiment_detail.html', {'experiment': experiment, 'flows': flows}) 
 
 def delete_flow(request, exp_id, flow_id):
 
@@ -35,29 +37,50 @@ def delete_step(request, exp_id, flow_id, step_id):
     return redirect('experiment_detail', exp_id=exp_id)
 
 def add_experiment(request):
+    projects = Project.objects.all().order_by('project_name')
 
     if request.method == 'POST':
-        exp_name = request.POST.get('exp_name')
-        if exp_name:
-            new_exp = Exp(exp_name=exp_name)
-            new_exp.save()
-            return redirect('index')  # Redirect to the index page after adding
+        project_id = request.POST.get('project')
+        if project_id:
+            try:
+                project = Project.objects.get(id=project_id)
+                exp_name = project.generate_experiment_name()
+                new_exp = Exp(exp_name=exp_name, project=project)
+                new_exp.save()
+                return redirect('index')
+            except Project.DoesNotExist:
+                return render(request, 'experiment_flow/add_experiment.html', {
+                    'projects': projects,
+                    'error': 'Selected project not found.'
+                })
+            except ValidationError as e:
+                return render(request, 'experiment_flow/add_experiment.html', {
+                    'projects': projects,
+                    'error': str(e)
+                })
         
-    return render(request, 'experiment_flow/add_experiment.html')
+    return render(request, 'experiment_flow/add_experiment.html', {'projects': projects})
 
 def add_flow(request, exp_id):
-    
-    if request.method == 'POST':
-        flow_name = request.POST.get('flow_name')
-        if flow_name:
-            exp = Exp.objects.get(id=exp_id)
-            new_flow = ExpFlow(flow_name=flow_name, exp=exp)
-            new_flow.save()
-            return redirect('experiment_flow/experiment_detail', exp_id=exp_id)
+    try:
+        experiment = get_object_or_404(Exp, id=exp_id)
         
-    experiment = Exp.objects.get(id=exp_id)
-
-    return render(request, 'experiment_flow/add_flow.html', {'experiment': experiment})
+        if request.method == 'POST':
+            flow_name = request.POST.get('flow_name')
+            if flow_name:
+                try:
+                    new_flow = ExpFlow(flow_name=flow_name, exp=experiment)
+                    new_flow.save()
+                    return redirect('experiment_detail', exp_id=exp_id)
+                except ValidationError as e:
+                    return render(request, 'experiment_flow/add_flow.html', {
+                        'experiment': experiment,
+                        'error': str(e)
+                    })
+        
+        return render(request, 'experiment_flow/add_flow.html', {'experiment': experiment})
+    except Exp.DoesNotExist:
+        return HttpResponse('Experiment not found', status=404)
 
 def add_step(request, exp_id, flow_id):
     
