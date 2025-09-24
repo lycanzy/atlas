@@ -1,4 +1,4 @@
-<form method="post" id="expstepEditForm">
+<form method="post" id="expstepEditForm" action="{% url 'edit_step' step.flow.exp.id step.flow.id step.id %}">
   {% csrf_token %}
   {{ form.as_p }}
   <button type="submit" class="btn btn-primary">Save</button>

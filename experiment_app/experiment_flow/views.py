@@ -98,20 +98,44 @@ def add_step(request, exp_id, flow_id):
     return render(request, 'experiment_flow/add_step.html', {'experiment': experiment, 'flow': flow})
 
 def edit_step(request, exp_id, flow_id, step_id):
-
-    step = get_object_or_404(ExpStep, id=step_id)
+    step = get_object_or_404(ExpStep, id=step_id, flow_id=flow_id)
+    flow = get_object_or_404(ExpFlow, id=flow_id)
     
     if request.method == 'POST':
-        form = ExpStepForm(request.POST, instance=step)
+        form = ExpStepForm(request.POST, instance=step, flow=flow)
         if form.is_valid():
-            form.save()
-            return JsonResponse({'success': True})
+            step = form.save(commit=False)
+            # Ensure the step is associated with the correct flow
+            step.flow = flow
+            step.save()
+            
+            # Return JSON response for AJAX requests
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'redirect_url': f'/experiment/{exp_id}/?expanded_flow={flow_id}'
+                })
+            # Regular form submission redirect
+            return redirect(f'/experiment/{exp_id}/?expanded_flow={flow_id}')
         else:
-            return JsonResponse({'success': False, 'errors': form.errors})
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'errors': form.errors
+                })
+            # If not AJAX, re-render the form with errors
     else:
-        form = ExpStepForm(instance=step)
+        form = ExpStepForm(instance=step, flow=flow)
     
-    return render(request, 'experiment_flow/edit_step.html', {'form': form})
+    return render(
+        request,
+        'experiment_flow/edit_step.html',
+        {
+            'form': form,
+            'step': step,
+            'flow': flow,
+        }
+    )
 
 @csrf_exempt
 def update_flow_desc(request, flow_id):
