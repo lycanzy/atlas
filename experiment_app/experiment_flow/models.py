@@ -12,7 +12,7 @@ class ResearchGroup(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.group_name
+        return str(self.group_name) if self.group_name else "Unnamed Group"
 
 class Project(models.Model):
     
@@ -41,7 +41,11 @@ class Project(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.project_name} ({self.project_code})"
+        if self.project_name:
+            if self.project_code:
+                return f"{self.project_name} ({self.project_code})"
+            return str(self.project_name)
+        return "Unnamed Project"
 
 class Exp(models.Model):
 
@@ -51,7 +55,7 @@ class Exp(models.Model):
     project = models.ForeignKey(Project, on_delete = models.CASCADE, related_name = 'experiment', null = True)
 
     def __str__(self):
-        return self.exp_name
+        return str(self.exp_name) if self.exp_name else "Unnamed Experiment"
     
 class ExpFlow(models.Model):
 
@@ -79,7 +83,11 @@ class ExpFlow(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.full_flow
+        if self.full_flow:
+            return str(self.full_flow)
+        if self.flow_name:
+            return str(self.flow_name)
+        return "Unnamed Flow"
     
     @property
     def flow(self):
@@ -163,7 +171,11 @@ class ExpStep(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.full_step_name
+        if hasattr(self, 'full_step') and self.full_step:
+            return str(self.full_step)
+        if self.step_name:
+            return f"{self.step_name}{self.step_number or '00'}"
+        return "Unnamed Step"
 
 # Signal to update ExpFlow.full_flow when Exp name changes
 @receiver(post_save, sender=Exp)
