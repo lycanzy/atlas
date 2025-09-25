@@ -17,6 +17,76 @@
     color: #0056b3;
     text-decoration: none;
 }
+
+/* Compact table headers for both flow and step tables */
+.table thead th {
+    font-size: 0.85rem !important;
+    padding: 0.5rem !important;
+    font-weight: 600 !important;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Make the table header background lighter */
+.table-light, .table-secondary {
+    --bs-table-bg: rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Adjust cell padding for more compact look */
+.table td {
+    padding: 0.5rem !important;
+    vertical-align: middle;
+}
+
+/* Make nested table more compact */
+.steps-row .table {
+    margin-bottom: 0;
+}
+
+.steps-row .table thead th {
+    font-size: 0.8rem !important;
+    padding: 0.4rem 0.5rem !important;
+}
+
+/* Add subtle border between header and content */
+.table thead {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Compact table headers for both flow and step tables */
+.table thead th {
+    font-size: 0.85rem;
+    padding: 0.5rem;
+    font-weight: 600;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Make the table header background lighter */
+.table-light, .table-secondary {
+    --bs-table-bg: rgba(0, 0, 0, 0.02);
+}
+
+/* Adjust cell padding for more compact look */
+.table td {
+    padding: 0.5rem;
+    vertical-align: middle;
+}
+
+/* Make nested table more compact */
+#steps-{{ flow.id }} .table {
+    margin-bottom: 0;
+}
+
+#steps-{{ flow.id }} .table thead th {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.5rem;
+}
+
+/* Add subtle border between header and content */
+.table thead {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
 </style>
 
 <div class="main-section">
@@ -54,7 +124,7 @@
             </tr>
 
             <!-- Collapsible row for steps -->
-            <tr id="steps-{{ flow.id }}" class="bg-light" style="display:none;">
+            <tr id="steps-{{ flow.id }}" class="bg-light steps-row" style="display:none;">
                 <td colspan="5" class="p-0">
                     <table class="table mb-0">
                         <thead class="table-secondary">

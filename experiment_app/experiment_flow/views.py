@@ -45,7 +45,12 @@ def add_experiment(request):
             try:
                 project = Project.objects.get(id=project_id)
                 exp_name = project.generate_experiment_name()
-                new_exp = Exp(exp_name=exp_name, project=project)
+                exp_description = request.POST.get('exp_description')
+                new_exp = Exp(
+                    exp_name=exp_name,
+                    project=project,
+                    exp_description=exp_description
+                )
                 new_exp.save()
                 return redirect('index')
             except Project.DoesNotExist:

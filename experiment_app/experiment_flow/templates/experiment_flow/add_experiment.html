@@ -18,6 +18,11 @@
             {% endfor %}
         </select>
     </div>
+    <div style="margin-bottom: 1rem;">
+        <label for="exp_description" style="display:block; margin-bottom:0.5rem;">Experiment Description:</label>
+        <textarea id="exp_description" name="exp_description" class="form-control" rows="3" 
+                  placeholder="Enter experiment description"></textarea>
+    </div>
     <button type="submit" class="btn btn-primary">Create Experiment</button>
 </form>
 {% endblock %}

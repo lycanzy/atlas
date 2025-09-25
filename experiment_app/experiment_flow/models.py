@@ -177,6 +177,15 @@ class ExpStep(models.Model):
             return f"{self.step_name}{self.step_number or '00'}"
         return "Unnamed Step"
 
+class Sample(models.Model):
+
+    sample_name = models.CharField(max_length = 50)
+    created_on = models.DateTimeField(auto_now_add=True)
+    flow = models.ForeignKey(ExpStep, on_delete = models.CASCADE, related_name = 'sample', null = True)
+
+    def __str__(self):
+        return str(self.sample_name) if self.sample_name else "Unnamed Sample"
+
 # Signal to update ExpFlow.full_flow when Exp name changes
 @receiver(post_save, sender=Exp)
 def update_flow_identifiers(sender, instance, **kwargs):
