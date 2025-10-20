@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup
+from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Sample, StepNameTemplate
 
 # Base admin class with custom CSS
 class BaseModelAdmin(admin.ModelAdmin):
@@ -28,3 +28,27 @@ class ProjectAdmin(BaseModelAdmin):
 @admin.register(ResearchGroup)
 class ResearchGroupAdmin(BaseModelAdmin):
     list_display = ("group_name", "created_on")
+
+@admin.register(Sample)
+class SampleAdmin(BaseModelAdmin):
+    list_display = ("sample_name", "flow", "created_on")
+    readonly_fields = ("created_on",)
+
+@admin.register(StepNameTemplate)
+class StepNameTemplateAdmin(BaseModelAdmin):
+    list_display = ("step_code", "step_label", "category", "is_active", "created_on")
+    list_filter = ("is_active", "category")
+    search_fields = ("step_code", "step_label", "category")
+    readonly_fields = ("created_on",)
+    fieldsets = (
+        ('Step Information', {
+            'fields': ('step_code', 'step_label', 'category', 'is_active')
+        }),
+        ('Template Details', {
+            'fields': ('default_description',)
+        }),
+        ('Metadata', {
+            'fields': ('created_on',),
+            'classes': ('collapse',)
+        }),
+    )

@@ -80,9 +80,104 @@
         .experiment-card:hover {
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
+        .experiment-card.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        .experiment-card.active .experiment-heading {
+            color: #ffffff;
+            font-weight: 700;
+        }
+        .experiment-card.active .experiment-description {
+            color: #f0f0f0;
+        }
+        .experiment-card.active .experiment-date {
+            color: #e0e0e0;
+        }
+        .experiment-card.active .project-name {
+            color: #e8e8e8;
+        }
         .container {
             flex: 1;
             padding: 2rem;
+        }
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+        .pagination-controls button {
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .pagination-controls button:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        .pagination-controls button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .pagination-controls span {
+            font-size: 0.8rem;
+            color: #666;
+        }
+        .search-container {
+            margin-bottom: 1rem;
+            position: relative;
+        }
+        .search-input {
+            width: 100%;
+            padding: 0.5rem 2rem 0.5rem 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        .search-icon {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            pointer-events: none;
+        }
+        .clear-search {
+            position: absolute;
+            right: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            padding: 0.25rem;
+            font-size: 1rem;
+            display: none;
+        }
+        .clear-search:hover {
+            color: #333;
+        }
+        .search-input:not(:placeholder-shown) ~ .clear-search {
+            display: block;
+        }
+        .search-input:not(:placeholder-shown) ~ .search-icon {
+            display: none;
         }
     </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
@@ -111,23 +206,120 @@
                     <i class="bi bi-plus-lg"></i>
                 </button>
             </div>
+            
+            <!-- Search Bar -->
+            <div class="search-container">
+                <form method="get" action="" id="searchForm">
+                    <input 
+                        type="text" 
+                        name="search" 
+                        class="search-input" 
+                        placeholder="Search experiments..." 
+                        value="{{ search_query|default:'' }}"
+                        id="searchInput">
+                    <button type="button" class="clear-search" onclick="clearSearch()" title="Clear search">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </button>
+                    <i class="bi bi-search search-icon"></i>
+                </form>
+            </div>
+            
             {% if experiments %}
-            {% for experiment in experiments %}
-                <a href="{% url 'experiment_detail' experiment.id %}" 
-                   class="experiment-card" 
+            {% for exp in experiments %}
+                <a href="{% url 'experiment_detail' exp.id %}?page={{ page_obj.number|default:1 }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                   class="experiment-card{% if experiment.id == exp.id %} active{% endif %}" 
                    style="text-decoration:none; color:inherit; display:block;">
-                    <span class="experiment-heading">{{ experiment.exp_name }}</span>
+                    <span class="experiment-heading">{{ exp.exp_name }}</span>
                     <div class="experiment-date">
-                        {{ experiment.created_on|date:"M d, Y" }}
+                        {{ exp.created_on|date:"M d, Y" }}
                     </div>
-                    {% if experiment.exp_description %}
-                    <span class="experiment-description">{{ experiment.exp_description }}</span>
+                    {% if exp.exp_description %}
+                    <span class="experiment-description">{{ exp.exp_description }}</span>
                     {% endif %}
-                    <span class="project-name">{{ experiment.project.project_name }}</span>
+                    <span class="project-name">{{ exp.project.project_name }}</span>
                 </a>
             {% empty %}
                 <p>No experiments found.</p>
             {% endfor %}
+            
+            <!-- Pagination Controls -->
+            {% if page_obj %}
+            <div class="pagination-controls">
+                {% if page_obj.has_previous %}
+                    <button onclick="navigateToPage(1)" title="First page">«</button>
+                    <button onclick="navigateToPage({{ page_obj.previous_page_number }})" title="Previous page">‹</button>
+                {% else %}
+                    <button disabled>«</button>
+                    <button disabled>‹</button>
+                {% endif %}
+                
+                <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                
+                {% if page_obj.has_next %}
+                    <button onclick="navigateToPage({{ page_obj.next_page_number }})" title="Next page">›</button>
+                    <button onclick="navigateToPage({{ page_obj.paginator.num_pages }})" title="Last page">»</button>
+                {% else %}
+                    <button disabled>›</button>
+                    <button disabled>»</button>
+                {% endif %}
+            </div>
+            <script>
+                function navigateToPage(page) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('page', page);
+                    window.location.href = url.toString();
+                }
+                
+                function clearSearch() {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('search');
+                    url.searchParams.set('page', '1');
+                    window.location.href = url.toString();
+                }
+                
+                // Auto-submit search form on input with debounce
+                let searchTimeout;
+                const searchInput = document.getElementById('searchInput');
+                const searchForm = document.getElementById('searchForm');
+                
+                if (searchInput && searchForm) {
+                    searchInput.addEventListener('input', function() {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(function() {
+                            const url = new URL(window.location.href);
+                            const searchValue = searchInput.value.trim();
+                            
+                            if (searchValue) {
+                                url.searchParams.set('search', searchValue);
+                            } else {
+                                url.searchParams.delete('search');
+                            }
+                            url.searchParams.set('page', '1');
+                            window.location.href = url.toString();
+                        }, 500); // 500ms debounce
+                    });
+                    
+                    // Handle Enter key
+                    searchInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            clearTimeout(searchTimeout);
+                            const url = new URL(window.location.href);
+                            const searchValue = searchInput.value.trim();
+                            
+                            if (searchValue) {
+                                url.searchParams.set('search', searchValue);
+                            } else {
+                                url.searchParams.delete('search');
+                            }
+                            url.searchParams.set('page', '1');
+                            window.location.href = url.toString();
+                        }
+                    });
+                }
+            </script>
+            {% endif %}
+            
             {% elif experiment %}
                 <a href="{% url 'experiment_detail' experiment.id %}" 
                    class="experiment-card" 

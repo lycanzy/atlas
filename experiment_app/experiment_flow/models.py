@@ -177,6 +177,35 @@ class ExpStep(models.Model):
             return f"{self.step_name}{self.step_number or '00'}"
         return "Unnamed Step"
 
+class StepNameTemplate(models.Model):
+    """Predefined step name templates that can be selected when adding/editing steps"""
+    
+    step_code = models.CharField(max_length=2, unique=True, help_text="Two-letter code (e.g., AA, BB, CV)")
+    step_label = models.CharField(max_length=100, help_text="Descriptive name (e.g., Cleaning, Deposition)")
+    category = models.CharField(max_length=50, blank=True, null=True, help_text="Category for grouping (e.g., Preparation, Lithography)")
+    default_description = models.TextField(blank=True, null=True, help_text="Default description template for this step")
+    is_active = models.BooleanField(default=True, help_text="Whether this step template is available for selection")
+    created_on = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['category', 'step_code']
+        verbose_name = "Step Name Template"
+        verbose_name_plural = "Step Name Templates"
+    
+    def clean(self):
+        if self.step_code:
+            # Ensure step code is exactly 2 uppercase letters
+            if not (len(self.step_code) == 2 and self.step_code.isalpha()):
+                raise ValidationError('Step code must be exactly 2 letters.')
+            self.step_code = self.step_code.upper()
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.step_code} - {self.step_label}" if self.step_label else self.step_code
+
 class Sample(models.Model):
 
     sample_name = models.CharField(max_length = 50)

@@ -18,6 +18,20 @@
     text-decoration: none;
 }
 
+/* Expand/collapse button styling */
+.expand-btn {
+    transition: transform 0.2s ease;
+}
+
+.expand-btn i {
+    transition: transform 0.2s ease;
+    display: inline-block;
+}
+
+.expand-btn:hover {
+    transform: scale(1.2);
+}
+
 /* Compact table headers for both flow and step tables */
 .table thead th {
     font-size: 0.85rem !important;
@@ -87,6 +101,113 @@
 .table thead {
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
+
+/* Inline edit container */
+.inline-edit-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.inline-edit-input {
+    flex: 1;
+}
+
+.inline-save-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.inline-save-btn:hover {
+    background: #218838;
+}
+
+.inline-save-btn i {
+    font-size: 1rem;
+}
+
+/* Add Flow Dropdown Styles */
+.add-flow-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.add-flow-btn {
+    background: none !important;
+    border: none !important;
+    padding: 0.25rem 0.5rem;
+    font-size: 1rem;
+    color: #007bff;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.add-flow-btn:hover {
+    color: #0056b3;
+}
+
+.flow-dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+    min-width: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.flow-dropdown-menu.show {
+    display: block;
+}
+
+.flow-dropdown-item {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.flow-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.flow-dropdown-item:hover {
+    background: #f8f9fa;
+}
+
+.flow-dropdown-search {
+    padding: 0.5rem;
+    border-bottom: 1px solid #ddd;
+    position: sticky;
+    top: 0;
+    background: white;
+}
+
+.flow-dropdown-search input {
+    width: 100%;
+    padding: 0.4rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.no-available-codes {
+    padding: 1rem;
+    text-align: center;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
 </style>
 
 <div class="main-section">
@@ -100,7 +221,23 @@
                 <th>Flow</th>
                 <th>Description</th>
                 <th style="width:120px; text-align:center;">
-                    <a href="{% url 'add_flow' experiment.id %}" class="btn-no-style" title="Add Flow">+</a>
+                    <div class="add-flow-dropdown">
+                        <button class="add-flow-btn" id="addFlowBtn" title="Add Flow">+</button>
+                        <div class="flow-dropdown-menu" id="flowDropdownMenu">
+                            <div class="flow-dropdown-search">
+                                <input type="text" id="flowCodeSearch" placeholder="Search flow codes...">
+                            </div>
+                            {% if available_flow_codes %}
+                                <div id="flowCodeList">
+                                    {% for code in available_flow_codes %}
+                                        <div class="flow-dropdown-item" data-code="{{ code }}">{{ code }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="no-available-codes">All flow codes have been used</div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </th>
             </tr>
         </thead>
@@ -110,7 +247,9 @@
             <tr>
                 <!-- Expand/collapse button -->
                 <td class="text-center">
-                    <button type="button" class="btn-no-style expand-btn" data-flow-id="{{ flow.id }}">+</button>
+                    <button type="button" class="btn-no-style expand-btn" data-flow-id="{{ flow.id }}">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
                 </td>
                 <td>{{ experiment.exp_name }}</td>
                 <td>{{ flow.full_flow }}</td>
@@ -118,7 +257,10 @@
                     <span class="flow-desc" data-flow-id="{{ flow.id }}">{{ flow.flow_description|default:"Click to add description" }}</span>
                 </td>
                 <td class="text-center d-flex justify-content-center gap-1">
-                    <a href="{% url 'add_step' experiment.id flow.id %}" class="btn-no-style" title="Add Step">+</a>
+                    <button type="button" class="btn-no-style add-step-btn" 
+                            data-exp-id="{{ experiment.id }}" 
+                            data-flow-id="{{ flow.id }}" 
+                            title="Add Step">+</button>
                     <a href="{% url 'delete_flow' experiment.id flow.id %}" class="btn-no-style" title="Delete Flow">-</a>
                 </td>
             </tr>
@@ -174,14 +316,45 @@
 
 <!-- Edit Step Modal -->
 <div class="modal fade" id="editStepModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Experiment Step</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil-square me-2"></i>Edit Experiment Step
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="editStepModalBody">
                 <!-- The edit form will be loaded here dynamically -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Loading form...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Step Modal -->
+<div class="modal fade" id="addStepModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-square me-2"></i>Add New Experiment Step
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="addStepModalBody">
+                <!-- The add form will be loaded here dynamically -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-success" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Loading form...</p>
+                </div>
             </div>
         </div>
     </div>
@@ -209,12 +382,14 @@ document.querySelectorAll('.expand-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
         const flowId = btn.getAttribute('data-flow-id');
         const row = document.getElementById('steps-' + flowId);
+        const icon = btn.querySelector('i');
+        
         if (row.style.display === 'none') {
             row.style.display = '';
-            btn.textContent = '−';
+            icon.className = 'bi bi-chevron-down';
         } else {
             row.style.display = 'none';
-            btn.textContent = '+';
+            icon.className = 'bi bi-chevron-right';
         }
     });
 });
@@ -225,39 +400,68 @@ function attachInlineHandler(selector, urlPrefix, dataAttr) {
         span.addEventListener('click', function() {
             const id = span.getAttribute(dataAttr);
             const currentText = span.textContent;
+            const originalClassName = span.className;
+            
+            // Create container for input and button
+            const container = document.createElement('div');
+            container.className = 'inline-edit-container';
+            
+            // Create input
             const input = document.createElement('input');
             input.type = 'text';
             input.value = currentText;
-            input.className = 'form-control form-control-sm';
-            span.replaceWith(input);
+            input.className = 'form-control form-control-sm inline-edit-input';
+            
+            // Create save button
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'inline-save-btn';
+            saveBtn.innerHTML = '<i class="bi bi-check-lg"></i>';
+            saveBtn.title = 'Save';
+            
+            container.appendChild(input);
+            container.appendChild(saveBtn);
+            span.replaceWith(container);
             input.focus();
 
+            // Function to save the description
+            function saveDescription() {
+                const newValue = input.value;
+                fetch(urlPrefix + id + '/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({description: newValue})
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const newSpan = document.createElement('span');
+                        newSpan.className = originalClassName;
+                        newSpan.setAttribute(dataAttr, id);
+                        newSpan.textContent = newValue || 'Click to add description';
+                        container.replaceWith(newSpan);
+                        attachInlineHandler('.' + originalClassName.split(' ')[0], urlPrefix, dataAttr);
+                    } else {
+                        alert('Failed to update: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => alert('Network error: ' + err));
+            }
+
+            // Save on Enter key
             input.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
-                    const newValue = input.value;
-                    fetch(urlPrefix + id + '/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCookie('csrftoken')
-                        },
-                        body: JSON.stringify({description: newValue})
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            const newSpan = document.createElement('span');
-                            newSpan.className = span.className;
-                            newSpan.setAttribute(dataAttr, id);
-                            newSpan.textContent = newValue;
-                            input.replaceWith(newSpan);
-                            attachInlineHandler('.' + span.className, urlPrefix, dataAttr);
-                        } else {
-                            alert('Failed to update: ' + (data.error || 'Unknown error'));
-                        }
-                    })
-                    .catch(err => alert('Network error: ' + err));
+                    e.preventDefault();
+                    saveDescription();
                 }
+            });
+
+            // Save on button click
+            saveBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                saveDescription();
             });
         });
     });
@@ -286,5 +490,102 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
 document.getElementById('editStepModal').addEventListener('hidden.bs.modal', function () {
     document.getElementById('editStepModalBody').innerHTML = '';
 });
+
+// Add step modal handler
+document.querySelectorAll('.add-step-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const expId = btn.getAttribute('data-exp-id');
+        const flowId = btn.getAttribute('data-flow-id');
+        fetch(`/experiment/${expId}/flow/${flowId}/add_step/`)
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('addStepModalBody').innerHTML = html;
+                const modal = new bootstrap.Modal(document.getElementById('addStepModal'));
+                modal.show();
+            });
+    });
+});
+
+// Reset add step modal content when closed
+document.getElementById('addStepModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('addStepModalBody').innerHTML = '';
+});
+
+// Add Flow Dropdown functionality
+const addFlowBtn = document.getElementById('addFlowBtn');
+const flowDropdownMenu = document.getElementById('flowDropdownMenu');
+const flowCodeSearch = document.getElementById('flowCodeSearch');
+const flowCodeList = document.getElementById('flowCodeList');
+
+// Toggle dropdown
+if (addFlowBtn) {
+    addFlowBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        flowDropdownMenu.classList.toggle('show');
+        if (flowDropdownMenu.classList.contains('show')) {
+            flowCodeSearch.focus();
+        }
+    });
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (flowDropdownMenu && !flowDropdownMenu.contains(e.target) && e.target !== addFlowBtn) {
+        flowDropdownMenu.classList.remove('show');
+    }
+});
+
+// Search functionality
+if (flowCodeSearch) {
+    flowCodeSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const items = flowCodeList.querySelectorAll('.flow-dropdown-item');
+        
+        items.forEach(item => {
+            const code = item.getAttribute('data-code').toLowerCase();
+            if (code.includes(searchTerm)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+}
+
+// Handle flow code selection
+if (flowCodeList) {
+    flowCodeList.addEventListener('click', function(e) {
+        if (e.target.classList.contains('flow-dropdown-item')) {
+            const flowCode = e.target.getAttribute('data-code');
+            
+            // Send AJAX request to create the flow
+            fetch(`/experiment/{{ experiment.id }}/add_flow/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: `flow_name=${flowCode}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload the page to show the new flow
+                    location.reload();
+                } else {
+                    alert('Failed to add flow: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Network error: ' + err);
+            });
+            
+            // Close dropdown
+            flowDropdownMenu.classList.remove('show');
+        }
+    });
+}
 </script>
 {% endblock %}

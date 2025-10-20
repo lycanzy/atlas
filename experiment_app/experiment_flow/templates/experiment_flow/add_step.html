@@ -1,13 +1,247 @@
-{% extends "experiment_flow/base.html" %}
+<style>
+.edit-step-form {
+    padding: 0;
+}
 
-{% block content %}
-<h2>Add New Step</h2>
-<form method="post" action="{% url 'add_step' experiment.id flow.id%}">
-    {% csrf_token %}
-    <div style="margin-bottom: 1rem;">
-        <label for="name" style="display:block; margin-bottom:0.5rem;">Step Name:</label>
-        <input type="text" name="step_name" required style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
+.form-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-group {
+    flex: 1;
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: #495057;
+    margin-bottom: 0.4rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="datetime-local"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    font-size: 0.9rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.25rem;
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+.modal-footer-custom {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+    margin-top: 1.5rem;
+}
+
+.full-width {
+    flex: 1 1 100%;
+}
+
+.half-width {
+    flex: 1 1 48%;
+}
+</style>
+
+<form method="post" id="addStepForm" action="{% url 'add_step' experiment.id flow.id %}" class="edit-step-form">
+  {% csrf_token %}
+  
+  <!-- Basic Information Section -->
+  <div class="form-section">
+    <div class="section-title">Basic Information</div>
+    <div class="form-row">
+      <div class="form-group half-width">
+        <label for="id_step_name">Step Name *</label>
+        {{ form.step_name }}
+        {% if form.step_name.errors %}
+          <div class="error-message">{{ form.step_name.errors.0 }}</div>
+        {% endif %}
+        <small>Two letter code (e.g., AA, BB)</small>
+      </div>
+      <div class="form-group half-width">
+        <label for="id_parent">Parent Step</label>
+        {{ form.parent }}
+        {% if form.parent.errors %}
+          <div class="error-message">{{ form.parent.errors.0 }}</div>
+        {% endif %}
+        <small>Optional: Select a parent step</small>
+      </div>
     </div>
-    <button type="submit" style="background-color:#007bff; color:#fff; padding:0.5rem 1rem; border:none; border-radius:4px; cursor:pointer;">Add Step</button>
+    
+    <div class="form-group full-width">
+      <label for="id_step_description">Description</label>
+      {{ form.step_description }}
+      {% if form.step_description.errors %}
+        <div class="error-message">{{ form.step_description.errors.0 }}</div>
+      {% endif %}
+      <small>Detailed description of this step</small>
+    </div>
+  </div>
+  
+  <!-- Status & Timing Section -->
+  <div class="form-section">
+    <div class="section-title">Status & Timing</div>
+    <div class="form-row">
+      <div class="form-group half-width">
+        <label for="id_status">Status *</label>
+        {{ form.status }}
+        {% if form.status.errors %}
+          <div class="error-message">{{ form.status.errors.0 }}</div>
+        {% endif %}
+      </div>
+      <div class="form-group half-width">
+        <label for="id_completed_on">Completed On</label>
+        {{ form.completed_on }}
+        {% if form.completed_on.errors %}
+          <div class="error-message">{{ form.completed_on.errors.0 }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  
+  <!-- Process Details Section -->
+  <div class="form-section">
+    <div class="section-title">Process Details</div>
+    <div class="form-row">
+      <div class="form-group half-width">
+        <label for="id_tool">Tool</label>
+        {{ form.tool }}
+        {% if form.tool.errors %}
+          <div class="error-message">{{ form.tool.errors.0 }}</div>
+        {% endif %}
+        <small>Equipment or tool used</small>
+      </div>
+      <div class="form-group half-width">
+        <label for="id_recipe">Recipe</label>
+        {{ form.recipe }}
+        {% if form.recipe.errors %}
+          <div class="error-message">{{ form.recipe.errors.0 }}</div>
+        {% endif %}
+        <small>Recipe or process ID</small>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Notes Section -->
+  <div class="form-section">
+    <div class="section-title">Additional Notes</div>
+    <div class="form-group full-width">
+      <label for="id_notes">Notes</label>
+      {{ form.notes }}
+      {% if form.notes.errors %}
+        <div class="error-message">{{ form.notes.errors.0 }}</div>
+      {% endif %}
+      <small>Any additional observations or comments</small>
+    </div>
+  </div>
+  
+  <!-- Form Actions -->
+  <div class="modal-footer-custom">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Add Step
+    </button>
+  </div>
 </form>
-{% endblock %}
+
+<script>
+document.querySelector("#addStepForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    fetch(this.action || window.location.href, {
+        method: "POST",
+        body: new FormData(this),
+        headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": (function() {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i=0; i<cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, "csrftoken".length + 1) === ("csrftoken" + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring("csrftoken".length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            })()
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal
+            var modalEl = document.getElementById('addStepModal');
+            var modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+
+            // Reload the page to show the new step
+            location.reload();
+        } else if (data.errors) {
+            // Handle form errors
+            alert('Please correct the errors in the form.');
+        }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('An error occurred while saving. Please try again.');
+    });
+});
+</script>
