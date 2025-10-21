@@ -29,5 +29,6 @@ urlpatterns = [
     path('experiment/<int:exp_id>/flow/<int:flow_id>/delete_step/<int:step_id>/', views.delete_step, name='delete_step'),
     path('update_flow_desc/<int:flow_id>/', views.update_flow_desc, name='update_flow_desc'),
     path('update_step_desc/<int:step_id>/', views.update_step_desc, name='update_step_desc'),
+    path('update_step_status/<int:step_id>/', views.update_step_status, name='update_step_status'),
     path('admin/', admin.site.urls),
 ]

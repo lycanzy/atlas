@@ -90,7 +90,7 @@ def delete_step(request, exp_id, flow_id, step_id):
     step = ExpStep.objects.get(id=step_id)
     step.delete()
 
-    return redirect('experiment_detail', exp_id=exp_id)
+    return redirect(f'/experiment/{exp_id}/?expanded_flow={flow_id}')
 
 def add_experiment(request):
     projects = Project.objects.all().order_by('project_name')
@@ -239,7 +239,7 @@ def add_step(request, exp_id, flow_id):
                     'redirect_url': f'/experiment/{exp_id}/?expanded_flow={flow_id}'
                 })
             
-            return redirect('experiment_detail', exp_id=exp_id)
+            return redirect(f'/experiment/{exp_id}/?expanded_flow={flow_id}')
         else:
             # Return errors for AJAX requests
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -321,6 +321,39 @@ def update_step_desc(request, step_id):
             step.step_description = data.get('description', '')
             step.save()
             return JsonResponse({'success': True})
+        except ExpStep.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Step not found'})
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+@csrf_exempt
+def update_step_status(request, step_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            step = ExpStep.objects.get(id=step_id)
+            new_status = data.get('status', '')
+            
+            # Validate status
+            valid_statuses = ['Planned', 'Completed', 'Canceled']
+            if new_status not in valid_statuses:
+                return JsonResponse({'success': False, 'error': 'Invalid status'})
+            
+            # Update status
+            step.status = new_status
+            
+            # If status is Completed, update completed_on timestamp
+            if new_status == 'Completed':
+                from django.utils import timezone
+                step.completed_on = timezone.now()
+            
+            step.save()
+            
+            # Return success with completed_on timestamp if applicable
+            response_data = {'success': True}
+            if new_status == 'Completed' and step.completed_on:
+                response_data['completed_on'] = step.completed_on.strftime('%Y-%m-%d %H:%M:%S')
+            
+            return JsonResponse(response_data)
         except ExpStep.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Step not found'})
     return JsonResponse({'success': False, 'error': 'Invalid request'})

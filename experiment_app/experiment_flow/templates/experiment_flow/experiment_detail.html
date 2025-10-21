@@ -208,6 +208,49 @@
     color: #6c757d;
     font-size: 0.9rem;
 }
+
+/* Status dropdown styling */
+.status-dropdown {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.status-dropdown[data-current-status="Planned"] {
+    background-color: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+}
+
+.status-dropdown[data-current-status="Completed"] {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.status-dropdown[data-current-status="Canceled"] {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+
+/* Color the individual dropdown options */
+.status-dropdown option[value="Planned"] {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-dropdown option[value="Completed"] {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-dropdown option[value="Canceled"] {
+    background-color: #f8d7da;
+    color: #721c24;
+}
 </style>
 
 <div class="main-section">
@@ -216,11 +259,11 @@
     <table class="table table-striped table-bordered align-middle">
         <thead class="table-light">
             <tr>
-                <th style="width:40px;"></th>
-                <th>Experiment</th>
-                <th>Flow</th>
-                <th>Description</th>
-                <th style="width:120px; text-align:center;">
+                <th style="width:50px;"></th>
+                <th style="width:150px;">Experiment</th>
+                <th style="width:150px;">Flow</th>
+                <th style="width:auto;">Description</th>
+                <th style="width:100px; text-align:center;">
                     <div class="add-flow-dropdown">
                         <button class="add-flow-btn" id="addFlowBtn" title="Add Flow">+</button>
                         <div class="flow-dropdown-menu" id="flowDropdownMenu">
@@ -271,11 +314,11 @@
                     <table class="table mb-0">
                         <thead class="table-secondary">
                             <tr>
-                                <th style="width:30%;">Step Name</th>
-                                <th style="width:10%;">Step Num</th>
-                                <th style="width:50%;">Description</th>
-                                <th style="width:5%;"></th>
-                                <th style="width:5%;"></th>
+                                <th style="width:200px;">Step Name</th>
+                                <th style="width:80px;">Step Num</th>
+                                <th style="width:120px;">Status</th>
+                                <th style="width:auto;">Description</th>
+                                <th style="width:100px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -283,6 +326,13 @@
                             <tr>
                                 <td>{{ step.full_step }}</td>
                                 <td>{{ step.step_num }}</td>
+                                <td>
+                                    <select class="form-select form-select-sm status-dropdown" data-step-id="{{ step.id }}" data-current-status="{{ step.status }}">
+                                        <option value="Planned" {% if step.status == "Planned" %}selected{% endif %}>Planned</option>
+                                        <option value="Completed" {% if step.status == "Completed" %}selected{% endif %}>Completed</option>
+                                        <option value="Canceled" {% if step.status == "Canceled" %}selected{% endif %}>Canceled</option>
+                                    </select>
+                                </td>
                                 <td>
                                     <span class="step-desc" data-step-id="{{ step.id }}">{{ step.step_description|default:"Click to add description" }}</span>
                                 </td>
@@ -394,6 +444,25 @@ document.querySelectorAll('.expand-btn').forEach(function(btn) {
     });
 });
 
+// Auto-expand flow if expanded_flow parameter is present in URL
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const expandedFlowId = urlParams.get('expanded_flow');
+    
+    if (expandedFlowId) {
+        const row = document.getElementById('steps-' + expandedFlowId);
+        const btn = document.querySelector(`.expand-btn[data-flow-id="${expandedFlowId}"]`);
+        
+        if (row && btn) {
+            row.style.display = '';
+            const icon = btn.querySelector('i');
+            if (icon) {
+                icon.className = 'bi bi-chevron-down';
+            }
+        }
+    }
+});
+
 // Inline editing helper
 function attachInlineHandler(selector, urlPrefix, dataAttr) {
     document.querySelectorAll(selector).forEach(function(span) {
@@ -491,6 +560,44 @@ document.getElementById('editStepModal').addEventListener('hidden.bs.modal', fun
     document.getElementById('editStepModalBody').innerHTML = '';
 });
 
+// Handle edit step form submission (delegated to work with dynamically loaded content)
+document.addEventListener('submit', function(e) {
+    if (e.target && e.target.id === 'expstepEditForm') {
+        e.preventDefault();
+        fetch(e.target.action || window.location.href, {
+            method: "POST",
+            body: new FormData(e.target),
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+                "X-CSRFToken": getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Close modal
+                var modalEl = document.getElementById('editStepModal');
+                var modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+
+                // Redirect to the URL with expanded_flow parameter
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    location.reload();
+                }
+            } else if (data.errors) {
+                // Handle form errors
+                alert('Please correct the errors in the form.');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('An error occurred while saving. Please try again.');
+        });
+    }
+});
+
 // Add step modal handler
 document.querySelectorAll('.add-step-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -509,6 +616,44 @@ document.querySelectorAll('.add-step-btn').forEach(function(btn) {
 // Reset add step modal content when closed
 document.getElementById('addStepModal').addEventListener('hidden.bs.modal', function () {
     document.getElementById('addStepModalBody').innerHTML = '';
+});
+
+// Handle add step form submission (delegated to work with dynamically loaded content)
+document.addEventListener('submit', function(e) {
+    if (e.target && e.target.id === 'addStepForm') {
+        e.preventDefault();
+        fetch(e.target.action || window.location.href, {
+            method: "POST",
+            body: new FormData(e.target),
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+                "X-CSRFToken": getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Close modal
+                var modalEl = document.getElementById('addStepModal');
+                var modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+
+                // Redirect to the URL with expanded_flow parameter
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    location.reload();
+                }
+            } else if (data.errors) {
+                // Handle form errors
+                alert('Please correct the errors in the form.');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('An error occurred while saving. Please try again.');
+        });
+    }
 });
 
 // Add Flow Dropdown functionality
@@ -587,5 +732,55 @@ if (flowCodeList) {
         }
     });
 }
+
+// Handle status dropdown changes
+document.querySelectorAll('.status-dropdown').forEach(function(dropdown) {
+    dropdown.addEventListener('change', function() {
+        const stepId = this.getAttribute('data-step-id');
+        const newStatus = this.value;
+        const oldStatus = this.getAttribute('data-current-status');
+        
+        // Confirm the status change
+        if (!confirm(`Change status from "${oldStatus}" to "${newStatus}"?`)) {
+            // Revert to old status if user cancels
+            this.value = oldStatus;
+            return;
+        }
+        
+        // Send AJAX request to update status
+        fetch(`/update_step_status/${stepId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                status: newStatus
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // Update the data-current-status attribute
+                this.setAttribute('data-current-status', newStatus);
+                
+                // Show success message with completion date if applicable
+                if (newStatus === 'Completed' && data.completed_on) {
+                    alert(`Status updated to ${newStatus}.\nCompleted on: ${data.completed_on}`);
+                }
+            } else {
+                alert('Failed to update status: ' + (data.error || 'Unknown error'));
+                // Revert to old status on error
+                this.value = oldStatus;
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('Network error: ' + err);
+            // Revert to old status on error
+            this.value = oldStatus;
+        });
+    });
+});
 </script>
 {% endblock %}

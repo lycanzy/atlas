@@ -232,8 +232,12 @@ document.querySelector("#addStepForm").addEventListener("submit", function(e) {
             var modal = bootstrap.Modal.getInstance(modalEl);
             modal.hide();
 
-            // Reload the page to show the new step
-            location.reload();
+            // Redirect to the URL with expanded_flow parameter
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+            } else {
+                location.reload();
+            }
         } else if (data.errors) {
             // Handle form errors
             alert('Please correct the errors in the form.');
