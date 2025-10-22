@@ -178,6 +178,16 @@
     </div>
   </div>
   
+  <!-- Components Section -->
+  <div class="form-section">
+    <div class="section-title">Components / Raw Materials</div>
+    <div id="components-container">
+    </div>
+    <button type="button" class="btn btn-sm btn-success" id="add-component-btn">
+      <i class="bi bi-plus-circle"></i> Add Component
+    </button>
+  </div>
+  
   <!-- Notes Section -->
   <div class="form-section">
     <div class="section-title">Additional Notes</div>
@@ -199,53 +209,3 @@
     </button>
   </div>
 </form>
-
-<script>
-document.querySelector("#addStepForm").addEventListener("submit", function(e) {
-    e.preventDefault();
-    fetch(this.action || window.location.href, {
-        method: "POST",
-        body: new FormData(this),
-        headers: {
-            "X-Requested-With": "XMLHttpRequest",
-            "X-CSRFToken": (function() {
-                let cookieValue = null;
-                if (document.cookie && document.cookie !== '') {
-                    const cookies = document.cookie.split(';');
-                    for (let i=0; i<cookies.length; i++) {
-                        const cookie = cookies[i].trim();
-                        if (cookie.substring(0, "csrftoken".length + 1) === ("csrftoken" + '=')) {
-                            cookieValue = decodeURIComponent(cookie.substring("csrftoken".length + 1));
-                            break;
-                        }
-                    }
-                }
-                return cookieValue;
-            })()
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Close modal
-            var modalEl = document.getElementById('addStepModal');
-            var modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
-
-            // Redirect to the URL with expanded_flow parameter
-            if (data.redirect_url) {
-                window.location.href = data.redirect_url;
-            } else {
-                location.reload();
-            }
-        } else if (data.errors) {
-            // Handle form errors
-            alert('Please correct the errors in the form.');
-        }
-    })
-    .catch(err => {
-        console.error('Error:', err);
-        alert('An error occurred while saving. Please try again.');
-    });
-});
-</script>

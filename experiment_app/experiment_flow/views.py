@@ -266,6 +266,14 @@ def add_step(request, exp_id, flow_id):
         if form.is_valid():
             step = form.save(commit=False)
             step.flow = flow
+            
+            # Handle components data from JSON
+            components_json = request.POST.get('components', '[]')
+            try:
+                step.components = json.loads(components_json)
+            except json.JSONDecodeError:
+                step.components = []
+            
             step.save()
             
             # Return JSON for AJAX requests
@@ -305,6 +313,14 @@ def edit_step(request, exp_id, flow_id, step_id):
             step = form.save(commit=False)
             # Ensure the step is associated with the correct flow
             step.flow = flow
+            
+            # Handle components data from JSON
+            components_json = request.POST.get('components', '[]')
+            try:
+                step.components = json.loads(components_json)
+            except json.JSONDecodeError:
+                step.components = []
+            
             step.save()
             
             # Return JSON response for AJAX requests

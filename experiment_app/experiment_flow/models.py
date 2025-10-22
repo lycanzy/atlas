@@ -123,6 +123,7 @@ class ExpStep(models.Model):
     completed_on = models.DateTimeField(blank=True, null=True)
     tool = models.CharField(max_length=20, blank=True, null=True)
     recipe = models.CharField(max_length=20, blank=True, null=True)
+    components = models.JSONField(default=list, blank=True, help_text="List of components/materials used in this step")
 
     @property
     def full_step_name(self):
