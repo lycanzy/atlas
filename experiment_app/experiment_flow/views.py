@@ -1,7 +1,6 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
-from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
@@ -351,7 +350,7 @@ def edit_step(request, exp_id, flow_id, step_id):
         }
     )
 
-@csrf_exempt
+@login_required
 def update_flow_desc(request, flow_id):
     if request.method == 'POST':
         data = json.loads(request.body)
@@ -365,7 +364,7 @@ def update_flow_desc(request, flow_id):
             return JsonResponse({'success': False}, status=404)
     return JsonResponse({'success': False}, status=400)
 
-@csrf_exempt
+@login_required
 def update_step_desc(request, step_id):
     if request.method == 'POST':
         try:
@@ -378,7 +377,7 @@ def update_step_desc(request, step_id):
             return JsonResponse({'success': False, 'error': 'Step not found'})
     return JsonResponse({'success': False, 'error': 'Invalid request'})
 
-@csrf_exempt
+@login_required
 def update_step_status(request, step_id):
     if request.method == 'POST':
         try:
@@ -412,7 +411,6 @@ def update_step_status(request, step_id):
     return JsonResponse({'success': False, 'error': 'Invalid request'})
 
 @login_required
-@csrf_exempt
 def copy_steps(request, exp_id):
     if request.method == 'POST':
         try:
@@ -495,7 +493,6 @@ def copy_steps(request, exp_id):
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 @login_required
-@csrf_exempt
 def delete_steps(request, exp_id):
     if request.method == 'POST':
         try:

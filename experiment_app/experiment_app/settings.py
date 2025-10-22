@@ -20,12 +20,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# TODO: Generate a new secret key for production deployment
+# You can generate one with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
 SECRET_KEY = 'django-insecure-m#pvjaintafsrohgn1fwxx0qg)g+%of3c7k03j+y!u*2ftn(tp'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+# IMPORTANT: Add your internal server's hostname or IP address here
+# Examples: ['experiment-app.yourlab.edu', '192.168.1.100', 'localhost']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 
 
 # Application definition
@@ -117,9 +121,8 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [
-    BASE_DIR / 'static',
-]
+# Removed non-existent directory from STATICFILES_DIRS
+# App-specific static files are automatically collected from each app's static/ folder
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
