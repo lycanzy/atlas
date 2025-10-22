@@ -50,6 +50,12 @@
 .table td {
     padding: 0.5rem !important;
     vertical-align: middle;
+    font-size: 0.85rem;
+}
+
+/* Make flow table cells smaller */
+.table tbody td {
+    font-size: 0.85rem;
 }
 
 /* Make nested table more compact */
@@ -60,6 +66,21 @@
 .steps-row .table thead th {
     font-size: 0.8rem !important;
     padding: 0.4rem 0.5rem !important;
+}
+
+/* Make step table cells smaller */
+.steps-row .table td {
+    font-size: 0.8rem;
+}
+
+/* Add borders to step table cells */
+.steps-row .table td,
+.steps-row .table th {
+    border: 1px solid #dee2e6;
+}
+
+.steps-row .table {
+    border-collapse: collapse;
 }
 
 /* Add subtle border between header and content */

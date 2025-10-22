@@ -12,12 +12,46 @@
             background: #f7f7f7;
         }
         .navbar {
-            background: #222;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #fff;
             padding: 1rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        .navbar .btn-primary {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            transition: all 0.2s;
+        }
+        .navbar .btn-primary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-1px);
+        }
+        .navbar .btn-outline-light {
+            border-color: rgba(255, 255, 255, 0.5);
+            color: white;
+            transition: all 0.2s;
+        }
+        .navbar .btn-outline-light:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.8);
+            color: white;
+        }
+        .btn-outline-primary {
+            border-color: #667eea;
+            color: #667eea;
+            transition: all 0.2s;
+        }
+        .btn-outline-primary:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: #667eea;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
         }
         .main-layout {
             display: flex;
@@ -125,21 +159,24 @@
             border-top: 1px solid #eee;
         }
         .pagination-controls button {
-            background: #007bff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
             border-radius: 4px;
             padding: 0.3rem 0.6rem;
             font-size: 0.8rem;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
         }
         .pagination-controls button:hover:not(:disabled) {
-            background: #0056b3;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
         }
         .pagination-controls button:disabled {
             background: #ccc;
             cursor: not-allowed;
+            box-shadow: none;
         }
         .pagination-controls span {
             font-size: 0.8rem;
@@ -160,7 +197,8 @@
         }
         .search-input:focus {
             outline: none;
-            border-color: #007bff;
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
         }
         .search-icon {
             position: absolute;
