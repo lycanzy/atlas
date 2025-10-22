@@ -4,10 +4,38 @@ from django.core.exceptions import ValidationError
 from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from .models import Exp, ExpFlow, ExpStep, Project
 from .forms import ExpStepForm, ExpFlowForm
 import json
 import string
+
+# Authentication views
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('index')
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            auth_login(request, user)
+            # Redirect to 'next' parameter if present, otherwise to index
+            next_url = request.GET.get('next', 'index')
+            return redirect(next_url)
+        else:
+            messages.error(request, 'Invalid username or password.')
+    
+    return render(request, 'experiment_flow/login.html')
+
+def logout_view(request):
+    auth_logout(request)
+    messages.success(request, 'You have been successfully logged out.')
+    return redirect('login')
 
 # Helper function to generate available flow codes
 def get_available_flow_codes(experiment):
@@ -26,6 +54,7 @@ def get_available_flow_codes(experiment):
 
 # Create your views here.
 
+@login_required
 def index(request):
 
     search_query = request.GET.get('search', '')
@@ -48,6 +77,7 @@ def index(request):
         'search_query': search_query
     })
 
+@login_required
 def experiment_detail(request, exp_id):
     
     experiment = Exp.objects.get(id=exp_id)
@@ -77,6 +107,7 @@ def experiment_detail(request, exp_id):
         'search_query': search_query
     }) 
 
+@login_required
 def delete_flow(request, exp_id, flow_id):
 
     experiment = Exp.objects.get(id=exp_id)
@@ -85,6 +116,7 @@ def delete_flow(request, exp_id, flow_id):
 
     return redirect('experiment_detail', exp_id=exp_id)
 
+@login_required
 def delete_step(request, exp_id, flow_id, step_id):
 
     step = ExpStep.objects.get(id=step_id)
@@ -92,6 +124,7 @@ def delete_step(request, exp_id, flow_id, step_id):
 
     return redirect(f'/experiment/{exp_id}/?expanded_flow={flow_id}')
 
+@login_required
 def add_experiment(request):
     projects = Project.objects.all().order_by('project_name')
     
@@ -119,7 +152,8 @@ def add_experiment(request):
                 new_exp = Exp(
                     exp_name=exp_name,
                     project=project,
-                    exp_description=exp_description
+                    exp_description=exp_description,
+                    owner=request.user  # Automatically set the logged-in user as owner
                 )
                 new_exp.save()
                 return redirect('index')
@@ -147,6 +181,7 @@ def add_experiment(request):
         'search_query': search_query
     })
 
+@login_required
 def add_flow(request, exp_id):
     try:
         experiment = get_object_or_404(Exp, id=exp_id)
@@ -220,6 +255,7 @@ def add_flow(request, exp_id):
     except Exp.DoesNotExist:
         return HttpResponse('Experiment not found', status=404)
 
+@login_required
 def add_step(request, exp_id, flow_id):
     
     experiment = Exp.objects.get(id=exp_id)
@@ -258,6 +294,7 @@ def add_step(request, exp_id, flow_id):
         'is_add': True  # Flag to indicate this is add mode, not edit mode
     })
 
+@login_required
 def edit_step(request, exp_id, flow_id, step_id):
     step = get_object_or_404(ExpStep, id=step_id, flow_id=flow_id)
     flow = get_object_or_404(ExpFlow, id=flow_id)
@@ -357,4 +394,121 @@ def update_step_status(request, step_id):
         except ExpStep.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Step not found'})
     return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+@login_required
+@csrf_exempt
+def copy_steps(request, exp_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            step_ids = data.get('step_ids', [])
+            target_flow_name = data.get('target_flow_name', '')
+            
+            if not step_ids:
+                return JsonResponse({'success': False, 'error': 'No steps selected'})
+            
+            if not target_flow_name:
+                return JsonResponse({'success': False, 'error': 'Target flow name is required'})
+            
+            # Get the experiment
+            experiment = get_object_or_404(Exp, id=exp_id)
+            
+            # Find the target flow by full_flow name (e.g., "MLO001AB")
+            try:
+                target_flow = ExpFlow.objects.get(full_flow=target_flow_name, exp=experiment)
+            except ExpFlow.DoesNotExist:
+                return JsonResponse({'success': False, 'error': f'Flow "{target_flow_name}" does not exist in this experiment'})
+            
+            # Get the selected steps
+            steps_to_copy = ExpStep.objects.filter(id__in=step_ids).order_by('step_number')
+            
+            if not steps_to_copy:
+                return JsonResponse({'success': False, 'error': 'Selected steps not found'})
+            
+            copied_count = 0
+            
+            # Copy each step to the target flow
+            for original_step in steps_to_copy:
+                # Get the step name (just the 2-letter code, e.g., "MX")
+                step_name = original_step.step_name
+                
+                # Find existing steps with the same name in target flow
+                existing_steps = ExpStep.objects.filter(
+                    flow=target_flow,
+                    step_name=step_name
+                ).order_by('-step_number')
+                
+                # Determine the new step number
+                if existing_steps.exists():
+                    # Get the highest step number and increment
+                    latest_step = existing_steps.first()
+                    # Extract number from step_number field (e.g., "01")
+                    if latest_step.step_number and latest_step.step_number.isdigit():
+                        latest_num = int(latest_step.step_number)
+                        new_step_number = f"{latest_num + 1:02d}"
+                    else:
+                        new_step_number = "00"
+                else:
+                    new_step_number = "00"
+                
+                # Create the copied step (always set status to "Planned" for copied steps)
+                new_step = ExpStep(
+                    step_name=step_name,  # Just the 2-letter code (e.g., "MX")
+                    step_number=new_step_number,  # The number part (e.g., "01")
+                    step_description=original_step.step_description,
+                    flow=target_flow,
+                    parent=None,  # Parent relationships are flow-specific, so reset
+                    recipe=original_step.recipe,
+                    notes=original_step.notes,
+                    status="Planned",  # Always set to "Planned" regardless of original status
+                    started_on=None,  # Reset timestamps for copied steps
+                    completed_on=None
+                )
+                new_step.save()
+                copied_count += 1
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully copied {copied_count} step(s) to flow {target_flow.full_flow}',
+                'copied_count': copied_count
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@login_required
+@csrf_exempt
+def delete_steps(request, exp_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            step_ids = data.get('step_ids', [])
+            
+            if not step_ids:
+                return JsonResponse({'success': False, 'error': 'No steps selected'})
+            
+            # Get the steps to delete
+            steps_to_delete = ExpStep.objects.filter(id__in=step_ids)
+            
+            if not steps_to_delete:
+                return JsonResponse({'success': False, 'error': 'Selected steps not found'})
+            
+            # Count before deletion
+            deleted_count = steps_to_delete.count()
+            
+            # Delete the steps
+            steps_to_delete.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully deleted {deleted_count} step(s)',
+                'deleted_count': deleted_count
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 

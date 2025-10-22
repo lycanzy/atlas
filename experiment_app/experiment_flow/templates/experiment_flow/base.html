@@ -75,7 +75,17 @@
             color: #6b7280;
             font-size: 0.7rem;
             margin-top: 0.25rem;
+            margin-right: 5rem;
             display: block;
+            padding-bottom: 1.2rem;
+        }
+        .experiment-owner {
+            position: absolute;
+            bottom: 8px;
+            right: 10px;
+            font-size: 0.7rem;
+            color: #888;
+            white-space: nowrap;
         }
         .experiment-card:hover {
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -97,6 +107,9 @@
         }
         .experiment-card.active .project-name {
             color: #e8e8e8;
+        }
+        .experiment-card.active .experiment-owner {
+            color: #e0e0e0;
         }
         .container {
             flex: 1;
@@ -188,10 +201,26 @@
     <div class="navbar">
         <div>Experiment App</div>
         <!-- Bootstrap primary buttons with right alignment -->
-        <div class="ms-auto d-flex gap-2">
+        <div class="ms-auto d-flex gap-2 align-items-center">
             <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Experiment</button>
             <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Physical Characterization</button>
             <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Electrical Tests</button>
+            {% if user.is_authenticated %}
+                <span class="text-white mx-2">
+                    <i class="bi bi-person-circle"></i> 
+                    {% if user.first_name and user.last_name %}
+                        {{ user.first_name }} {{ user.last_name }}
+                    {% else %}
+                        {{ user.username }}
+                    {% endif %}
+                    {% if user.profile.research_group %}
+                        <small class="text-muted">({{ user.profile.research_group.group_name }})</small>
+                    {% endif %}
+                </span>
+                <button onclick="location.href='{% url 'logout' %}'" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            {% endif %}
         </div>
     </div>
     
@@ -237,6 +266,14 @@
                     <span class="experiment-description">{{ exp.exp_description }}</span>
                     {% endif %}
                     <span class="project-name">{{ exp.project.project_name }}</span>
+                    <span class="experiment-owner">
+                        <i class="bi bi-person-circle"></i> 
+                        {% if exp.owner.first_name and exp.owner.last_name %}
+                            {{ exp.owner.first_name }} {{ exp.owner.last_name }}
+                        {% else %}
+                            {{ exp.owner.username }}
+                        {% endif %}
+                    </span>
                 </a>
             {% empty %}
                 <p>No experiments found.</p>

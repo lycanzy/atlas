@@ -2,6 +2,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.auth.models import User
 import re
 
 # Create your models here.
@@ -13,6 +14,15 @@ class ResearchGroup(models.Model):
 
     def __str__(self):
         return str(self.group_name) if self.group_name else "Unnamed Group"
+
+class UserProfile(models.Model):
+    """Extended user profile linked to research group"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    research_group = models.ForeignKey(ResearchGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='members')
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.research_group.group_name if self.research_group else 'No Group'}"
 
 class Project(models.Model):
     
@@ -53,6 +63,7 @@ class Exp(models.Model):
     exp_description = models.TextField(blank = True, null = True)
     created_on = models.DateTimeField(auto_now_add=True)
     project = models.ForeignKey(Project, on_delete = models.CASCADE, related_name = 'experiment', null = True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='experiments')
 
     def __str__(self):
         return str(self.exp_name) if self.exp_name else "Unnamed Experiment"

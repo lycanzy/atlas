@@ -311,9 +311,24 @@
             <!-- Collapsible row for steps -->
             <tr id="steps-{{ flow.id }}" class="bg-light steps-row" style="display:none;">
                 <td colspan="5" class="p-0">
+                    <div class="d-flex justify-content-between align-items-center p-2 bg-white border-bottom">
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="checkbox" class="form-check-input select-all-steps" data-flow-id="{{ flow.id }}" title="Select all steps">
+                            <label class="form-check-label small">Select All</label>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-primary copy-steps-btn" data-flow-id="{{ flow.id }}" style="display:none;">
+                                <i class="bi bi-clipboard"></i> Copy Steps
+                            </button>
+                            <button class="btn btn-sm btn-danger delete-steps-btn" data-flow-id="{{ flow.id }}" style="display:none;">
+                                <i class="bi bi-trash"></i> Delete Steps
+                            </button>
+                        </div>
+                    </div>
                     <table class="table mb-0">
                         <thead class="table-secondary">
                             <tr>
+                                <th style="width:40px;"></th>
                                 <th style="width:200px;">Step Name</th>
                                 <th style="width:80px;">Step Num</th>
                                 <th style="width:120px;">Status</th>
@@ -324,6 +339,7 @@
                         <tbody>
                             {% for step in flow.step.all|dictsort:"step_num" %}
                             <tr>
+                                <td><input type="checkbox" class="form-check-input step-checkbox" data-step-id="{{ step.id }}" data-flow-id="{{ flow.id }}"></td>
                                 <td>{{ step.full_step }}</td>
                                 <td>{{ step.step_num }}</td>
                                 <td>
@@ -779,6 +795,164 @@ document.querySelectorAll('.status-dropdown').forEach(function(dropdown) {
             alert('Network error: ' + err);
             // Revert to old status on error
             this.value = oldStatus;
+        });
+    });
+});
+
+// Copy Steps Functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle select all checkboxes
+    document.querySelectorAll('.select-all-steps').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const flowId = this.getAttribute('data-flow-id');
+            const isChecked = this.checked;
+            const stepCheckboxes = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]`);
+            
+            stepCheckboxes.forEach(cb => {
+                cb.checked = isChecked;
+            });
+            
+            // Show/hide copy button
+            updateCopyButtonVisibility(flowId);
+        });
+    });
+    
+    // Handle individual step checkboxes
+    document.querySelectorAll('.step-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const flowId = this.getAttribute('data-flow-id');
+            updateCopyButtonVisibility(flowId);
+            
+            // Update "select all" checkbox state
+            const allCheckboxes = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]`);
+            const checkedCheckboxes = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`);
+            const selectAllCheckbox = document.querySelector(`.select-all-steps[data-flow-id="${flowId}"]`);
+            
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = allCheckboxes.length === checkedCheckboxes.length && allCheckboxes.length > 0;
+            }
+        });
+    });
+    
+    function updateCopyButtonVisibility(flowId) {
+        const checkedCount = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`).length;
+        const copyBtn = document.querySelector(`.copy-steps-btn[data-flow-id="${flowId}"]`);
+        const deleteBtn = document.querySelector(`.delete-steps-btn[data-flow-id="${flowId}"]`);
+        
+        if (copyBtn) {
+            copyBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+        }
+        if (deleteBtn) {
+            deleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+        }
+    }
+    
+    // Handle copy steps button click
+    document.querySelectorAll('.copy-steps-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const flowId = this.getAttribute('data-flow-id');
+            const checkedSteps = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`);
+            
+            if (checkedSteps.length === 0) {
+                alert('Please select at least one step to copy.');
+                return;
+            }
+            
+            // Get step IDs
+            const stepIds = Array.from(checkedSteps).map(cb => cb.getAttribute('data-step-id'));
+            
+            // Prompt for target flow name (full flow name like "MLO001AB")
+            const targetFlowName = prompt(`Enter the target flow name (e.g., {{ experiment.exp_name }}AA, {{ experiment.exp_name }}MX):\n\nCopying ${stepIds.length} step(s)`);
+            
+            if (!targetFlowName) {
+                return; // User cancelled
+            }
+            
+            // Trim whitespace
+            const trimmedFlowName = targetFlowName.trim();
+            
+            if (!trimmedFlowName) {
+                alert('Flow name cannot be empty');
+                return;
+            }
+            
+            // Send copy request
+            const expId = {{ experiment.id }};
+            
+            fetch(`/experiment/${expId}/copy_steps/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    step_ids: stepIds,
+                    target_flow_name: trimmedFlowName
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // Reload page to show copied steps
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to copy steps'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Network error: ' + err);
+            });
+        });
+    });
+    
+    // Handle delete steps button click
+    document.querySelectorAll('.delete-steps-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const flowId = this.getAttribute('data-flow-id');
+            const checkedSteps = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`);
+            
+            if (checkedSteps.length === 0) {
+                alert('Please select at least one step to delete.');
+                return;
+            }
+            
+            // Get step IDs
+            const stepIds = Array.from(checkedSteps).map(cb => cb.getAttribute('data-step-id'));
+            
+            // Confirm deletion
+            if (!confirm(`Are you sure you want to delete ${stepIds.length} step(s)?\n\nThis action cannot be undone.`)) {
+                return;
+            }
+            
+            // Send delete request
+            const expId = {{ experiment.id }};
+            
+            fetch(`/experiment/${expId}/delete_steps/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    step_ids: stepIds
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // Reload page to show updated steps
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to delete steps'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Network error: ' + err);
+            });
         });
     });
 });

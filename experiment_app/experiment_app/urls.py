@@ -19,6 +19,8 @@ from django.urls import path, include
 from experiment_flow import views
 
 urlpatterns = [
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
     path('', views.index, name = 'index'),
     path('experiment/<int:exp_id>/', views.experiment_detail, name='experiment_detail'),
     path('add_experiment/', views.add_experiment, name='add_experiment'),
@@ -30,5 +32,7 @@ urlpatterns = [
     path('update_flow_desc/<int:flow_id>/', views.update_flow_desc, name='update_flow_desc'),
     path('update_step_desc/<int:step_id>/', views.update_step_desc, name='update_step_desc'),
     path('update_step_status/<int:step_id>/', views.update_step_status, name='update_step_status'),
+    path('experiment/<int:exp_id>/copy_steps/', views.copy_steps, name='copy_steps'),
+    path('experiment/<int:exp_id>/delete_steps/', views.delete_steps, name='delete_steps'),
     path('admin/', admin.site.urls),
 ]

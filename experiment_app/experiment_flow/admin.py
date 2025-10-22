@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Sample, StepNameTemplate
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User
+from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Sample, StepNameTemplate, UserProfile
 
 # Base admin class with custom CSS
 class BaseModelAdmin(admin.ModelAdmin):
@@ -7,6 +9,41 @@ class BaseModelAdmin(admin.ModelAdmin):
         css = {
             'all': ('admin/css/custom_admin.css',)
         }
+
+# Inline admin for UserProfile
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    can_delete = False
+    verbose_name_plural = 'Profile'
+    fk_name = 'user'
+
+# Extended User Admin
+class UserAdmin(BaseUserAdmin):
+    inlines = (UserProfileInline,)
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'get_research_group')
+    
+    # Make first_name and last_name appear in the add/edit forms
+    fieldsets = (
+        (None, {'fields': ('username', 'password')}),
+        ('Personal info', {'fields': ('first_name', 'last_name', 'email')}),
+        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+    )
+    
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'first_name', 'last_name', 'email', 'password1', 'password2'),
+        }),
+    )
+    
+    def get_research_group(self, obj):
+        return obj.profile.research_group if hasattr(obj, 'profile') and obj.profile.research_group else 'No Group'
+    get_research_group.short_description = 'Research Group'
+
+# Unregister the original User admin and register the new one
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)
 
 @admin.register(Exp)
 class ExpAdmin(BaseModelAdmin):
