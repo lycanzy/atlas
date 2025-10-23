@@ -601,9 +601,9 @@ document.addEventListener('submit', function(e) {
     if (e.target && e.target.id === 'expstepEditForm') {
         e.preventDefault();
         
-        // Collect component data
+        // Collect component data from this form only
         const components = [];
-        document.querySelectorAll('.component-row').forEach(row => {
+        e.target.querySelectorAll('.component-row').forEach(row => {
             const material = row.querySelector('.component-material')?.value;
             const quantity = row.querySelector('.component-quantity')?.value;
             const unit = row.querySelector('.component-unit')?.value;
@@ -680,9 +680,9 @@ document.addEventListener('submit', function(e) {
     if (e.target && e.target.id === 'addStepForm') {
         e.preventDefault();
         
-        // Collect component data
+        // Collect component data from this form only
         const components = [];
-        document.querySelectorAll('.component-row').forEach(row => {
+        e.target.querySelectorAll('.component-row').forEach(row => {
             const material = row.querySelector('.component-material')?.value;
             const quantity = row.querySelector('.component-quantity')?.value;
             const unit = row.querySelector('.component-unit')?.value;
@@ -1026,34 +1026,29 @@ let componentCounter = 0;
 document.addEventListener('click', function(e) {
     if (e.target && e.target.id === 'add-component-btn') {
         componentCounter++;
-        const container = document.getElementById('components-container');
-        if (!container) return;
+        const tbody = document.getElementById('components-container');
+        if (!tbody) return;
         
-        const newRow = document.createElement('div');
+        const newRow = document.createElement('tr');
         newRow.className = 'component-row';
         newRow.setAttribute('data-component-id', 'new-' + componentCounter);
         newRow.innerHTML = `
-            <div class="form-row">
-              <div class="form-group" style="flex: 2;">
-                <label>Material Name</label>
-                <input type="text" class="form-control component-material" placeholder="e.g., Photoresist, Silicon wafer">
-              </div>
-              <div class="form-group" style="flex: 1;">
-                <label>Quantity</label>
-                <input type="number" step="0.001" class="form-control component-quantity" placeholder="e.g., 100">
-              </div>
-              <div class="form-group" style="flex: 1;">
-                <label>Unit</label>
-                <input type="text" class="form-control component-unit" placeholder="e.g., mL, g, kg">
-              </div>
-              <div class="form-group" style="flex: 0 0 auto; display: flex; align-items: flex-end;">
-                <button type="button" class="btn btn-sm btn-danger remove-component-btn" style="margin-bottom: 1rem;">
-                  <i class="bi bi-trash"></i>
+            <td>
+                <input type="text" class="form-control form-control-sm component-material" placeholder="e.g., Photoresist, Silicon wafer">
+            </td>
+            <td>
+                <input type="number" step="0.001" class="form-control form-control-sm component-quantity" placeholder="e.g., 100">
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm component-unit" placeholder="e.g., mL, g, kg">
+            </td>
+            <td>
+                <button type="button" class="btn btn-sm btn-danger remove-component-btn">
+                    <i class="bi bi-trash"></i>
                 </button>
-              </div>
-            </div>
+            </td>
         `;
-        container.appendChild(newRow);
+        tbody.appendChild(newRow);
     }
     
     // Remove component button

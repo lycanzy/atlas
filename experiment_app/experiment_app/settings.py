@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-m#pvjaintafsrohgn1fwxx0qg)g+%of3c7k03j+y!u*2ftn(tp'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 # IMPORTANT: Add your internal server's hostname or IP address here
 # Examples: ['experiment-app.yourlab.edu', '192.168.1.100', 'localhost']

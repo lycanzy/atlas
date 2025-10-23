@@ -181,31 +181,30 @@
   <!-- Components Section -->
   <div class="form-section">
     <div class="section-title">Components / Raw Materials</div>
-    <div id="components-container">
-      {% for component in step.components %}
-      <div class="component-row">
-        <div class="form-row">
-          <div class="form-group" style="flex: 2;">
-            <label>Material Name</label>
-            <input type="text" class="form-control component-material" value="{{ component.material_name }}" placeholder="e.g., Photoresist, Silicon wafer">
-          </div>
-          <div class="form-group" style="flex: 1;">
-            <label>Quantity</label>
-            <input type="number" step="0.001" class="form-control component-quantity" value="{{ component.quantity }}" placeholder="e.g., 100">
-          </div>
-          <div class="form-group" style="flex: 1;">
-            <label>Unit</label>
-            <input type="text" class="form-control component-unit" value="{{ component.unit }}" placeholder="e.g., mL, g, kg">
-          </div>
-          <div class="form-group" style="flex: 0 0 auto; display: flex; align-items: flex-end;">
-            <button type="button" class="btn btn-sm btn-danger remove-component-btn" style="margin-bottom: 1rem;">
+    <table class="table table-sm table-bordered" id="components-table">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 40%;">Material Name</th>
+          <th style="width: 25%;">Quantity</th>
+          <th style="width: 25%;">Unit</th>
+          <th style="width: 10%;"></th>
+        </tr>
+      </thead>
+      <tbody id="components-container">
+        {% for component in step.components %}
+        <tr class="component-row">
+          <td><input type="text" class="form-control form-control-sm component-material" value="{{ component.material_name }}" placeholder="Material name"></td>
+          <td><input type="number" step="0.001" class="form-control form-control-sm component-quantity" value="{{ component.quantity }}" placeholder="0.00"></td>
+          <td><input type="text" class="form-control form-control-sm component-unit" value="{{ component.unit }}" placeholder="g, ml, pcs"></td>
+          <td class="text-center">
+            <button type="button" class="btn btn-sm btn-danger remove-component-btn" title="Remove">
               <i class="bi bi-trash"></i>
             </button>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     <button type="button" class="btn btn-sm btn-success" id="add-component-btn">
       <i class="bi bi-plus-circle"></i> Add Component
     </button>

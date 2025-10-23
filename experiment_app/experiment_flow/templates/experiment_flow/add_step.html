@@ -181,8 +181,19 @@
   <!-- Components Section -->
   <div class="form-section">
     <div class="section-title">Components / Raw Materials</div>
-    <div id="components-container">
-    </div>
+    <table class="table table-sm table-bordered" id="components-table">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 40%;">Material Name</th>
+          <th style="width: 25%;">Quantity</th>
+          <th style="width: 25%;">Unit</th>
+          <th style="width: 10%;"></th>
+        </tr>
+      </thead>
+      <tbody id="components-container">
+        <!-- Component rows will be added here -->
+      </tbody>
+    </table>
     <button type="button" class="btn btn-sm btn-success" id="add-component-btn">
       <i class="bi bi-plus-circle"></i> Add Component
     </button>
