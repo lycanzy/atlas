@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Sample, StepNameTemplate, UserProfile
+from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment
 
 # Base admin class with custom CSS
 class BaseModelAdmin(admin.ModelAdmin):
@@ -86,6 +86,31 @@ class StepNameTemplateAdmin(BaseModelAdmin):
         }),
         ('Metadata', {
             'fields': ('created_on',),
+            'classes': ('collapse',)
+        }),
+    )
+
+@admin.register(Equipment)
+class EquipmentAdmin(BaseModelAdmin):
+    list_display = ("equipment_name", "owner", "location", "is_active", "created_on")
+    list_filter = ("is_active", "owner")
+    search_fields = ("equipment_name", "description", "location")
+    readonly_fields = ("created_on", "updated_on")
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('equipment_name', 'description', 'owner', 'location', 'is_active')
+        }),
+        ('Physical Specifications', {
+            'fields': ('size',)
+        }),
+        ('Power Requirements', {
+            'fields': ('power_requirement', 'voltage', 'current')
+        }),
+        ('Utility Requirements', {
+            'fields': ('water_requirement', 'gas_input', 'exhaust_requirement')
+        }),
+        ('Metadata', {
+            'fields': ('created_on', 'updated_on'),
             'classes': ('collapse',)
         }),
     )
