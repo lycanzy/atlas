@@ -1,0 +1,177 @@
+{% extends "experiment_flow/base_no_sidebar.html" %}
+{% load static %}
+
+{% block title %}Equipment Database{% endblock %}
+
+{% block content %}
+<style>
+    .content-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    .header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    .search-bar {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .search-input {
+        padding: 0.5rem 1rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        width: 300px;
+    }
+    .equipment-table {
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .equipment-table table {
+        width: 100%;
+    }
+    .equipment-table th {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+    }
+    .equipment-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #eee;
+    }
+    .equipment-table tr:hover {
+        background: #f8f9fa;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+    .status-inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .pagination-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 1.5rem;
+    }
+    .pagination-controls button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 0.4rem 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .pagination-controls button:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+    }
+    .pagination-controls button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+</style>
+
+<div class="content-container">
+    <div class="header-section">
+        <h2>Equipment Database</h2>
+        <div class="search-bar">
+            <form method="get" action="" style="display: flex; gap: 0.5rem;">
+                <input type="text" name="search" class="search-input" placeholder="Search equipment..." value="{{ search_query|default:'' }}">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Search
+                </button>
+            </form>
+            <button onclick="location.href='{% url 'add_equipment' %}'" class="btn btn-success">
+                <i class="bi bi-plus-lg"></i> Add Equipment
+            </button>
+        </div>
+    </div>
+
+    <div class="equipment-table">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Equipment Name</th>
+                    <th>Owner</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for equipment in equipment_list %}
+                <tr>
+                    <td>
+                        <strong>{{ equipment.equipment_name }}</strong>
+                        {% if equipment.description %}
+                        <br><small class="text-muted">{{ equipment.description|truncatewords:15 }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if equipment.owner %}
+                            <i class="bi bi-person"></i> 
+                            {% if equipment.owner.first_name and equipment.owner.last_name %}
+                                {{ equipment.owner.first_name }} {{ equipment.owner.last_name }}
+                            {% else %}
+                                {{ equipment.owner.username }}
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">Not assigned</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ equipment.location|default:"—" }}</td>
+                    <td>
+                        {% if equipment.is_active %}
+                            <span class="status-badge status-active">Active</span>
+                        {% else %}
+                            <span class="status-badge status-inactive">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'equipment_detail' equipment.id %}" class="btn btn-sm btn-info" title="View Details">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <a href="{% url 'edit_equipment' equipment.id %}" class="btn btn-sm btn-warning" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted">No equipment found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-controls">
+        <button onclick="window.location.href='?page=1{% if search_query %}&search={{ search_query }}{% endif %}'" {% if not page_obj.has_previous %}disabled{% endif %}>«</button>
+        <button onclick="window.location.href='?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}'" {% if not page_obj.has_previous %}disabled{% endif %}>‹</button>
+        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        <button onclick="window.location.href='?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}'" {% if not page_obj.has_next %}disabled{% endif %}>›</button>
+        <button onclick="window.location.href='?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}'" {% if not page_obj.has_next %}disabled{% endif %}>»</button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

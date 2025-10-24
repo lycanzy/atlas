@@ -34,5 +34,9 @@ urlpatterns = [
     path('update_step_status/<int:step_id>/', views.update_step_status, name='update_step_status'),
     path('experiment/<int:exp_id>/copy_steps/', views.copy_steps, name='copy_steps'),
     path('experiment/<int:exp_id>/delete_steps/', views.delete_steps, name='delete_steps'),
+    path('equipment/', views.equipment_list, name='equipment_list'),
+    path('equipment/<int:equipment_id>/', views.equipment_detail, name='equipment_detail'),
+    path('add_equipment/', views.add_equipment, name='add_equipment'),
+    path('equipment/<int:equipment_id>/edit/', views.edit_equipment, name='edit_equipment'),
     path('admin/', admin.site.urls),
 ]

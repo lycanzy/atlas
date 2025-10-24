@@ -587,12 +587,41 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
                 document.getElementById('editStepModalBody').innerHTML = html;
                 const modal = new bootstrap.Modal(document.getElementById('editStepModal'));
                 modal.show();
+                
+                // Initialize Select2 on the parent and tool fields after modal content loads
+                setTimeout(function() {
+                    if ($('#id_parent').length) {
+                        $('#id_parent').select2({
+                            theme: 'bootstrap-5',
+                            dropdownParent: $('#editStepModal'),
+                            width: '100%',
+                            placeholder: 'Search for a previous step...',
+                            allowClear: true
+                        });
+                    }
+                    if ($('#id_tool').length) {
+                        $('#id_tool').select2({
+                            theme: 'bootstrap-5',
+                            dropdownParent: $('#editStepModal'),
+                            width: '100%',
+                            placeholder: 'Search for equipment...',
+                            allowClear: true
+                        });
+                    }
+                }, 100);
             });
     });
 });
 
 // Reset modal content when closed
 document.getElementById('editStepModal').addEventListener('hidden.bs.modal', function () {
+    // Destroy Select2 instances before clearing modal
+    if ($('#id_parent').hasClass('select2-hidden-accessible')) {
+        $('#id_parent').select2('destroy');
+    }
+    if ($('#id_tool').hasClass('select2-hidden-accessible')) {
+        $('#id_tool').select2('destroy');
+    }
     document.getElementById('editStepModalBody').innerHTML = '';
 });
 
@@ -666,12 +695,41 @@ document.querySelectorAll('.add-step-btn').forEach(function(btn) {
                 document.getElementById('addStepModalBody').innerHTML = html;
                 const modal = new bootstrap.Modal(document.getElementById('addStepModal'));
                 modal.show();
+                
+                // Initialize Select2 on the parent and tool fields after modal content loads
+                setTimeout(function() {
+                    if ($('#id_parent').length) {
+                        $('#id_parent').select2({
+                            theme: 'bootstrap-5',
+                            dropdownParent: $('#addStepModal'),
+                            width: '100%',
+                            placeholder: 'Search for a previous step...',
+                            allowClear: true
+                        });
+                    }
+                    if ($('#id_tool').length) {
+                        $('#id_tool').select2({
+                            theme: 'bootstrap-5',
+                            dropdownParent: $('#addStepModal'),
+                            width: '100%',
+                            placeholder: 'Search for equipment...',
+                            allowClear: true
+                        });
+                    }
+                }, 100);
             });
     });
 });
 
 // Reset add step modal content when closed
 document.getElementById('addStepModal').addEventListener('hidden.bs.modal', function () {
+    // Destroy Select2 instances before clearing modal
+    if ($('#id_parent').hasClass('select2-hidden-accessible')) {
+        $('#id_parent').select2('destroy');
+    }
+    if ($('#id_tool').hasClass('select2-hidden-accessible')) {
+        $('#id_tool').select2('destroy');
+    }
     document.getElementById('addStepModalBody').innerHTML = '';
 });
 
@@ -1034,13 +1092,13 @@ document.addEventListener('click', function(e) {
         newRow.setAttribute('data-component-id', 'new-' + componentCounter);
         newRow.innerHTML = `
             <td>
-                <input type="text" class="form-control form-control-sm component-material" placeholder="e.g., Photoresist, Silicon wafer">
+                <input type="text" class="form-control form-control-sm component-material">
             </td>
             <td>
-                <input type="number" step="0.001" class="form-control form-control-sm component-quantity" placeholder="e.g., 100">
+                <input type="number" step="0.001" class="form-control form-control-sm component-quantity">
             </td>
             <td>
-                <input type="text" class="form-control form-control-sm component-unit" placeholder="e.g., mL, g, kg">
+                <input type="text" class="form-control form-control-sm component-unit">
             </td>
             <td>
                 <button type="button" class="btn btn-sm btn-danger remove-component-btn">

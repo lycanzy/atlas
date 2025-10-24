@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Experiment App{% endblock %}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f7f7f7;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        .navbar .btn-primary {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            transition: all 0.2s;
+        }
+        .navbar .btn-primary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-1px);
+        }
+        .navbar .btn-outline-light {
+            border-color: rgba(255, 255, 255, 0.5);
+            color: white;
+            transition: all 0.2s;
+        }
+        .navbar .btn-outline-light:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.8);
+            color: white;
+        }
+        .btn-outline-primary {
+            border-color: #667eea;
+            color: #667eea;
+            transition: all 0.2s;
+        }
+        .btn-outline-primary:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: #667eea;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+        }
+        .container {
+            padding: 2rem;
+        }
+    </style>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <div class="navbar">
+        <div>Experiment Tracking App</div>
+        <!-- Bootstrap primary buttons with right alignment -->
+        <div class="ms-auto d-flex gap-2 align-items-center">
+            <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Experiment</button>
+            <button onclick="location.href='{% url 'equipment_list' %}'" class="btn btn-primary btn-sm">Equipment</button>
+            <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Physical Characterization</button>
+            <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Electrical Tests</button>
+            {% if user.is_authenticated %}
+                <span class="text-white mx-2">
+                    <i class="bi bi-person-circle"></i> 
+                    {% if user.first_name and user.last_name %}
+                        {{ user.first_name }} {{ user.last_name }}
+                    {% else %}
+                        {{ user.username }}
+                    {% endif %}
+                    {% if user.profile.research_group %}
+                        <small class="text-muted">({{ user.profile.research_group.group_name }})</small>
+                    {% endif %}
+                </span>
+                <button onclick="location.href='{% url 'logout' %}'" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Main Content (No Sidebar) -->
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

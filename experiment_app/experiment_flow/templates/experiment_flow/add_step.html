@@ -112,15 +112,13 @@
         {% if form.step_name.errors %}
           <div class="error-message">{{ form.step_name.errors.0 }}</div>
         {% endif %}
-        <small>Two letter code (e.g., AA, BB)</small>
       </div>
       <div class="form-group half-width">
-        <label for="id_parent">Parent Step</label>
+        <label for="id_parent">Previous Step (Any Experiment)</label>
         {{ form.parent }}
         {% if form.parent.errors %}
           <div class="error-message">{{ form.parent.errors.0 }}</div>
         {% endif %}
-        <small>Optional: Select a parent step</small>
       </div>
     </div>
     
@@ -130,7 +128,6 @@
       {% if form.step_description.errors %}
         <div class="error-message">{{ form.step_description.errors.0 }}</div>
       {% endif %}
-      <small>Detailed description of this step</small>
     </div>
   </div>
   
@@ -165,7 +162,6 @@
         {% if form.tool.errors %}
           <div class="error-message">{{ form.tool.errors.0 }}</div>
         {% endif %}
-        <small>Equipment or tool used</small>
       </div>
       <div class="form-group half-width">
         <label for="id_recipe">Recipe</label>
@@ -173,7 +169,6 @@
         {% if form.recipe.errors %}
           <div class="error-message">{{ form.recipe.errors.0 }}</div>
         {% endif %}
-        <small>Recipe or process ID</small>
       </div>
     </div>
   </div>
@@ -208,7 +203,6 @@
       {% if form.notes.errors %}
         <div class="error-message">{{ form.notes.errors.0 }}</div>
       {% endif %}
-      <small>Any additional observations or comments</small>
     </div>
   </div>
   

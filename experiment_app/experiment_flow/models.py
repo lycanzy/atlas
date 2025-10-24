@@ -121,7 +121,7 @@ class ExpStep(models.Model):
     step_description = models.TextField(blank=True, null=True)
     started_on = models.DateTimeField(auto_now_add=True, null=True)
     completed_on = models.DateTimeField(blank=True, null=True)
-    tool = models.CharField(max_length=20, blank=True, null=True)
+    tool = models.ForeignKey('Equipment', on_delete=models.SET_NULL, blank=True, null=True, related_name='steps', help_text="Equipment/tool used for this step")
     recipe = models.CharField(max_length=20, blank=True, null=True)
     components = models.JSONField(default=list, blank=True, help_text="List of components/materials used in this step")
 
@@ -143,10 +143,13 @@ class ExpStep(models.Model):
 
     @property
     def step_num(self):
+        """Count the number of previous steps within the current flow only"""
         step_num = 0
         current = self.parent
         while current:
-            step_num += 1
+            # Only count if the parent is in the same flow
+            if current.flow == self.flow:
+                step_num += 1
             current = current.parent   # ✅ move up to the next parent
         return f"{step_num:02d}"
 
@@ -226,6 +229,40 @@ class Sample(models.Model):
 
     def __str__(self):
         return str(self.sample_name) if self.sample_name else "Unnamed Sample"
+
+class Equipment(models.Model):
+    """Equipment/Tool database for tracking lab equipment"""
+    
+    equipment_name = models.CharField(max_length=100, unique=True, help_text="Name of the equipment")
+    description = models.TextField(blank=True, null=True, help_text="Detailed description of the equipment")
+    owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='equipment', help_text="Equipment owner/responsible person")
+    location = models.CharField(max_length=200, blank=True, null=True, help_text="Current location (e.g., Lab 101, Room A)")
+    
+    # Physical specifications
+    size = models.CharField(max_length=100, blank=True, null=True, help_text="Physical dimensions (e.g., 60cm x 80cm x 120cm)")
+    
+    # Power requirements
+    power_requirement = models.CharField(max_length=100, blank=True, null=True, help_text="Power requirement (e.g., 5kW, 3-phase)")
+    voltage = models.CharField(max_length=50, blank=True, null=True, help_text="Voltage requirement (e.g., 220V, 380V)")
+    current = models.CharField(max_length=50, blank=True, null=True, help_text="Current requirement (e.g., 15A, 20A)")
+    
+    # Utilities
+    water_requirement = models.CharField(max_length=200, blank=True, null=True, help_text="Water requirement (e.g., DI water, 5L/min)")
+    gas_input = models.CharField(max_length=200, blank=True, null=True, help_text="Gas input requirements (e.g., N2, Ar, 2 SLM)")
+    exhaust_requirement = models.CharField(max_length=200, blank=True, null=True, help_text="Exhaust requirements (e.g., Acid exhaust, 500 CFM)")
+    
+    # Metadata
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True, help_text="Whether the equipment is currently active/available")
+    
+    class Meta:
+        ordering = ['equipment_name']
+        verbose_name = "Equipment"
+        verbose_name_plural = "Equipment"
+    
+    def __str__(self):
+        return self.equipment_name
 
 # Signal to update ExpFlow.full_flow when Exp name changes
 @receiver(post_save, sender=Exp)

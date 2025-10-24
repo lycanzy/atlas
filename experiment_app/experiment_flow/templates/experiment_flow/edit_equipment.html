@@ -1,0 +1,228 @@
+{% extends "experiment_flow/base_no_sidebar.html" %}
+{% load static %}
+
+{% block title %}Edit {{ equipment.equipment_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>Edit Equipment</h2>
+                    <p class="text-muted mb-0">{{ equipment.equipment_name }}</p>
+                </div>
+                <div>
+                    <a href="{% url 'equipment_detail' equipment.id %}" class="btn btn-secondary me-2">
+                        <i class="bi bi-arrow-left"></i> Back to Detail
+                    </a>
+                    <a href="{% url 'equipment_list' %}" class="btn btn-secondary">
+                        <i class="bi bi-list"></i> Back to List
+                    </a>
+                </div>
+            </div>
+
+            <!-- Form Card -->
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Basic Information Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="bi bi-info-circle"></i> Basic Information
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.equipment_name.id_for_label }}" class="form-label fw-bold">
+                                        Equipment Name <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.equipment_name }}
+                                    {% if form.equipment_name.errors %}
+                                        <div class="text-danger">{{ form.equipment_name.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.owner.id_for_label }}" class="form-label fw-bold">
+                                        Owner <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.owner }}
+                                    {% if form.owner.errors %}
+                                        <div class="text-danger">{{ form.owner.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.location.id_for_label }}" class="form-label fw-bold">
+                                        Location
+                                    </label>
+                                    {{ form.location }}
+                                    {% if form.location.errors %}
+                                        <div class="text-danger">{{ form.location.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">
+                                        Description
+                                    </label>
+                                    {{ form.description }}
+                                    {% if form.description.errors %}
+                                        <div class="text-danger">{{ form.description.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check">
+                                        {{ form.is_active }}
+                                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                            Active
+                                        </label>
+                                    </div>
+                                    {% if form.is_active.errors %}
+                                        <div class="text-danger">{{ form.is_active.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Physical Specifications Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="bi bi-rulers"></i> Physical Specifications
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.size.id_for_label }}" class="form-label fw-bold">
+                                        Size/Dimensions
+                                    </label>
+                                    {{ form.size }}
+                                    <small class="form-text text-muted">e.g., "60cm x 40cm x 80cm" or "2m x 1m"</small>
+                                    {% if form.size.errors %}
+                                        <div class="text-danger">{{ form.size.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Power Requirements Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="bi bi-lightning-charge"></i> Power Requirements
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.power_requirement.id_for_label }}" class="form-label fw-bold">
+                                        Power Requirement
+                                    </label>
+                                    {{ form.power_requirement }}
+                                    <small class="form-text text-muted">e.g., "5 kW" or "500 W"</small>
+                                    {% if form.power_requirement.errors %}
+                                        <div class="text-danger">{{ form.power_requirement.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.voltage.id_for_label }}" class="form-label fw-bold">
+                                        Voltage
+                                    </label>
+                                    {{ form.voltage }}
+                                    <small class="form-text text-muted">e.g., "220V" or "110V"</small>
+                                    {% if form.voltage.errors %}
+                                        <div class="text-danger">{{ form.voltage.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.current.id_for_label }}" class="form-label fw-bold">
+                                        Current
+                                    </label>
+                                    {{ form.current }}
+                                    <small class="form-text text-muted">e.g., "10A" or "15A"</small>
+                                    {% if form.current.errors %}
+                                        <div class="text-danger">{{ form.current.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Utility Requirements Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="bi bi-droplet"></i> Utility Requirements
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.water_requirement.id_for_label }}" class="form-label fw-bold">
+                                        Water Requirement
+                                    </label>
+                                    {{ form.water_requirement }}
+                                    <small class="form-text text-muted">e.g., "10 L/min" or "None"</small>
+                                    {% if form.water_requirement.errors %}
+                                        <div class="text-danger">{{ form.water_requirement.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.gas_input.id_for_label }}" class="form-label fw-bold">
+                                        Gas Input
+                                    </label>
+                                    {{ form.gas_input }}
+                                    <small class="form-text text-muted">e.g., "N2", "Ar", "Air"</small>
+                                    {% if form.gas_input.errors %}
+                                        <div class="text-danger">{{ form.gas_input.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.exhaust_requirement.id_for_label }}" class="form-label fw-bold">
+                                        Exhaust Requirement
+                                    </label>
+                                    {{ form.exhaust_requirement }}
+                                    <small class="form-text text-muted">e.g., "Fume hood required"</small>
+                                    {% if form.exhaust_requirement.errors %}
+                                        <div class="text-danger">{{ form.exhaust_requirement.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Equipment Info -->
+                        <div class="alert alert-info">
+                            <strong>Created:</strong> {{ equipment.created_on|date:"M d, Y H:i" }} | 
+                            <strong>Last Updated:</strong> {{ equipment.updated_on|date:"M d, Y H:i" }}
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'equipment_detail' equipment.id %}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Initialize Select2 for owner field
+    $(document).ready(function() {
+        if ($('#id_owner').length) {
+            $('#id_owner').select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                placeholder: 'Search for owner...',
+                allowClear: false
+            });
+        }
+    });
+</script>
+{% endblock %}

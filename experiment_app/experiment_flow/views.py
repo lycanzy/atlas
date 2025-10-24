@@ -6,8 +6,8 @@ from django.db.models import Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Exp, ExpFlow, ExpStep, Project
-from .forms import ExpStepForm, ExpFlowForm
+from .models import Exp, ExpFlow, ExpStep, Project, Equipment
+from .forms import ExpStepForm, ExpFlowForm, EquipmentForm
 import json
 import string
 
@@ -57,7 +57,12 @@ def get_available_flow_codes(experiment):
 def index(request):
 
     search_query = request.GET.get('search', '')
+    my_experiments = request.GET.get('my_experiments', '')
     latest_exp = Exp.objects.order_by('-created_on')
+    
+    # Filter by owner if my_experiments is set
+    if my_experiments == '1':
+        latest_exp = latest_exp.filter(owner=request.user)
     
     if search_query:
         latest_exp = latest_exp.filter(
@@ -84,7 +89,12 @@ def experiment_detail(request, exp_id):
     available_flow_codes = get_available_flow_codes(experiment)
     
     search_query = request.GET.get('search', '')
+    my_experiments = request.GET.get('my_experiments', '')
     latest_exp = Exp.objects.order_by('-created_on')
+    
+    # Filter by owner if my_experiments is set
+    if my_experiments == '1':
+        latest_exp = latest_exp.filter(owner=request.user)
     
     if search_query:
         latest_exp = latest_exp.filter(
@@ -128,7 +138,12 @@ def add_experiment(request):
     projects = Project.objects.all().order_by('project_name')
     
     search_query = request.GET.get('search', '')
+    my_experiments = request.GET.get('my_experiments', '')
     latest_exp = Exp.objects.order_by('-created_on')
+    
+    # Filter by owner if my_experiments is set
+    if my_experiments == '1':
+        latest_exp = latest_exp.filter(owner=request.user)
     
     if search_query:
         latest_exp = latest_exp.filter(
@@ -209,7 +224,12 @@ def add_flow(request, exp_id):
                         })
                     
                     search_query = request.GET.get('search', '')
+                    my_experiments = request.GET.get('my_experiments', '')
                     latest_exp = Exp.objects.order_by('-created_on')
+                    
+                    # Filter by owner if my_experiments is set
+                    if my_experiments == '1':
+                        latest_exp = latest_exp.filter(owner=request.user)
                     
                     if search_query:
                         latest_exp = latest_exp.filter(
@@ -232,7 +252,12 @@ def add_flow(request, exp_id):
         
         # For GET requests or rendering the form
         search_query = request.GET.get('search', '')
+        my_experiments = request.GET.get('my_experiments', '')
         latest_exp = Exp.objects.order_by('-created_on')
+        
+        # Filter by owner if my_experiments is set
+        if my_experiments == '1':
+            latest_exp = latest_exp.filter(owner=request.user)
         
         if search_query:
             latest_exp = latest_exp.filter(
@@ -524,4 +549,67 @@ def delete_steps(request, exp_id):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+
+# Equipment views
+@login_required
+def equipment_list(request):
+    search_query = request.GET.get('search', '')
+    equipment_list = Equipment.objects.all().select_related('owner').order_by('equipment_name')
+    
+    if search_query:
+        equipment_list = equipment_list.filter(
+            Q(equipment_name__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(location__icontains=search_query) |
+            Q(owner__username__icontains=search_query)
+        )
+    
+    page_number = request.GET.get('page', 1)
+    paginator = Paginator(equipment_list, 20)  # 20 equipment per page
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'experiment_flow/equipment_list.html', {
+        'equipment_list': page_obj,
+        'page_obj': page_obj,
+        'search_query': search_query
+    })
+
+@login_required
+def equipment_detail(request, equipment_id):
+    equipment = get_object_or_404(Equipment, id=equipment_id)
+    return render(request, 'experiment_flow/equipment_detail.html', {
+        'equipment': equipment
+    })
+
+@login_required
+def add_equipment(request):
+    if request.method == 'POST':
+        form = EquipmentForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('equipment_list')
+    else:
+        form = EquipmentForm()
+    
+    return render(request, 'experiment_flow/add_equipment.html', {
+        'form': form
+    })
+
+@login_required
+def edit_equipment(request, equipment_id):
+    equipment = get_object_or_404(Equipment, id=equipment_id)
+    
+    if request.method == 'POST':
+        form = EquipmentForm(request.POST, instance=equipment)
+        if form.is_valid():
+            form.save()
+            return redirect('equipment_detail', equipment_id=equipment_id)
+    else:
+        form = EquipmentForm(instance=equipment)
+    
+    return render(request, 'experiment_flow/edit_equipment.html', {
+        'form': form,
+        'equipment': equipment
+    })
 

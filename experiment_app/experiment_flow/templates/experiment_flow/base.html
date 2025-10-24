@@ -191,6 +191,13 @@
         .search-container {
             margin-bottom: 0.75rem;
             position: relative;
+            display: flex;
+            gap: 0.35rem;
+            align-items: center;
+        }
+        .search-wrapper {
+            flex: 1;
+            position: relative;
         }
         .search-input {
             width: 100%;
@@ -239,7 +246,12 @@
     </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Select2 for searchable dropdowns -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 </head>
 <body>
     <div class="navbar">
@@ -247,6 +259,7 @@
         <!-- Bootstrap primary buttons with right alignment -->
         <div class="ms-auto d-flex gap-2 align-items-center">
             <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Experiment</button>
+            <button onclick="location.href='{% url 'equipment_list' %}'" class="btn btn-primary btn-sm">Equipment</button>
             <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Physical Characterization</button>
             <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Electrical Tests</button>
             {% if user.is_authenticated %}
@@ -272,34 +285,45 @@
         <div class="sidebar">
             <div class="sidebar-header">
                 <h3 style="margin:0;">Experiments</h3>
-                <!-- Bootstrap small outline button -->
+            </div>
+            
+            <!-- Search Bar with Buttons with Buttons -->
+            <div class="search-container">
+                <div class="search-wrapper">
+                    <form method="get" action="" id="searchForm">
+                        <input 
+                            type="text" 
+                            name="search" 
+                            class="search-input" 
+                            placeholder="Search..." 
+                            value="{{ search_query|default:'' }}"
+                            id="searchInput">
+                        <button type="button" class="clear-search" onclick="clearSearch()" title="Clear search">
+                            <i class="bi bi-x-circle-fill"></i>
+                        </button>
+                        <i class="bi bi-search search-icon"></i>
+                    </form>
+                </div>
+                <!-- My Exp Filter Button -->
+                <button onclick="toggleMyExperiments()" 
+                        class="btn btn-sm {% if request.GET.my_experiments == '1' %}btn-primary{% else %}btn-outline-primary{% endif %}" 
+                        id="myExpBtn"
+                        title="Show only my experiments"
+                        style="flex-shrink: 0;">
+                    <i class="bi bi-person-check"></i>
+                </button>
+                <!-- Add Experiment Button -->
                 <button onclick="location.href='{% url 'add_experiment' %}'" 
                         class="btn btn-outline-primary btn-sm" 
-                        title="Add Experiment">
+                        title="Add Experiment"
+                        style="flex-shrink: 0;">
                     <i class="bi bi-plus-lg"></i>
                 </button>
             </div>
             
-            <!-- Search Bar -->
-            <div class="search-container">
-                <form method="get" action="" id="searchForm">
-                    <input 
-                        type="text" 
-                        name="search" 
-                        class="search-input" 
-                        placeholder="Search experiments..." 
-                        value="{{ search_query|default:'' }}"
-                        id="searchInput">
-                    <button type="button" class="clear-search" onclick="clearSearch()" title="Clear search">
-                        <i class="bi bi-x-circle-fill"></i>
-                    </button>
-                    <i class="bi bi-search search-icon"></i>
-                </form>
-            </div>
-            
             {% if experiments %}
             {% for exp in experiments %}
-                <a href="{% url 'experiment_detail' exp.id %}?page={{ page_obj.number|default:1 }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                <a href="{% url 'experiment_detail' exp.id %}?page={{ page_obj.number|default:1 }}{% if search_query %}&search={{ search_query }}{% endif %}{% if request.GET.my_experiments %}&my_experiments={{ request.GET.my_experiments }}{% endif %}" 
                    class="experiment-card{% if experiment.id == exp.id %} active{% endif %}" 
                    style="text-decoration:none; color:inherit; display:block;">
                     <span class="experiment-heading">{{ exp.exp_name }}</span>
@@ -345,15 +369,30 @@
                 {% endif %}
             </div>
             <script>
-                function navigateToPage(page) {
+                function navigateToPage(pageNum) {
                     const url = new URL(window.location.href);
-                    url.searchParams.set('page', page);
+                    url.searchParams.set('page', pageNum);
                     window.location.href = url.toString();
                 }
                 
                 function clearSearch() {
                     const url = new URL(window.location.href);
                     url.searchParams.delete('search');
+                    url.searchParams.set('page', '1');
+                    window.location.href = url.toString();
+                }
+                
+                function toggleMyExperiments() {
+                    const url = new URL(window.location.href);
+                    const currentValue = url.searchParams.get('my_experiments');
+                    
+                    if (currentValue === '1') {
+                        // Turn off the filter
+                        url.searchParams.delete('my_experiments');
+                    } else {
+                        // Turn on the filter
+                        url.searchParams.set('my_experiments', '1');
+                    }
                     url.searchParams.set('page', '1');
                     window.location.href = url.toString();
                 }

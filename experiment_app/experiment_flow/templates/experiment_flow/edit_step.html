@@ -112,15 +112,13 @@
         {% if form.step_name.errors %}
           <div class="error-message">{{ form.step_name.errors.0 }}</div>
         {% endif %}
-        <small>Two letter code (e.g., AA, BB)</small>
       </div>
       <div class="form-group half-width">
-        <label for="id_parent">Parent Step</label>
+        <label for="id_parent">Previous Step (Any Experiment)</label>
         {{ form.parent }}
         {% if form.parent.errors %}
           <div class="error-message">{{ form.parent.errors.0 }}</div>
         {% endif %}
-        <small>Optional: Select a parent step</small>
       </div>
     </div>
     
@@ -130,7 +128,6 @@
       {% if form.step_description.errors %}
         <div class="error-message">{{ form.step_description.errors.0 }}</div>
       {% endif %}
-      <small>Detailed description of this step</small>
     </div>
   </div>
   
@@ -165,7 +162,6 @@
         {% if form.tool.errors %}
           <div class="error-message">{{ form.tool.errors.0 }}</div>
         {% endif %}
-        <small>Equipment or tool used</small>
       </div>
       <div class="form-group half-width">
         <label for="id_recipe">Recipe</label>
@@ -173,7 +169,6 @@
         {% if form.recipe.errors %}
           <div class="error-message">{{ form.recipe.errors.0 }}</div>
         {% endif %}
-        <small>Recipe or process ID</small>
       </div>
     </div>
   </div>
@@ -193,9 +188,9 @@
       <tbody id="components-container">
         {% for component in step.components %}
         <tr class="component-row">
-          <td><input type="text" class="form-control form-control-sm component-material" value="{{ component.material_name }}" placeholder="Material name"></td>
-          <td><input type="number" step="0.001" class="form-control form-control-sm component-quantity" value="{{ component.quantity }}" placeholder="0.00"></td>
-          <td><input type="text" class="form-control form-control-sm component-unit" value="{{ component.unit }}" placeholder="g, ml, pcs"></td>
+          <td><input type="text" class="form-control form-control-sm component-material" value="{{ component.material_name }}"></td>
+          <td><input type="number" step="0.001" class="form-control form-control-sm component-quantity" value="{{ component.quantity }}"></td>
+          <td><input type="text" class="form-control form-control-sm component-unit" value="{{ component.unit }}"></td>
           <td class="text-center">
             <button type="button" class="btn btn-sm btn-danger remove-component-btn" title="Remove">
               <i class="bi bi-trash"></i>
@@ -219,7 +214,6 @@
       {% if form.notes.errors %}
         <div class="error-message">{{ form.notes.errors.0 }}</div>
       {% endif %}
-      <small>Any additional observations or comments</small>
     </div>
   </div>
   

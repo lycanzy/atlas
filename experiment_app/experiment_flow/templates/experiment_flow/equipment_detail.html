@@ -1,0 +1,166 @@
+{% extends "experiment_flow/base_no_sidebar.html" %}
+{% load static %}
+
+{% block title %}{{ equipment.equipment_name }} - Equipment Detail{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header with Equipment Name and Actions -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>{{ equipment.equipment_name }}</h2>
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-person"></i> {{ equipment.owner.username }} | 
+                        <i class="bi bi-calendar"></i> Created: {{ equipment.created_on|date:"M d, Y" }}
+                    </p>
+                </div>
+                <div>
+                    {% if equipment.is_active %}
+                        <span class="badge bg-success me-2">Active</span>
+                    {% else %}
+                        <span class="badge bg-danger me-2">Inactive</span>
+                    {% endif %}
+                    <a href="{% url 'edit_equipment' equipment.id %}" class="btn btn-warning btn-sm">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                    <a href="{% url 'equipment_list' %}" class="btn btn-secondary btn-sm">
+                        <i class="bi bi-arrow-left"></i> Back to List
+                    </a>
+                </div>
+            </div>
+
+            <!-- Equipment Details Card -->
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <!-- Basic Information Section -->
+                    <div class="mb-4">
+                        <h5 class="text-primary mb-3">
+                            <i class="bi bi-info-circle"></i> Basic Information
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">Equipment Name:</label>
+                                <p>{{ equipment.equipment_name }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">Owner:</label>
+                                <p>{{ equipment.owner.get_full_name|default:equipment.owner.username }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">Location:</label>
+                                <p>{{ equipment.location|default:"Not specified" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">Status:</label>
+                                <p>
+                                    {% if equipment.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Inactive</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="fw-bold">Description:</label>
+                                <p>{{ equipment.description|default:"No description provided" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Physical Specifications Section -->
+                    <div class="mb-4">
+                        <h5 class="text-primary mb-3">
+                            <i class="bi bi-rulers"></i> Physical Specifications
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">Size/Dimensions:</label>
+                                <p>{{ equipment.size|default:"Not specified" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Power Requirements Section -->
+                    <div class="mb-4">
+                        <h5 class="text-primary mb-3">
+                            <i class="bi bi-lightning-charge"></i> Power Requirements
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold">Power Requirement:</label>
+                                <p>{{ equipment.power_requirement|default:"Not specified" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold">Voltage:</label>
+                                <p>{{ equipment.voltage|default:"Not specified" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold">Current:</label>
+                                <p>{{ equipment.current|default:"Not specified" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Utility Requirements Section -->
+                    <div class="mb-4">
+                        <h5 class="text-primary mb-3">
+                            <i class="bi bi-droplet"></i> Utility Requirements
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold">Water Requirement:</label>
+                                <p>{{ equipment.water_requirement|default:"Not specified" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold">Gas Input:</label>
+                                <p>{{ equipment.gas_input|default:"Not specified" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="fw-bold">Exhaust Requirement:</label>
+                                <p>{{ equipment.exhaust_requirement|default:"Not specified" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Timestamps Section -->
+                    <div class="mb-2">
+                        <h5 class="text-primary mb-3">
+                            <i class="bi bi-clock-history"></i> Timestamps
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">Created On:</label>
+                                <p>{{ equipment.created_on|date:"M d, Y H:i" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">Last Updated:</label>
+                                <p>{{ equipment.updated_on|date:"M d, Y H:i" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions Card -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">Actions</h5>
+                    <a href="{% url 'edit_equipment' equipment.id %}" class="btn btn-warning me-2">
+                        <i class="bi bi-pencil"></i> Edit Equipment
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
