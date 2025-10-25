@@ -233,6 +233,7 @@ class Sample(models.Model):
 class Equipment(models.Model):
     """Equipment/Tool database for tracking lab equipment"""
     
+    equipment_id = models.CharField(max_length=30, unique=True, blank=True, null=True, help_text="Unique equipment ID or serial number")
     equipment_name = models.CharField(max_length=100, unique=True, help_text="Name of the equipment")
     description = models.TextField(blank=True, null=True, help_text="Detailed description of the equipment")
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='equipment', help_text="Equipment owner/responsible person")

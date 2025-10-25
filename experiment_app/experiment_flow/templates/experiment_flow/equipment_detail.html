@@ -45,6 +45,10 @@
                                 <p>{{ equipment.equipment_name }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
+                                <label class="fw-bold">Equipment ID:</label>
+                                <p>{% if equipment.equipment_id %}<code>{{ equipment.equipment_id }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
                                 <label class="fw-bold">Owner:</label>
                                 <p>{{ equipment.owner.get_full_name|default:equipment.owner.username }}</p>
                             </div>

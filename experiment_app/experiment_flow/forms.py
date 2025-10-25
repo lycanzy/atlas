@@ -144,12 +144,13 @@ class EquipmentForm(forms.ModelForm):
     class Meta:
         model = Equipment
         fields = [
-            'equipment_name', 'description', 'owner', 'location',
+            'equipment_name', 'equipment_id', 'description', 'owner', 'location',
             'size', 'power_requirement', 'voltage', 'current',
             'water_requirement', 'gas_input', 'exhaust_requirement', 'is_active'
         ]
         widgets = {
             'equipment_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'equipment_id': forms.TextInput(attrs={'class': 'form-control', 'id': 'id_equipment_id'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'location': forms.TextInput(attrs={'class': 'form-control'}),
             'size': forms.TextInput(attrs={'class': 'form-control'}),

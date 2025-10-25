@@ -92,9 +92,9 @@ class StepNameTemplateAdmin(BaseModelAdmin):
 
 @admin.register(Equipment)
 class EquipmentAdmin(BaseModelAdmin):
-    list_display = ("equipment_name", "owner", "location", "is_active", "created_on")
+    list_display = ("equipment_name", "equipment_id", "owner", "location", "is_active", "created_on")
     list_filter = ("is_active", "owner")
-    search_fields = ("equipment_name", "description", "location")
+    search_fields = ("equipment_name", "equipment_id", "description", "location")
     readonly_fields = ("created_on", "updated_on")
     fieldsets = (
         ('Basic Information', {

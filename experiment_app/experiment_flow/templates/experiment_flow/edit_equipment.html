@@ -45,6 +45,15 @@
                                     {% endif %}
                                 </div>
                                 <div class="col-md-6 mb-3">
+                                    <label for="{{ form.equipment_id.id_for_label }}" class="form-label fw-bold">
+                                        Equipment ID
+                                    </label>
+                                    {{ form.equipment_id }}
+                                    {% if form.equipment_id.errors %}
+                                        <div class="text-danger">{{ form.equipment_id.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
                                     <label for="{{ form.owner.id_for_label }}" class="form-label fw-bold">
                                         Owner <span class="text-danger">*</span>
                                     </label>

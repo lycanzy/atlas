@@ -17,14 +17,63 @@
     }
     .search-bar {
         display: flex;
-        gap: 0.5rem;
+        gap: 0.35rem;
         align-items: center;
     }
+    .search-container {
+        margin-bottom: 0;
+        position: relative;
+        display: flex;
+        gap: 0.35rem;
+        align-items: center;
+    }
+    .search-wrapper {
+        flex: 1;
+        position: relative;
+    }
     .search-input {
-        padding: 0.5rem 1rem;
+        width: 100%;
+        padding: 0.4rem 2rem 0.4rem 0.65rem;
         border: 1px solid #ddd;
         border-radius: 6px;
-        width: 300px;
+        font-size: 0.8rem;
+        box-sizing: border-box;
+        transition: border-color 0.2s;
+    }
+    .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    .search-icon {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #666;
+        pointer-events: none;
+    }
+    .clear-search {
+        position: absolute;
+        right: 0.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        padding: 0.25rem;
+        font-size: 1rem;
+        display: none;
+    }
+    .clear-search:hover {
+        color: #333;
+    }
+    .search-input:not(:placeholder-shown) ~ .clear-search {
+        display: block;
+    }
+    .search-input:not(:placeholder-shown) ~ .search-icon {
+        display: none;
     }
     .equipment-table {
         background: white;
@@ -94,15 +143,30 @@
     <div class="header-section">
         <h2>Equipment Database</h2>
         <div class="search-bar">
-            <form method="get" action="" style="display: flex; gap: 0.5rem;">
-                <input type="text" name="search" class="search-input" placeholder="Search equipment..." value="{{ search_query|default:'' }}">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-search"></i> Search
-                </button>
-            </form>
-            <button onclick="location.href='{% url 'add_equipment' %}'" class="btn btn-success">
-                <i class="bi bi-plus-lg"></i> Add Equipment
-            </button>
+            <div class="search-container">
+                <div class="search-wrapper">
+                    <form method="get" action="" id="searchForm">
+                        <input 
+                            type="text" 
+                            name="search" 
+                            class="search-input" 
+                            placeholder="Search equipment..." 
+                            value="{{ search_query|default:'' }}"
+                            id="searchInput">
+                        <button type="button" class="clear-search" onclick="clearSearch()" title="Clear search">
+                            <i class="bi bi-x-circle-fill"></i>
+                        </button>
+                        <i class="bi bi-search search-icon"></i>
+                    </form>
+                </div>
+                <!-- Add Equipment Button -->
+                <a href="{% url 'add_equipment' %}" 
+                        class="btn btn-success btn-sm" 
+                        title="Add Equipment"
+                        style="flex-shrink: 0;">
+                    <i class="bi bi-plus-lg"></i>
+                </a>
+            </div>
         </div>
     </div>
 
@@ -111,6 +175,7 @@
             <thead>
                 <tr>
                     <th>Equipment Name</th>
+                    <th>Equipment ID</th>
                     <th>Owner</th>
                     <th>Location</th>
                     <th>Status</th>
@@ -124,6 +189,13 @@
                         <strong>{{ equipment.equipment_name }}</strong>
                         {% if equipment.description %}
                         <br><small class="text-muted">{{ equipment.description|truncatewords:15 }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if equipment.equipment_id %}
+                            <code>{{ equipment.equipment_id }}</code>
+                        {% else %}
+                            <span class="text-muted">—</span>
                         {% endif %}
                     </td>
                     <td>
@@ -174,4 +246,56 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-submit search form on input with debounce
+    let searchTimeout;
+    const searchInput = document.getElementById('searchInput');
+    const searchForm = document.getElementById('searchForm');
+    
+    if (searchInput && searchForm) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                const url = new URL(window.location.href);
+                const searchValue = searchInput.value.trim();
+                
+                if (searchValue) {
+                    url.searchParams.set('search', searchValue);
+                } else {
+                    url.searchParams.delete('search');
+                }
+                url.searchParams.set('page', '1');
+                window.location.href = url.toString();
+            }, 500); // 500ms debounce
+        });
+        
+        // Handle Enter key
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(searchTimeout);
+                const url = new URL(window.location.href);
+                const searchValue = searchInput.value.trim();
+                
+                if (searchValue) {
+                    url.searchParams.set('search', searchValue);
+                } else {
+                    url.searchParams.delete('search');
+                }
+                url.searchParams.set('page', '1');
+                window.location.href = url.toString();
+            }
+        });
+    }
+    
+    function clearSearch() {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('search');
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    }
+</script>
 {% endblock %}

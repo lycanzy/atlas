@@ -260,8 +260,6 @@
         <div class="ms-auto d-flex gap-2 align-items-center">
             <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Experiment</button>
             <button onclick="location.href='{% url 'equipment_list' %}'" class="btn btn-primary btn-sm">Equipment</button>
-            <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Physical Characterization</button>
-            <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Electrical Tests</button>
             {% if user.is_authenticated %}
                 <span class="text-white mx-2">
                     <i class="bi bi-person-circle"></i> 
