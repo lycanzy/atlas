@@ -1,6 +1,7 @@
 from django import forms
 from .models import ExpStep, ExpFlow, StepNameTemplate, Equipment
 from django.contrib.auth.models import User
+from django.contrib.auth.forms import PasswordChangeForm
 import re
 
 class ExpFlowForm(forms.ModelForm):
@@ -169,3 +170,30 @@ class EquipmentForm(forms.ModelForm):
         # Populate owner choices with all users, ordered by first name then last name
         self.fields['owner'].queryset = User.objects.all().order_by('first_name', 'last_name', 'username')
         self.fields['owner'].label_from_instance = lambda obj: obj.get_full_name() if obj.get_full_name() else obj.username
+
+
+class CustomPasswordChangeForm(PasswordChangeForm):
+    """
+    Custom password change form with styled widgets
+    """
+    old_password = forms.CharField(
+        label="Current Password",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter your current password'
+        })
+    )
+    new_password1 = forms.CharField(
+        label="New Password",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter your new password'
+        })
+    )
+    new_password2 = forms.CharField(
+        label="Confirm New Password",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirm your new password'
+        })
+    )

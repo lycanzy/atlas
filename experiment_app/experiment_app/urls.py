@@ -21,6 +21,7 @@ from experiment_flow import views
 urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('change_password/', views.change_password, name='change_password'),
     path('', views.index, name = 'index'),
     path('experiment/<int:exp_id>/', views.experiment_detail, name='experiment_detail'),
     path('add_experiment/', views.add_experiment, name='add_experiment'),

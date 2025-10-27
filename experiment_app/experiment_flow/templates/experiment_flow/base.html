@@ -272,6 +272,9 @@
                         <small class="text-muted">({{ user.profile.research_group.group_name }})</small>
                     {% endif %}
                 </span>
+                <button onclick="location.href='{% url 'change_password' %}'" class="btn btn-outline-light btn-sm me-2">
+                    <i class="bi bi-key"></i> Change Password
+                </button>
                 <button onclick="location.href='{% url 'logout' %}'" class="btn btn-outline-light btn-sm">
                     <i class="bi bi-box-arrow-right"></i> Logout
                 </button>

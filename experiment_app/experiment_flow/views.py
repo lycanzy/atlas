@@ -3,11 +3,11 @@ from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Exp, ExpFlow, ExpStep, Project, Equipment
-from .forms import ExpStepForm, ExpFlowForm, EquipmentForm
+from .forms import ExpStepForm, ExpFlowForm, EquipmentForm, CustomPasswordChangeForm
 import json
 import string
 
@@ -35,6 +35,25 @@ def logout_view(request):
     auth_logout(request)
     messages.success(request, 'You have been successfully logged out.')
     return redirect('login')
+
+@login_required
+def change_password(request):
+    if request.method == 'POST':
+        form = CustomPasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            # Update session auth hash to prevent logout
+            update_session_auth_hash(request, user)
+            messages.success(request, 'Your password was successfully updated!')
+            return redirect('index')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = CustomPasswordChangeForm(request.user)
+    
+    return render(request, 'experiment_flow/change_password.html', {
+        'form': form
+    })
 
 # Helper function to generate available flow codes
 def get_available_flow_codes(experiment):
