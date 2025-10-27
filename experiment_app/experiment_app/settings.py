@@ -29,7 +29,7 @@ DEBUG = True
 
 # IMPORTANT: Add your internal server's hostname or IP address here
 # Examples: ['experiment-app.yourlab.edu', '192.168.1.100', 'localhost']
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]','*']
 
 
 # Application definition
