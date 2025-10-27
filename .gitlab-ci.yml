@@ -22,7 +22,7 @@ scp_files_to_production_server:
     -   scp -i $IDENTITY "./$file" root@$REMOTEHOST:"/$BASEDIR/$file"
     - done
     - ssh -i $IDENTITY root@$REMOTEHOST "supervisorctl stop experiment_app:*"
-    - ssh -i $IDENTITY root@$REMOTEHOST "cd $BASEDIR; python3 manage.py makemigrations;python3 manage.py migrate"
+    - ssh -i $IDENTITY root@$REMOTEHOST "cd $BASEDIR/experiment_app; python3 manage.py makemigrations;python3 manage.py migrate"
     # - ssh -i $IDENTITY root@$REMOTEHOST "cd $BASEDIR; python3 manage.py collectstatic"
     - ssh -i $IDENTITY root@$REMOTEHOST "supervisorctl start experiment_app:*"
     - ssh -i $IDENTITY root@$REMOTEHOST "echo 'helloexperiment' > /tmp/2.txt"
