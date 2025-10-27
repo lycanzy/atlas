@@ -119,8 +119,19 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+import os
+
+# STATIC_URL = 'static/'
+# STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+MEDIA_URL = 'images/'
+STATIC_DIRS = [ BASE_DIR / 'static']
+print(STATIC_DIRS)
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+print(STATIC_ROOT)
+MEDIA_ROOT =  BASE_DIR / 'images'
 # Removed non-existent directory from STATICFILES_DIRS
 # App-specific static files are automatically collected from each app's static/ folder
 
