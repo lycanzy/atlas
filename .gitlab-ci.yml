@@ -1,4 +1,4 @@
-stages: #阶段
+stages: #阶段 
   - scp_files_to_production_server
 
 variables:
