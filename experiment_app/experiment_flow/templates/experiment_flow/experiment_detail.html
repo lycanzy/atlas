@@ -273,6 +273,64 @@
     background-color: #f8d7da;
     color: #721c24;
 }
+
+/* Prevent text wrapping in flow descriptions */
+.flow-desc {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    max-width: 100%;
+    cursor: pointer;
+}
+
+/* Prevent text wrapping in step descriptions */
+.step-desc {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    max-width: 100%;
+    cursor: pointer;
+}
+
+/* Fix table layout to prevent cell resizing */
+.table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.table th:nth-child(1) { width: 50px; }
+.table th:nth-child(2) { width: 150px; }
+.table th:nth-child(3) { width: 150px; }
+.table th:nth-child(4) { width: calc(100% - 450px); } /* Remaining space for description */
+.table th:nth-child(5) { width: 100px; }
+
+.table td:nth-child(1) { width: 50px; }
+.table td:nth-child(2) { width: 150px; }
+.table td:nth-child(3) { width: 150px; }
+.table td:nth-child(4) { width: calc(100% - 450px); } /* Remaining space for description */
+.table td:nth-child(5) { width: 100px; }
+
+/* Fix step table layout to prevent cell resizing */
+.steps-row .table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.steps-row .table th:nth-child(1) { width: 40px; }   /* Checkbox */
+.steps-row .table th:nth-child(2) { width: 200px; }  /* Step Name */
+.steps-row .table th:nth-child(3) { width: 80px; }   /* Step Num */
+.steps-row .table th:nth-child(4) { width: 140px; }  /* Status */
+.steps-row .table th:nth-child(5) { width: calc(100% - 560px); } /* Description (remaining space) */
+.steps-row .table th:nth-child(6) { width: 100px; }  /* Actions */
+
+.steps-row .table td:nth-child(1) { width: 40px; }
+.steps-row .table td:nth-child(2) { width: 200px; }
+.steps-row .table td:nth-child(3) { width: 80px; }
+.steps-row .table td:nth-child(4) { width: 140px; }
+.steps-row .table td:nth-child(5) { width: calc(100% - 560px); }
+.steps-row .table td:nth-child(6) { width: 100px; }
 </style>
 
 <div class="main-section">
