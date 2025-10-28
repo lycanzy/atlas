@@ -484,8 +484,12 @@ def copy_steps(request, exp_id):
                 return JsonResponse({'success': False, 'error': 'Selected steps not found'})
             
             copied_count = 0
-            
-            # Copy each step to the target flow
+
+            # We'll keep a mapping from original step id -> new step instance
+            # This allows us to restore parent relationships for copied steps
+            orig_to_new = {}
+
+            # Copy each step to the target flow (first pass: create steps)
             for original_step in steps_to_copy:
                 # Get the step name (just the 2-letter code, e.g., "MX")
                 step_name = original_step.step_name
@@ -525,8 +529,20 @@ def copy_steps(request, exp_id):
                     completed_on=None
                 )
                 new_step.save()
+                # record mapping
+                orig_to_new[original_step.id] = new_step
                 copied_count += 1
             
+            # Second pass: restore parent relationships when parent was also copied
+            for original_step in steps_to_copy:
+                new_step = orig_to_new.get(original_step.id)
+                if not new_step:
+                    continue
+                if original_step.parent and original_step.parent.id in orig_to_new:
+                    new_parent = orig_to_new[original_step.parent.id]
+                    new_step.parent = new_parent
+                    new_step.save()
+
             return JsonResponse({
                 'success': True,
                 'message': f'Successfully copied {copied_count} step(s) to flow {target_flow.full_flow}',
