@@ -516,8 +516,10 @@ def copy_steps(request, exp_id):
                     step_description=original_step.step_description,
                     flow=target_flow,
                     parent=None,  # Parent relationships are flow-specific, so reset
+                    tool=original_step.tool,  # Copy equipment/tool used for the step
                     recipe=original_step.recipe,
                     notes=original_step.notes,
+                    components=original_step.components or [],  # Copy components/materials list
                     status="Planned",  # Always set to "Planned" regardless of original status
                     started_on=None,  # Reset timestamps for copied steps
                     completed_on=None
