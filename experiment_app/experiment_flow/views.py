@@ -11,6 +11,37 @@ from .forms import ExpStepForm, ExpFlowForm, EquipmentForm, CustomPasswordChange
 import json
 import string
 
+
+# Helper to return experiments visible to the current user (by research group)
+def get_experiments_for_user(user, search_query='', my_experiments=''):
+    """Return a queryset of Exp filtered to the user's research group.
+
+    If the user has no profile or no research_group, return an empty queryset.
+    """
+    # Start with none by default
+    rg = None
+    profile = getattr(user, 'profile', None)
+    if profile:
+        rg = getattr(profile, 'research_group', None)
+
+    if not rg:
+        return Exp.objects.none()
+
+    qs = Exp.objects.filter(project__group=rg).order_by('-created_on')
+
+    # Filter by owner if requested
+    if my_experiments == '1':
+        qs = qs.filter(owner=user)
+
+    if search_query:
+        qs = qs.filter(
+            Q(exp_name__icontains=search_query) |
+            Q(exp_description__icontains=search_query) |
+            Q(project__project_name__icontains=search_query)
+        )
+
+    return qs
+
 # Authentication views
 def login_view(request):
     if request.user.is_authenticated:
@@ -77,18 +108,8 @@ def index(request):
 
     search_query = request.GET.get('search', '')
     my_experiments = request.GET.get('my_experiments', '')
-    latest_exp = Exp.objects.order_by('-created_on')
-    
-    # Filter by owner if my_experiments is set
-    if my_experiments == '1':
-        latest_exp = latest_exp.filter(owner=request.user)
-    
-    if search_query:
-        latest_exp = latest_exp.filter(
-            Q(exp_name__icontains=search_query) | 
-            Q(exp_description__icontains=search_query) |
-            Q(project__project_name__icontains=search_query)
-        )
+    # Use group-restricted queryset helper
+    latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
     
     page_number = request.GET.get('page', 1)
     paginator = Paginator(latest_exp, 10)  # 10 experiments per page
@@ -104,23 +125,18 @@ def index(request):
 def experiment_detail(request, exp_id):
     
     experiment = Exp.objects.get(id=exp_id)
+    # Security: ensure the current user is in the same research group as the experiment's project
+    profile = getattr(request.user, 'profile', None)
+    user_group = getattr(profile, 'research_group', None)
+    if not user_group or not getattr(experiment, 'project', None) or experiment.project.group != user_group:
+        messages.error(request, 'You do not have permission to view this experiment.')
+        return redirect('index')
     flows = ExpFlow.objects.filter(exp=experiment).order_by('created_on')
     available_flow_codes = get_available_flow_codes(experiment)
     
     search_query = request.GET.get('search', '')
     my_experiments = request.GET.get('my_experiments', '')
-    latest_exp = Exp.objects.order_by('-created_on')
-    
-    # Filter by owner if my_experiments is set
-    if my_experiments == '1':
-        latest_exp = latest_exp.filter(owner=request.user)
-    
-    if search_query:
-        latest_exp = latest_exp.filter(
-            Q(exp_name__icontains=search_query) | 
-            Q(exp_description__icontains=search_query) |
-            Q(project__project_name__icontains=search_query)
-        )
+    latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
     
     page_number = request.GET.get('page', 1)
     paginator = Paginator(latest_exp, 10)  # 10 experiments per page
@@ -154,23 +170,18 @@ def delete_step(request, exp_id, flow_id, step_id):
 
 @login_required
 def add_experiment(request):
-    projects = Project.objects.all().order_by('project_name')
-    
+    # Show only projects in the user's research group
+    profile = getattr(request.user, 'profile', None)
+    user_group = getattr(profile, 'research_group', None)
+    if user_group:
+        projects = Project.objects.filter(group=user_group).order_by('project_name')
+    else:
+        projects = Project.objects.none()
+
     search_query = request.GET.get('search', '')
     my_experiments = request.GET.get('my_experiments', '')
-    latest_exp = Exp.objects.order_by('-created_on')
-    
-    # Filter by owner if my_experiments is set
-    if my_experiments == '1':
-        latest_exp = latest_exp.filter(owner=request.user)
-    
-    if search_query:
-        latest_exp = latest_exp.filter(
-            Q(exp_name__icontains=search_query) | 
-            Q(exp_description__icontains=search_query) |
-            Q(project__project_name__icontains=search_query)
-        )
-    
+    latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
+
     page_number = request.GET.get('page', 1)
     paginator = Paginator(latest_exp, 10)
     page_obj = paginator.get_page(page_number)
@@ -179,7 +190,8 @@ def add_experiment(request):
         project_id = request.POST.get('project')
         if project_id:
             try:
-                project = Project.objects.get(id=project_id)
+                # ensure the selected project belongs to user's group
+                project = Project.objects.get(id=project_id, group=user_group)
                 exp_name = project.generate_experiment_name()
                 exp_description = request.POST.get('exp_description')
                 new_exp = Exp(
@@ -218,6 +230,12 @@ def add_experiment(request):
 def add_flow(request, exp_id):
     try:
         experiment = get_object_or_404(Exp, id=exp_id)
+        # Security: ensure the user is in the same research group as the experiment
+        profile = getattr(request.user, 'profile', None)
+        user_group = getattr(profile, 'research_group', None)
+        if not user_group or not getattr(experiment, 'project', None) or experiment.project.group != user_group:
+            messages.error(request, "You do not have permission to access this experiment.")
+            return redirect('index')
         
         if request.method == 'POST':
             flow_name = request.POST.get('flow_name')
@@ -241,26 +259,15 @@ def add_flow(request, exp_id):
                             'success': False,
                             'error': str(e)
                         })
-                    
+
                     search_query = request.GET.get('search', '')
                     my_experiments = request.GET.get('my_experiments', '')
-                    latest_exp = Exp.objects.order_by('-created_on')
-                    
-                    # Filter by owner if my_experiments is set
-                    if my_experiments == '1':
-                        latest_exp = latest_exp.filter(owner=request.user)
-                    
-                    if search_query:
-                        latest_exp = latest_exp.filter(
-                            Q(exp_name__icontains=search_query) | 
-                            Q(exp_description__icontains=search_query) |
-                            Q(project__project_name__icontains=search_query)
-                        )
-                    
+                    latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
+
                     page_number = request.GET.get('page', 1)
                     paginator = Paginator(latest_exp, 10)
                     page_obj = paginator.get_page(page_number)
-                    
+
                     return render(request, 'experiment_flow/add_flow.html', {
                         'experiment': experiment,
                         'experiments': page_obj,
@@ -272,19 +279,8 @@ def add_flow(request, exp_id):
         # For GET requests or rendering the form
         search_query = request.GET.get('search', '')
         my_experiments = request.GET.get('my_experiments', '')
-        latest_exp = Exp.objects.order_by('-created_on')
-        
-        # Filter by owner if my_experiments is set
-        if my_experiments == '1':
-            latest_exp = latest_exp.filter(owner=request.user)
-        
-        if search_query:
-            latest_exp = latest_exp.filter(
-                Q(exp_name__icontains=search_query) | 
-                Q(exp_description__icontains=search_query) |
-                Q(project__project_name__icontains=search_query)
-            )
-        
+        latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
+
         page_number = request.GET.get('page', 1)
         paginator = Paginator(latest_exp, 10)
         page_obj = paginator.get_page(page_number)

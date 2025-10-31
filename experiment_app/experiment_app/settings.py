@@ -66,6 +66,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # Inject group-scoped experiments into every template's context
+                'experiment_flow.context_processors.experiments_for_user',
             ],
         },
     },
