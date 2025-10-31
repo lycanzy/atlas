@@ -1,12 +1,12 @@
 from django.shortcuts import get_object_or_404, render, redirect
-from django.http import HttpResponse, JsonResponse, Http404
+from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Exp, ExpFlow, ExpStep, Project, Equipment, UserProfile
+from .models import Exp, ExpFlow, ExpStep, Project, Equipment
 from .forms import ExpStepForm, ExpFlowForm, EquipmentForm, CustomPasswordChangeForm
 import json
 import string
@@ -55,38 +55,6 @@ def change_password(request):
         'form': form
     })
 
-# Helper function to get experiments for a user
-def get_experiments_for_user(user, search_query='', my_experiments=''):
-    """Returns a queryset of experiments visible to the user."""
-    
-    # Start with a base queryset
-    exp_qs = Exp.objects.order_by('-created_on')
-
-    # Filter by user's research group
-    try:
-        user_group = user.profile.research_group
-        if user_group:
-            exp_qs = exp_qs.filter(project__group=user_group)
-        else:
-            # If user has no group, they see no experiments
-            exp_qs = Exp.objects.none()
-    except UserProfile.DoesNotExist:
-        # If user has no profile, they see no experiments
-        exp_qs = Exp.objects.none()
-
-    # Filter by owner if my_experiments is set
-    if my_experiments == '1':
-        exp_qs = exp_qs.filter(owner=user)
-    
-    if search_query:
-        exp_qs = exp_qs.filter(
-            Q(exp_name__icontains=search_query) | 
-            Q(exp_description__icontains=search_query) |
-            Q(project__project_name__icontains=search_query)
-        )
-    
-    return exp_qs
-
 # Helper function to generate available flow codes
 def get_available_flow_codes(experiment):
     """Generate list of available 2-letter codes not used in this experiment"""
@@ -109,8 +77,18 @@ def index(request):
 
     search_query = request.GET.get('search', '')
     my_experiments = request.GET.get('my_experiments', '')
+    latest_exp = Exp.objects.order_by('-created_on')
     
-    latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
+    # Filter by owner if my_experiments is set
+    if my_experiments == '1':
+        latest_exp = latest_exp.filter(owner=request.user)
+    
+    if search_query:
+        latest_exp = latest_exp.filter(
+            Q(exp_name__icontains=search_query) | 
+            Q(exp_description__icontains=search_query) |
+            Q(project__project_name__icontains=search_query)
+        )
     
     page_number = request.GET.get('page', 1)
     paginator = Paginator(latest_exp, 10)  # 10 experiments per page
@@ -125,30 +103,24 @@ def index(request):
 @login_required
 def experiment_detail(request, exp_id):
     
-    experiment = get_object_or_404(Exp, id=exp_id)
-
-    # Security check: ensure user belongs to the experiment's group
-    try:
-        user_group = request.user.profile.research_group
-        if not user_group:
-            messages.error(request, "You are not in a research group and cannot view experiments.")
-            return redirect('index')
-        
-        if not experiment.project or experiment.project.group != user_group:
-            messages.error(request, "You do not have permission to view this experiment.")
-            return redirect('index')
-
-    except UserProfile.DoesNotExist:
-        messages.error(request, "You do not have a user profile and cannot view experiments.")
-        return redirect('index')
-
+    experiment = Exp.objects.get(id=exp_id)
     flows = ExpFlow.objects.filter(exp=experiment).order_by('created_on')
     available_flow_codes = get_available_flow_codes(experiment)
     
     search_query = request.GET.get('search', '')
     my_experiments = request.GET.get('my_experiments', '')
+    latest_exp = Exp.objects.order_by('-created_on')
     
-    latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
+    # Filter by owner if my_experiments is set
+    if my_experiments == '1':
+        latest_exp = latest_exp.filter(owner=request.user)
+    
+    if search_query:
+        latest_exp = latest_exp.filter(
+            Q(exp_name__icontains=search_query) | 
+            Q(exp_description__icontains=search_query) |
+            Q(project__project_name__icontains=search_query)
+        )
     
     page_number = request.GET.get('page', 1)
     paginator = Paginator(latest_exp, 10)  # 10 experiments per page
@@ -182,34 +154,32 @@ def delete_step(request, exp_id, flow_id, step_id):
 
 @login_required
 def add_experiment(request):
-    user_group = None
-    try:
-        user_group = request.user.profile.research_group
-    except UserProfile.DoesNotExist:
-        pass  # user_group remains None
-
-    if user_group:
-        projects = Project.objects.filter(group=user_group).order_by('project_name')
-    else:
-        projects = Project.objects.none()
+    projects = Project.objects.all().order_by('project_name')
     
     search_query = request.GET.get('search', '')
     my_experiments = request.GET.get('my_experiments', '')
-    latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
+    latest_exp = Exp.objects.order_by('-created_on')
+    
+    # Filter by owner if my_experiments is set
+    if my_experiments == '1':
+        latest_exp = latest_exp.filter(owner=request.user)
+    
+    if search_query:
+        latest_exp = latest_exp.filter(
+            Q(exp_name__icontains=search_query) | 
+            Q(exp_description__icontains=search_query) |
+            Q(project__project_name__icontains=search_query)
+        )
     
     page_number = request.GET.get('page', 1)
     paginator = Paginator(latest_exp, 10)
     page_obj = paginator.get_page(page_number)
 
     if request.method == 'POST':
-        if not user_group:
-            messages.error(request, "You are not in a research group and cannot create experiments.")
-            return redirect('add_experiment')
-
         project_id = request.POST.get('project')
         if project_id:
             try:
-                project = get_object_or_404(Project, id=project_id, group=user_group)
+                project = Project.objects.get(id=project_id)
                 exp_name = project.generate_experiment_name()
                 exp_description = request.POST.get('exp_description')
                 new_exp = Exp(
@@ -220,13 +190,13 @@ def add_experiment(request):
                 )
                 new_exp.save()
                 return redirect('index')
-            except (Project.DoesNotExist, Http404):
+            except Project.DoesNotExist:
                 return render(request, 'experiment_flow/add_experiment.html', {
                     'projects': projects,
                     'experiments': page_obj,
                     'page_obj': page_obj,
                     'search_query': search_query,
-                    'error': 'Selected project not found or you do not have permission.'
+                    'error': 'Selected project not found.'
                 })
             except ValidationError as e:
                 return render(request, 'experiment_flow/add_experiment.html', {
@@ -246,72 +216,87 @@ def add_experiment(request):
 
 @login_required
 def add_flow(request, exp_id):
-    experiment = get_object_or_404(Exp, id=exp_id)
-    
-    # Security check
     try:
-        user_group = request.user.profile.research_group
-        if not user_group or not experiment.project or experiment.project.group != user_group:
-            messages.error(request, "You do not have permission to access this experiment.")
-            return redirect('index')
-    except UserProfile.DoesNotExist:
-        messages.error(request, "You do not have permission to access this experiment.")
-        return redirect('index')
+        experiment = get_object_or_404(Exp, id=exp_id)
         
-    if request.method == 'POST':
-        flow_name = request.POST.get('flow_name')
-        if flow_name:
-            try:
-                new_flow = ExpFlow(flow_name=flow_name, exp=experiment)
-                new_flow.save()
-                
-                # Return JSON for AJAX requests
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return JsonResponse({
-                        'success': True,
-                        'flow_id': new_flow.id,
-                        'flow_name': new_flow.full_flow
-                    })
-                
-                return redirect('experiment_detail', exp_id=exp_id)
-            except ValidationError as e:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return JsonResponse({
-                        'success': False,
+        if request.method == 'POST':
+            flow_name = request.POST.get('flow_name')
+            if flow_name:
+                try:
+                    new_flow = ExpFlow(flow_name=flow_name, exp=experiment)
+                    new_flow.save()
+                    
+                    # Return JSON for AJAX requests
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({
+                            'success': True,
+                            'flow_id': new_flow.id,
+                            'flow_name': new_flow.full_flow
+                        })
+                    
+                    return redirect('experiment_detail', exp_id=exp_id)
+                except ValidationError as e:
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({
+                            'success': False,
+                            'error': str(e)
+                        })
+                    
+                    search_query = request.GET.get('search', '')
+                    my_experiments = request.GET.get('my_experiments', '')
+                    latest_exp = Exp.objects.order_by('-created_on')
+                    
+                    # Filter by owner if my_experiments is set
+                    if my_experiments == '1':
+                        latest_exp = latest_exp.filter(owner=request.user)
+                    
+                    if search_query:
+                        latest_exp = latest_exp.filter(
+                            Q(exp_name__icontains=search_query) | 
+                            Q(exp_description__icontains=search_query) |
+                            Q(project__project_name__icontains=search_query)
+                        )
+                    
+                    page_number = request.GET.get('page', 1)
+                    paginator = Paginator(latest_exp, 10)
+                    page_obj = paginator.get_page(page_number)
+                    
+                    return render(request, 'experiment_flow/add_flow.html', {
+                        'experiment': experiment,
+                        'experiments': page_obj,
+                        'page_obj': page_obj,
+                        'search_query': search_query,
                         'error': str(e)
                     })
-                
-                search_query = request.GET.get('search', '')
-                my_experiments = request.GET.get('my_experiments', '')
-                latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
-                
-                page_number = request.GET.get('page', 1)
-                paginator = Paginator(latest_exp, 10)
-                page_obj = paginator.get_page(page_number)
-                
-                return render(request, 'experiment_flow/add_flow.html', {
-                    'experiment': experiment,
-                    'experiments': page_obj,
-                    'page_obj': page_obj,
-                    'search_query': search_query,
-                    'error': str(e)
-                })
-    
-    # For GET requests or rendering the form
-    search_query = request.GET.get('search', '')
-    my_experiments = request.GET.get('my_experiments', '')
-    latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
-    
-    page_number = request.GET.get('page', 1)
-    paginator = Paginator(latest_exp, 10)
-    page_obj = paginator.get_page(page_number)
-    
-    return render(request, 'experiment_flow/add_flow.html', {
-        'experiment': experiment, 
-        'experiments': page_obj, 
-        'page_obj': page_obj,
-        'search_query': search_query
-    })
+        
+        # For GET requests or rendering the form
+        search_query = request.GET.get('search', '')
+        my_experiments = request.GET.get('my_experiments', '')
+        latest_exp = Exp.objects.order_by('-created_on')
+        
+        # Filter by owner if my_experiments is set
+        if my_experiments == '1':
+            latest_exp = latest_exp.filter(owner=request.user)
+        
+        if search_query:
+            latest_exp = latest_exp.filter(
+                Q(exp_name__icontains=search_query) | 
+                Q(exp_description__icontains=search_query) |
+                Q(project__project_name__icontains=search_query)
+            )
+        
+        page_number = request.GET.get('page', 1)
+        paginator = Paginator(latest_exp, 10)
+        page_obj = paginator.get_page(page_number)
+        
+        return render(request, 'experiment_flow/add_flow.html', {
+            'experiment': experiment, 
+            'experiments': page_obj, 
+            'page_obj': page_obj,
+            'search_query': search_query
+        })
+    except Exp.DoesNotExist:
+        return HttpResponse('Experiment not found', status=404)
 
 @login_required
 def add_step(request, exp_id, flow_id):
