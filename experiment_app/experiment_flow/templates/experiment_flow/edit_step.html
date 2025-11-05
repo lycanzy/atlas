@@ -188,7 +188,16 @@
       <tbody id="components-container">
         {% for component in step.components %}
         <tr class="component-row">
-          <td><input type="text" class="form-control form-control-sm component-material" value="{{ component.material_name }}"></td>
+          <td style="position: relative;">
+            <input type="text" class="form-control form-control-sm component-material" 
+                   id="material-input-existing-{{ forloop.counter }}"
+                   value="{{ component.material_name }}" 
+                   placeholder="Type custom name or select step..."
+                   autocomplete="off">
+            <div class="steps-dropdown" id="steps-dropdown-existing-{{ forloop.counter }}" style="display: none;">
+              <div class="dropdown-loading">Loading steps...</div>
+            </div>
+          </td>
           <td><input type="number" step="0.001" class="form-control form-control-sm component-quantity" value="{{ component.quantity }}"></td>
           <td><input type="text" class="form-control form-control-sm component-unit" value="{{ component.unit }}"></td>
           <td class="text-center">
@@ -225,3 +234,111 @@
     </button>
   </div>
 </form>
+
+<script>
+// Setup dropdowns for existing components when the edit modal loads
+(async function() {
+    try {
+        const response = await fetch('/api/steps/');
+        const data = await response.json();
+        const steps = data.steps || [];
+        
+        // Setup each existing component's dropdown
+        document.querySelectorAll('input[id^="material-input-existing-"]').forEach((input, index) => {
+            const counter = index + 1;
+            const dropdown = document.getElementById(`steps-dropdown-existing-${counter}`);
+            
+            if (!dropdown) return;
+            
+            // Helper function to update dropdown options
+            function updateOptions(filteredSteps) {
+                if (filteredSteps.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-item-empty">No steps found</div>';
+                    return;
+                }
+                
+                dropdown.innerHTML = '';
+                filteredSteps.forEach(step => {
+                    const item = document.createElement('div');
+                    item.className = 'dropdown-item-custom';
+                    item.textContent = `${step.full_step} (${step.experiment})`;
+                    item.addEventListener('click', function() {
+                        input.value = step.full_step;
+                        dropdown.style.display = 'none';
+                    });
+                    dropdown.appendChild(item);
+                });
+            }
+            
+            // Initial population
+            updateOptions(steps);
+            
+            // Show dropdown on focus
+            input.addEventListener('focus', function() {
+                updateOptions(steps);
+                dropdown.style.display = 'block';
+            });
+            
+            // Filter dropdown on input
+            input.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const filtered = steps.filter(step => 
+                    step.full_step.toLowerCase().includes(searchTerm) ||
+                    step.experiment.toLowerCase().includes(searchTerm)
+                );
+                updateOptions(filtered);
+                dropdown.style.display = 'block';
+            });
+            
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        });
+    } catch (error) {
+        console.error('Error fetching steps for edit modal:', error);
+    }
+})();
+</script>
+
+<style>
+.steps-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ced4da;
+    border-top: none;
+    border-radius: 0 0 0.25rem 0.25rem;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dropdown-item-custom {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.dropdown-item-custom:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-item-custom:last-child {
+    border-bottom: none;
+}
+
+.dropdown-loading,
+.dropdown-item-empty {
+    padding: 0.5rem 0.75rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+    text-align: center;
+}
+</style>

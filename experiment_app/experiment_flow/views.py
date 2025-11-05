@@ -646,3 +646,76 @@ def edit_equipment(request, equipment_id):
         'equipment': equipment
     })
 
+# Barcode generation views
+@login_required
+def flow_barcode(request, flow_id):
+    """Generate a printable barcode page for a flow"""
+    flow = get_object_or_404(ExpFlow, id=flow_id)
+    
+    # Check if user has access to this flow's experiment
+    if not flow.exp or flow.exp.project.group != request.user.profile.research_group:
+        messages.error(request, "You don't have permission to access this flow.")
+        return redirect('index')
+    
+    # Generate barcode if it doesn't exist
+    if not flow.barcode:
+        barcode_id = f"F{flow.id:06d}"
+        flow.barcode = barcode_id
+        flow.save(update_fields=['barcode'])
+    
+    return render(request, 'experiment_flow/flow_barcode.html', {
+        'flow': flow,
+        'barcode_id': flow.barcode
+    })
+
+@login_required
+def step_barcode(request, step_id):
+    """Generate a printable barcode page for a step"""
+    step = get_object_or_404(ExpStep, id=step_id)
+    
+    # Check if user has access to this step's flow
+    if not step.flow or not step.flow.exp or step.flow.exp.project.group != request.user.profile.research_group:
+        messages.error(request, "You don't have permission to access this step.")
+        return redirect('index')
+    
+    # Generate barcode if it doesn't exist
+    if not step.barcode:
+        barcode_id = f"S{step.id:06d}"
+        step.barcode = barcode_id
+        step.save(update_fields=['barcode'])
+    
+    return render(request, 'experiment_flow/step_barcode.html', {
+        'step': step,
+        'barcode_id': step.barcode
+    })
+
+@login_required
+def get_all_steps(request):
+    """API endpoint to get all steps for the current user's research group"""
+    # Get user's research group
+    profile = getattr(request.user, 'profile', None)
+    if not profile:
+        return JsonResponse({'steps': []})
+    
+    rg = getattr(profile, 'research_group', None)
+    if not rg:
+        return JsonResponse({'steps': []})
+    
+    # Get all steps from experiments in the user's research group
+    steps = ExpStep.objects.filter(
+        flow__exp__project__group=rg
+    ).select_related('flow', 'flow__exp').order_by('-started_on')
+    
+    # Format step data
+    steps_data = []
+    for step in steps:
+        steps_data.append({
+            'id': step.id,
+            'full_step': step.full_step,
+            'step_name': f"{step.step_name}{step.step_number}",
+            'flow': step.flow.full_flow if step.flow else '',
+            'experiment': step.flow.exp.exp_name if step.flow and step.flow.exp else ''
+        })
+    
+    return JsonResponse({'steps': steps_data})
+

@@ -39,5 +39,8 @@ urlpatterns = [
     path('equipment/<int:equipment_id>/', views.equipment_detail, name='equipment_detail'),
     path('add_equipment/', views.add_equipment, name='add_equipment'),
     path('equipment/<int:equipment_id>/edit/', views.edit_equipment, name='edit_equipment'),
+    path('flow/<int:flow_id>/barcode/', views.flow_barcode, name='flow_barcode'),
+    path('step/<int:step_id>/barcode/', views.step_barcode, name='step_barcode'),
+    path('api/steps/', views.get_all_steps, name='get_all_steps'),
     path('admin/', admin.site.urls),
 ]

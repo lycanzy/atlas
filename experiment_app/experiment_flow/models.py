@@ -75,6 +75,7 @@ class ExpFlow(models.Model):
     exp = models.ForeignKey(Exp, on_delete = models.CASCADE, related_name = 'flow', null = True)
     created_on = models.DateTimeField(auto_now_add=True, null = True)
     full_flow = models.CharField(max_length=35, editable=False, db_index=True, null = True)  # Adding index for faster queries
+    barcode = models.CharField(max_length=100, blank=True, unique=True, null=True, help_text="Unique barcode identifier for this flow")
 
     def clean(self):
         if self.flow_name:
@@ -140,6 +141,7 @@ class ExpStep(models.Model):
 
     flow = models.ForeignKey(ExpFlow, on_delete = models.CASCADE, related_name = 'step', null = True)
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, related_name='child', null=True, blank=True)
+    barcode = models.CharField(max_length=100, blank=True, unique=True, null=True, help_text="Unique barcode identifier for this step")
 
     @property
     def step_num(self):
@@ -265,7 +267,7 @@ class Equipment(models.Model):
     def __str__(self):
         return self.equipment_name
 
-# Signal to update ExpFlow.full_flow when Exp name changes
+# Signal to update all flow identifiers when experiment changes
 @receiver(post_save, sender=Exp)
 def update_flow_identifiers(sender, instance, **kwargs):
     # Update all related flows
@@ -284,3 +286,21 @@ def update_step_identifiers(sender, instance, **kwargs):
     for step in instance.step.all():
         step.full_step = f"{instance.full_flow}-{step.full_step_name}"
         step.save(update_fields=['full_step'])
+
+# Signal to generate barcode for ExpFlow
+@receiver(post_save, sender=ExpFlow)
+def generate_flow_barcode(sender, instance, created, **kwargs):
+    if created and not instance.barcode:
+        # Generate a unique barcode ID using flow ID
+        barcode_id = f"F{instance.id:06d}"
+        instance.barcode = barcode_id
+        ExpFlow.objects.filter(pk=instance.pk).update(barcode=barcode_id)
+
+# Signal to generate barcode for ExpStep
+@receiver(post_save, sender=ExpStep)
+def generate_step_barcode(sender, instance, created, **kwargs):
+    if created and not instance.barcode:
+        # Generate a unique barcode ID using step ID
+        barcode_id = f"S{instance.id:06d}"
+        instance.barcode = barcode_id
+        ExpStep.objects.filter(pk=instance.pk).update(barcode=barcode_id)
