@@ -85,7 +85,7 @@
         width: 100%;
     }
     .equipment-table th {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-color: #3b6ef6;
         color: white;
         padding: 1rem;
         text-align: left;
@@ -121,21 +121,23 @@
         margin-top: 1.5rem;
     }
     .pagination-controls button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-color: #3b6ef6;
         color: white;
         border: none;
         border-radius: 4px;
         padding: 0.4rem 0.8rem;
         cursor: pointer;
         transition: all 0.2s;
+        box-shadow: 0 2px 4px rgba(20,30,60,0.12);
     }
     .pagination-controls button:hover:not(:disabled) {
         transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        box-shadow: 0 4px 8px rgba(20,30,60,0.2);
     }
     .pagination-controls button:disabled {
         background: #ccc;
         cursor: not-allowed;
+        box-shadow: none;
     }
 </style>
 
@@ -161,7 +163,7 @@
                 </div>
                 <!-- Add Equipment Button -->
                 <a href="{% url 'add_equipment' %}" 
-                        class="btn btn-success btn-sm" 
+                        class="btn btn-outline-primary btn-sm" 
                         title="Add Equipment"
                         style="flex-shrink: 0;">
                     <i class="bi bi-plus-lg"></i>

@@ -1,1 +1,2 @@
 experiment_app/db.sqlite3
+*.pyc

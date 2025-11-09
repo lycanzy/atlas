@@ -11,14 +11,15 @@
             padding: 0;
             background: #f7f7f7;
         }
+        /* simple professional gradient for navbar */
         .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #3b6ef6;
             color: #fff;
             padding: 1rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 2px 10px rgba(20,30,60,0.12);
         }
         .navbar .btn-primary {
             background: rgba(255, 255, 255, 0.2);
@@ -47,11 +48,11 @@
             transition: all 0.2s;
         }
         .btn-outline-primary:hover {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-color: #667eea;
+            background: rgba(102,126,234,0.14);
+            border-color: rgba(102,126,234,0.5);
             color: white;
             transform: translateY(-1px);
-            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 2px 6px rgba(20,30,60,0.12);
         }
         .container {
             padding: 2rem;
@@ -85,6 +86,9 @@
                         <small class="text-muted">({{ user.profile.research_group.group_name }})</small>
                     {% endif %}
                 </span>
+                <button onclick="location.href='{% url 'change_password' %}'" class="btn btn-outline-light btn-sm me-2">
+                    <i class="bi bi-key"></i> Change Password
+                </button>
                 <button onclick="location.href='{% url 'logout' %}'" class="btn btn-outline-light btn-sm">
                     <i class="bi bi-box-arrow-right"></i> Logout
                 </button>

@@ -16,18 +16,24 @@ import string
 def get_experiments_for_user(user, search_query='', my_experiments=''):
     """Return a queryset of Exp filtered to the user's research group.
 
+    Staff and superusers can see all experiments.
+    Regular users see only experiments in their research group.
     If the user has no profile or no research_group, return an empty queryset.
     """
-    # Start with none by default
-    rg = None
-    profile = getattr(user, 'profile', None)
-    if profile:
-        rg = getattr(profile, 'research_group', None)
+    # Staff and superusers can access all experiments
+    if user.is_staff or user.is_superuser:
+        qs = Exp.objects.all().order_by('-created_on')
+    else:
+        # Regular users: filter by research group
+        rg = None
+        profile = getattr(user, 'profile', None)
+        if profile:
+            rg = getattr(profile, 'research_group', None)
 
-    if not rg:
-        return Exp.objects.none()
+        if not rg:
+            return Exp.objects.none()
 
-    qs = Exp.objects.filter(project__group=rg).order_by('-created_on')
+        qs = Exp.objects.filter(project__group=rg).order_by('-created_on')
 
     # Filter by owner if requested
     if my_experiments == '1':
@@ -126,11 +132,13 @@ def experiment_detail(request, exp_id):
     
     experiment = Exp.objects.get(id=exp_id)
     # Security: ensure the current user is in the same research group as the experiment's project
-    profile = getattr(request.user, 'profile', None)
-    user_group = getattr(profile, 'research_group', None)
-    if not user_group or not getattr(experiment, 'project', None) or experiment.project.group != user_group:
-        messages.error(request, 'You do not have permission to view this experiment.')
-        return redirect('index')
+    # Staff and superusers can access all experiments
+    if not (request.user.is_staff or request.user.is_superuser):
+        profile = getattr(request.user, 'profile', None)
+        user_group = getattr(profile, 'research_group', None)
+        if not user_group or not getattr(experiment, 'project', None) or experiment.project.group != user_group:
+            messages.error(request, 'You do not have permission to view this experiment.')
+            return redirect('index')
     flows = ExpFlow.objects.filter(exp=experiment).order_by('created_on')
     available_flow_codes = get_available_flow_codes(experiment)
     
@@ -171,12 +179,16 @@ def delete_step(request, exp_id, flow_id, step_id):
 @login_required
 def add_experiment(request):
     # Show only projects in the user's research group
-    profile = getattr(request.user, 'profile', None)
-    user_group = getattr(profile, 'research_group', None)
-    if user_group:
-        projects = Project.objects.filter(group=user_group).order_by('project_name')
+    # Staff and superusers can see all projects
+    if request.user.is_staff or request.user.is_superuser:
+        projects = Project.objects.all().order_by('project_name')
     else:
-        projects = Project.objects.none()
+        profile = getattr(request.user, 'profile', None)
+        user_group = getattr(profile, 'research_group', None)
+        if user_group:
+            projects = Project.objects.filter(group=user_group).order_by('project_name')
+        else:
+            projects = Project.objects.none()
 
     search_query = request.GET.get('search', '')
     my_experiments = request.GET.get('my_experiments', '')
@@ -190,8 +202,15 @@ def add_experiment(request):
         project_id = request.POST.get('project')
         if project_id:
             try:
-                # ensure the selected project belongs to user's group
-                project = Project.objects.get(id=project_id, group=user_group)
+                # Staff and superusers can use any project
+                if request.user.is_staff or request.user.is_superuser:
+                    project = Project.objects.get(id=project_id)
+                else:
+                    # Regular users: ensure the selected project belongs to user's group
+                    profile = getattr(request.user, 'profile', None)
+                    user_group = getattr(profile, 'research_group', None)
+                    project = Project.objects.get(id=project_id, group=user_group)
+                
                 exp_name = project.generate_experiment_name()
                 exp_description = request.POST.get('exp_description')
                 new_exp = Exp(
@@ -231,11 +250,13 @@ def add_flow(request, exp_id):
     try:
         experiment = get_object_or_404(Exp, id=exp_id)
         # Security: ensure the user is in the same research group as the experiment
-        profile = getattr(request.user, 'profile', None)
-        user_group = getattr(profile, 'research_group', None)
-        if not user_group or not getattr(experiment, 'project', None) or experiment.project.group != user_group:
-            messages.error(request, "You do not have permission to access this experiment.")
-            return redirect('index')
+        # Staff and superusers can access all experiments
+        if not (request.user.is_staff or request.user.is_superuser):
+            profile = getattr(request.user, 'profile', None)
+            user_group = getattr(profile, 'research_group', None)
+            if not user_group or not getattr(experiment, 'project', None) or experiment.project.group != user_group:
+                messages.error(request, "You do not have permission to access this experiment.")
+                return redirect('index')
         
         if request.method == 'POST':
             flow_name = request.POST.get('flow_name')
@@ -653,9 +674,11 @@ def flow_barcode(request, flow_id):
     flow = get_object_or_404(ExpFlow, id=flow_id)
     
     # Check if user has access to this flow's experiment
-    if not flow.exp or flow.exp.project.group != request.user.profile.research_group:
-        messages.error(request, "You don't have permission to access this flow.")
-        return redirect('index')
+    # Staff and superusers can access all flows
+    if not (request.user.is_staff or request.user.is_superuser):
+        if not flow.exp or flow.exp.project.group != request.user.profile.research_group:
+            messages.error(request, "You don't have permission to access this flow.")
+            return redirect('index')
     
     # Generate barcode if it doesn't exist
     if not flow.barcode:
@@ -674,9 +697,11 @@ def step_barcode(request, step_id):
     step = get_object_or_404(ExpStep, id=step_id)
     
     # Check if user has access to this step's flow
-    if not step.flow or not step.flow.exp or step.flow.exp.project.group != request.user.profile.research_group:
-        messages.error(request, "You don't have permission to access this step.")
-        return redirect('index')
+    # Staff and superusers can access all steps
+    if not (request.user.is_staff or request.user.is_superuser):
+        if not step.flow or not step.flow.exp or step.flow.exp.project.group != request.user.profile.research_group:
+            messages.error(request, "You don't have permission to access this step.")
+            return redirect('index')
     
     # Generate barcode if it doesn't exist
     if not step.barcode:
@@ -692,19 +717,23 @@ def step_barcode(request, step_id):
 @login_required
 def get_all_steps(request):
     """API endpoint to get all steps for the current user's research group"""
-    # Get user's research group
-    profile = getattr(request.user, 'profile', None)
-    if not profile:
-        return JsonResponse({'steps': []})
-    
-    rg = getattr(profile, 'research_group', None)
-    if not rg:
-        return JsonResponse({'steps': []})
-    
-    # Get all steps from experiments in the user's research group
-    steps = ExpStep.objects.filter(
-        flow__exp__project__group=rg
-    ).select_related('flow', 'flow__exp').order_by('-started_on')
+    # Staff and superusers can see all steps
+    if request.user.is_staff or request.user.is_superuser:
+        steps = ExpStep.objects.all().select_related('flow', 'flow__exp').order_by('-started_on')
+    else:
+        # Get user's research group
+        profile = getattr(request.user, 'profile', None)
+        if not profile:
+            return JsonResponse({'steps': []})
+        
+        rg = getattr(profile, 'research_group', None)
+        if not rg:
+            return JsonResponse({'steps': []})
+        
+        # Get all steps from experiments in the user's research group
+        steps = ExpStep.objects.filter(
+            flow__exp__project__group=rg
+        ).select_related('flow', 'flow__exp').order_by('-started_on')
     
     # Format step data
     steps_data = []
