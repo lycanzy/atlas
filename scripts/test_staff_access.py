@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Test script to verify that staff and superuser can access all experiments
+Test s cript to verify that staff and superuser can access all experiments
 while regular users are still restricted to their research group.
 
 This script demonstrates the expected behavior:

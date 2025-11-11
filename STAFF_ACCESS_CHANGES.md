@@ -1,7 +1,7 @@
 # Staff and Superuser Access Changes
 
 ## Summary
-Updated the experiment tracking application to allow users with **Staff** or **Superuser** status to access all experiments without research group restrictions, while regular users continue to be restricted to their own research group.
+ Updated the experiment tracking application to allow users with **Staff** or **Superuser** status to access all experiments without research group restrictions, while regular users continue to be restricted to their own research group.
 
 ## Changes Made
 

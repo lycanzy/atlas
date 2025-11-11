@@ -12,7 +12,7 @@ import json
 import string
 
 
-# Helper to return experiments visible to the current user (by research group)
+# Helpe r to return experiments visible to the current user (by research group)
 def get_experiments_for_user(user, search_query='', my_experiments=''):
     """Return a queryset of Exp filtered to the user's research group.
 
