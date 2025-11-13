@@ -487,6 +487,38 @@
     </div>
 </div>
 
+<!-- Copy Steps Modal -->
+<div class="modal fade" id="copyStepsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-clipboard me-2"></i>Copy Steps to Flow
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Copying <strong><span id="copyStepsCount">0</span> step(s)</strong></p>
+                
+                <div class="mb-3">
+                    <label for="targetFlowId" class="form-label">Target Flow ID</label>
+                    <input type="text" class="form-control" id="targetFlowId" 
+                           placeholder="e.g., {{ experiment.exp_name }}AA, {{ experiment.exp_name }}MX, or flow from another experiment">
+                    <div class="form-text">Enter the full flow ID (e.g., MLO001AA)</div>
+                </div>
+                
+                <div id="copyStepsError" class="alert alert-danger d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmCopySteps">
+                    <i class="bi bi-clipboard-check me-1"></i>Copy Steps
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Add Step Modal -->
 <div class="modal fade" id="addStepModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl">
@@ -1032,9 +1064,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Handle copy steps button click
+    let selectedStepsForCopy = [];
+    let currentFlowIdForCopy = null;
+    
     document.querySelectorAll('.copy-steps-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const flowId = this.getAttribute('data-flow-id');
+            currentFlowIdForCopy = flowId;
             const checkedSteps = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`);
             
             if (checkedSteps.length === 0) {
@@ -1042,54 +1078,86 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Get step IDs
-            const stepIds = Array.from(checkedSteps).map(cb => cb.getAttribute('data-step-id'));
+            // Store step IDs
+            selectedStepsForCopy = Array.from(checkedSteps).map(cb => cb.getAttribute('data-step-id'));
             
-            // Prompt for target flow name (full flow name like "MLO001AB")
-            const targetFlowName = prompt(`Enter the target flow name (e.g., {{ experiment.exp_name }}AA, {{ experiment.exp_name }}MX):\n\nCopying ${stepIds.length} step(s)`);
+            // Update modal with count
+            document.getElementById('copyStepsCount').textContent = selectedStepsForCopy.length;
             
-            if (!targetFlowName) {
-                return; // User cancelled
-            }
+            // Clear previous input and errors
+            document.getElementById('targetFlowId').value = '';
+            document.getElementById('copyStepsError').classList.add('d-none');
             
-            // Trim whitespace
-            const trimmedFlowName = targetFlowName.trim();
-            
-            if (!trimmedFlowName) {
-                alert('Flow name cannot be empty');
-                return;
-            }
-            
-            // Send copy request
-            const expId = {{ experiment.id }};
-            
-            fetch(`/experiment/${expId}/copy_steps/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({
-                    step_ids: stepIds,
-                    target_flow_name: trimmedFlowName
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    // Reload page to show copied steps
-                    window.location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to copy steps'));
-                }
-            })
-            .catch(err => {
-                console.error('Error:', err);
-                alert('Network error: ' + err);
-            });
+            // Show modal
+            const copyModal = new bootstrap.Modal(document.getElementById('copyStepsModal'));
+            copyModal.show();
         });
     });
+    
+    // Handle confirm copy button
+    document.getElementById('confirmCopySteps').addEventListener('click', function() {
+        const targetFlowId = document.getElementById('targetFlowId').value.trim();
+        const errorDiv = document.getElementById('copyStepsError');
+        
+        if (!targetFlowId) {
+            errorDiv.textContent = 'Please enter a target flow ID.';
+            errorDiv.classList.remove('d-none');
+            return;
+        }
+        
+        if (selectedStepsForCopy.length === 0) {
+            errorDiv.textContent = 'No steps selected.';
+            errorDiv.classList.remove('d-none');
+            return;
+        }
+        
+        errorDiv.classList.add('d-none');
+        
+        // Disable button during request
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Copying...';
+        
+        const expId = {{ experiment.id }};
+        
+        fetch(`/experiment/${expId}/copy_steps/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                step_ids: selectedStepsForCopy,
+                target_flow_name: targetFlowId
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // Close modal
+                const copyModal = bootstrap.Modal.getInstance(document.getElementById('copyStepsModal'));
+                copyModal.hide();
+                
+                // Show success message
+                alert(data.message);
+                
+                // Reload page to show copied steps
+                window.location.reload();
+            } else {
+                errorDiv.textContent = 'Error: ' + (data.error || 'Failed to copy steps');
+                errorDiv.classList.remove('d-none');
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-clipboard-check me-1"></i>Copy Steps';
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            errorDiv.textContent = 'Network error: ' + err;
+            errorDiv.classList.remove('d-none');
+            this.disabled = false;
+            this.innerHTML = '<i class="bi bi-clipboard-check me-1"></i>Copy Steps';
+        });
+    });
+
     
     // Handle delete steps button click
     document.querySelectorAll('.delete-steps-btn').forEach(btn => {

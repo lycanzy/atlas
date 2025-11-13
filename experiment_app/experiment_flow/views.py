@@ -477,7 +477,7 @@ def copy_steps(request, exp_id):
         try:
             data = json.loads(request.body)
             step_ids = data.get('step_ids', [])
-            target_flow_name = data.get('target_flow_name', '')
+            target_flow_name = data.get('target_flow_name', '')  # Full flow name like "MLO001AA"
             
             if not step_ids:
                 return JsonResponse({'success': False, 'error': 'No steps selected'})
@@ -485,14 +485,20 @@ def copy_steps(request, exp_id):
             if not target_flow_name:
                 return JsonResponse({'success': False, 'error': 'Target flow name is required'})
             
-            # Get the experiment
-            experiment = get_object_or_404(Exp, id=exp_id)
+            # Get all experiments accessible to the user
+            experiments = get_experiments_for_user(request.user)
             
-            # Find the target flow by full_flow name (e.g., "MLO001AB")
-            try:
-                target_flow = ExpFlow.objects.get(full_flow=target_flow_name, exp=experiment)
-            except ExpFlow.DoesNotExist:
-                return JsonResponse({'success': False, 'error': f'Flow "{target_flow_name}" does not exist in this experiment'})
+            # Find the target flow by full_flow name across all accessible experiments
+            target_flow = None
+            for exp in experiments:
+                try:
+                    target_flow = ExpFlow.objects.get(full_flow=target_flow_name, exp=exp)
+                    break
+                except ExpFlow.DoesNotExist:
+                    continue
+            
+            if not target_flow:
+                return JsonResponse({'success': False, 'error': f'Flow "{target_flow_name}" does not exist or you do not have access to it'})
             
             # Get the selected steps
             steps_to_copy = ExpStep.objects.filter(id__in=step_ids).order_by('step_number')
@@ -560,9 +566,10 @@ def copy_steps(request, exp_id):
                     new_step.parent = new_parent
                     new_step.save()
 
+            target_exp_name = target_flow.exp.exp_name if target_flow.exp else "Unknown"
             return JsonResponse({
                 'success': True,
-                'message': f'Successfully copied {copied_count} step(s) to flow {target_flow.full_flow}',
+                'message': f'Successfully copied {copied_count} step(s) to {target_flow.full_flow} in experiment {target_exp_name}',
                 'copied_count': copied_count
             })
             
@@ -747,4 +754,31 @@ def get_all_steps(request):
         })
     
     return JsonResponse({'steps': steps_data})
+
+@login_required
+def get_experiments_with_flows(request):
+    """API endpoint to get all experiments with their flows for copy step dropdown"""
+    # Get experiments visible to user
+    experiments = get_experiments_for_user(request.user)
+    
+    # Format data
+    experiments_data = []
+    for exp in experiments:
+        flows_data = []
+        for flow in exp.flow.all().order_by('flow_name'):
+            flows_data.append({
+                'id': flow.id,
+                'full_flow': flow.full_flow,
+                'flow_name': flow.flow_name,
+                'flow_description': flow.flow_description or ''
+            })
+        
+        experiments_data.append({
+            'id': exp.id,
+            'exp_name': exp.exp_name,
+            'exp_description': exp.exp_description or '',
+            'flows': flows_data
+        })
+    
+    return JsonResponse({'experiments': experiments_data})
 

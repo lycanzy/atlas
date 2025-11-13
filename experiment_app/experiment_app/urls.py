@@ -42,5 +42,6 @@ urlpatterns = [
     path('flow/<int:flow_id>/barcode/', views.flow_barcode, name='flow_barcode'),
     path('step/<int:step_id>/barcode/', views.step_barcode, name='step_barcode'),
     path('api/steps/', views.get_all_steps, name='get_all_steps'),
+    path('api/experiments_with_flows/', views.get_experiments_with_flows, name='get_experiments_with_flows'),
     path('admin/', admin.site.urls),
 ]
