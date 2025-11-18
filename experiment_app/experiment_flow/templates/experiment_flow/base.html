@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+{% load static %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -100,6 +101,7 @@
             display: -webkit-box;
             -webkit-line-clamp: 1;
             -webkit-box-orient: vertical;
+            line-clamp: 1;
             line-height: 1.3;
         }
         .experiment-date {
@@ -246,22 +248,28 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
     <!-- Select2 for searchable dropdowns -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <link rel="stylesheet" href="{% static 'vendor/select2/css/select2.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'vendor/select2/css/select2-bootstrap-5-theme.min.css' %}" />
+    <script src="{% static 'vendor/jquery/jquery-3.7.0.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'vendor/select2/js/select2.min.js' %}"></script>
 </head>
 <body>
     <div class="navbar">
         <div>Experiment Tracking App</div>
         <!-- Bootstrap primary buttons with right alignment -->
         <div class="ms-auto d-flex gap-2 align-items-center">
-            <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">Experiment</button>
-            <button onclick="location.href='{% url 'equipment_list' %}'" class="btn btn-primary btn-sm">Equipment</button>
+                <button type="button"
+                    class="btn btn-primary btn-sm"
+                    data-url="{% url 'index' %}"
+                    onclick="window.location.href=this.dataset.url;">Experiment</button>
+                <button type="button"
+                    class="btn btn-primary btn-sm"
+                    data-url="{% url 'equipment_list' %}"
+                    onclick="window.location.href=this.dataset.url;">Equipment</button>
             {% if user.is_authenticated %}
                 <span class="text-white mx-2">
                     <i class="bi bi-person-circle"></i> 
@@ -274,10 +282,16 @@
                         <small class="text-muted">({{ user.profile.research_group.group_name }})</small>
                     {% endif %}
                 </span>
-                <button onclick="location.href='{% url 'change_password' %}'" class="btn btn-outline-light btn-sm me-2">
+                <button type="button"
+                        class="btn btn-outline-light btn-sm me-2"
+                        data-url="{% url 'change_password' %}"
+                        onclick="window.location.href=this.dataset.url;">
                     <i class="bi bi-key"></i> Change Password
                 </button>
-                <button onclick="location.href='{% url 'logout' %}'" class="btn btn-outline-light btn-sm">
+                <button type="button"
+                        class="btn btn-outline-light btn-sm"
+                        data-url="{% url 'logout' %}"
+                        onclick="window.location.href=this.dataset.url;">
                     <i class="bi bi-box-arrow-right"></i> Logout
                 </button>
             {% endif %}
@@ -316,10 +330,12 @@
                     <i class="bi bi-person-check"></i>
                 </button>
                 <!-- Add Experiment Button -->
-                <button onclick="location.href='{% url 'add_experiment' %}'" 
-                        class="btn btn-outline-primary btn-sm" 
-                        title="Add Experiment"
-                        style="flex-shrink: 0;">
+                <button type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    title="Add Experiment"
+                    style="flex-shrink: 0;"
+                    data-url="{% url 'add_experiment' %}"
+                    onclick="window.location.href=this.dataset.url;">
                     <i class="bi bi-plus-lg"></i>
                 </button>
             </div>
@@ -354,7 +370,9 @@
             <div class="pagination-controls">
                 {% if page_obj.has_previous %}
                     <button onclick="navigateToPage(1)" title="First page">«</button>
-                    <button onclick="navigateToPage({{ page_obj.previous_page_number }})" title="Previous page">‹</button>
+                        <button title="Previous page"
+                            data-page="{{ page_obj.previous_page_number }}"
+                            onclick="navigateToPage(Number(this.dataset.page));">‹</button>
                 {% else %}
                     <button disabled>«</button>
                     <button disabled>‹</button>
@@ -363,8 +381,12 @@
                 <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
                 
                 {% if page_obj.has_next %}
-                    <button onclick="navigateToPage({{ page_obj.next_page_number }})" title="Next page">›</button>
-                    <button onclick="navigateToPage({{ page_obj.paginator.num_pages }})" title="Last page">»</button>
+                        <button title="Next page"
+                            data-page="{{ page_obj.next_page_number }}"
+                            onclick="navigateToPage(Number(this.dataset.page));">›</button>
+                        <button title="Last page"
+                            data-page="{{ page_obj.paginator.num_pages }}"
+                            onclick="navigateToPage(Number(this.dataset.page));">»</button>
                 {% else %}
                     <button disabled>›</button>
                     <button disabled>»</button>
