@@ -129,6 +129,13 @@ class ExpStepForm(forms.ModelForm):
         if not (len(step_name) == 2 and step_name.isalpha()):
             raise forms.ValidationError('Step name must be exactly 2 letters.')
         return step_name
+    
+    def clean_parent(self):
+        parent = self.cleaned_data.get('parent')
+        # Additional validation: prevent setting self as parent (in case queryset filtering fails)
+        if parent and self.instance and parent.id == self.instance.id:
+            raise forms.ValidationError('A step cannot be its own parent.')
+        return parent
 class EquipmentForm(forms.ModelForm):
     # Override owner to use a searchable select
     owner = forms.ModelChoiceField(

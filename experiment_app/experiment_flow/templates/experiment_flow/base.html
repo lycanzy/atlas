@@ -281,6 +281,19 @@
     <script src="{% static 'vendor/select2/js/select2.min.js' %}"></script>
 </head>
 <body>
+    <!-- Toast container for notifications -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+        <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto" id="toast-title">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toast-body">
+                Message
+            </div>
+        </div>
+    </div>
+    
     <div class="navbar">
         <div>Experiment Tracking App</div>
         <!-- Bootstrap primary buttons with right alignment -->
@@ -505,5 +518,42 @@
             {% block content %}{% endblock %}
         </div>
     </div>
+    
+    <script>
+    // Toast notification helper
+    function showToast(title, message, type = 'info') {
+        const toastEl = document.getElementById('liveToast');
+        const toastTitle = document.getElementById('toast-title');
+        const toastBody = document.getElementById('toast-body');
+        const toastHeader = toastEl.querySelector('.toast-header');
+        
+        // Set content
+        toastTitle.textContent = title;
+        toastBody.textContent = message;
+        
+        // Set color based on type
+        toastHeader.className = 'toast-header';
+        if (type === 'success') {
+            toastHeader.classList.add('bg-success', 'text-white');
+            toastHeader.querySelector('.btn-close').classList.add('btn-close-white');
+        } else if (type === 'danger') {
+            toastHeader.classList.add('bg-danger', 'text-white');
+            toastHeader.querySelector('.btn-close').classList.add('btn-close-white');
+        } else if (type === 'warning') {
+            toastHeader.classList.add('bg-warning');
+            toastHeader.querySelector('.btn-close').classList.remove('btn-close-white');
+        } else {
+            toastHeader.classList.add('bg-info', 'text-white');
+            toastHeader.querySelector('.btn-close').classList.add('btn-close-white');
+        }
+        
+        // Show toast
+        const toast = new bootstrap.Toast(toastEl, {
+            autohide: true,
+            delay: 5000
+        });
+        toast.show();
+    }
+    </script>
 </body>
 </html>

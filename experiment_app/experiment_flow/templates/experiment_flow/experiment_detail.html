@@ -938,13 +938,23 @@ document.addEventListener('submit', function(e) {
                     location.reload();
                 }
             } else if (data.errors) {
-                // Handle form errors
-                alert('Please correct the errors in the form.');
+                // Handle form errors - display each error
+                let errorMessages = [];
+                for (let field in data.errors) {
+                    if (field === '__all__') {
+                        errorMessages.push(data.errors[field].join(', '));
+                    } else if (field === 'parent') {
+                        errorMessages.push('Previous Step: ' + data.errors[field].join(', '));
+                    } else {
+                        errorMessages.push(field + ': ' + data.errors[field].join(', '));
+                    }
+                }
+                showToast('Validation Error', errorMessages.join('\\n'), 'danger');
             }
         })
         .catch(err => {
             console.error('Error:', err);
-            alert('An error occurred while saving. Please try again.');
+            showToast('Error', 'An error occurred while saving. Please try again.', 'danger');
         });
     }
 });
@@ -1138,13 +1148,23 @@ document.addEventListener('submit', function(e) {
                     location.reload();
                 }
             } else if (data.errors) {
-                // Handle form errors
-                alert('Please correct the errors in the form.');
+                // Handle form errors - display each error
+                let errorMessages = [];
+                for (let field in data.errors) {
+                    if (field === '__all__') {
+                        errorMessages.push(data.errors[field].join(', '));
+                    } else if (field === 'parent') {
+                        errorMessages.push('Previous Step: ' + data.errors[field].join(', '));
+                    } else {
+                        errorMessages.push(field + ': ' + data.errors[field].join(', '));
+                    }
+                }
+                showToast('Validation Error', errorMessages.join('\\n'), 'danger');
             }
         })
         .catch(err => {
             console.error('Error:', err);
-            alert('An error occurred while saving. Please try again.');
+            showToast('Error', 'An error occurred while saving. Please try again.', 'danger');
         });
     }
 });
@@ -1226,17 +1246,16 @@ if (flowCodeList) {
     });
 }
 
-// Handle status dropdown changes
-document.querySelectorAll('.status-dropdown').forEach(function(dropdown) {
-    dropdown.addEventListener('change', function() {
-        const stepId = this.getAttribute('data-step-id');
-        const newStatus = this.value;
-        const oldStatus = this.getAttribute('data-current-status');
+// Handle status dropdown changes - direct update without confirmation
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.classList.contains('status-dropdown')) {
+        const dropdown = e.target;
+        const stepId = dropdown.getAttribute('data-step-id');
+        const newStatus = dropdown.value;
+        const oldStatus = dropdown.getAttribute('data-current-status');
         
-        // Confirm the status change
-        if (!confirm(`Change status from "${oldStatus}" to "${newStatus}"?`)) {
-            // Revert to old status if user cancels
-            this.value = oldStatus;
+        // Don't process if status hasn't actually changed
+        if (newStatus === oldStatus) {
             return;
         }
         
@@ -1255,25 +1274,27 @@ document.querySelectorAll('.status-dropdown').forEach(function(dropdown) {
         .then(data => {
             if (data.success) {
                 // Update the data-current-status attribute
-                this.setAttribute('data-current-status', newStatus);
+                dropdown.setAttribute('data-current-status', newStatus);
                 
                 // Show success message with completion date if applicable
+                let message = `Status updated to ${newStatus}.`;
                 if (newStatus === 'Completed' && data.completed_on) {
-                    alert(`Status updated to ${newStatus}.\nCompleted on: ${data.completed_on}`);
+                    message += ` Completed on: ${data.completed_on}`;
                 }
+                showToast('Success', message, 'success');
             } else {
-                alert('Failed to update status: ' + (data.error || 'Unknown error'));
+                showToast('Error', 'Failed to update status: ' + (data.error || 'Unknown error'), 'danger');
                 // Revert to old status on error
-                this.value = oldStatus;
+                dropdown.value = oldStatus;
             }
         })
         .catch(err => {
             console.error('Error:', err);
-            alert('Network error: ' + err);
+            showToast('Network Error', 'Failed to update status: ' + err, 'danger');
             // Revert to old status on error
-            this.value = oldStatus;
+            dropdown.value = oldStatus;
         });
-    });
+    }
 });
 
 // Copy Steps Functionality
