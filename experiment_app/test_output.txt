@@ -1,0 +1,151 @@
+Creating test database for alias 'default'...
+..........EEEEEEE
+======================================================================
+ERROR: test_add_experiment (experiment_flow.tests.test_views.ViewTests.test_add_experiment)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/tests/test_views.py", line 26, in setUp
+    self.project1 = Project.objects.create(project_name="P1", project_code="PR1", group=self.group1)
+                    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/query.py", line 663, in create
+    obj.save(force_insert=True, using=self.db)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/models.py", line 50, in save
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/base.py", line 1679, in full_clean
+    raise ValidationError(errors)
+django.core.exceptions.ValidationError: {'__all__': ['Project code must be exactly 3 letters.']}
+
+======================================================================
+ERROR: test_add_flow (experiment_flow.tests.test_views.ViewTests.test_add_flow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/tests/test_views.py", line 26, in setUp
+    self.project1 = Project.objects.create(project_name="P1", project_code="PR1", group=self.group1)
+                    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/query.py", line 663, in create
+    obj.save(force_insert=True, using=self.db)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/models.py", line 50, in save
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/base.py", line 1679, in full_clean
+    raise ValidationError(errors)
+django.core.exceptions.ValidationError: {'__all__': ['Project code must be exactly 3 letters.']}
+
+======================================================================
+ERROR: test_add_step (experiment_flow.tests.test_views.ViewTests.test_add_step)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/tests/test_views.py", line 26, in setUp
+    self.project1 = Project.objects.create(project_name="P1", project_code="PR1", group=self.group1)
+                    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/query.py", line 663, in create
+    obj.save(force_insert=True, using=self.db)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/models.py", line 50, in save
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/base.py", line 1679, in full_clean
+    raise ValidationError(errors)
+django.core.exceptions.ValidationError: {'__all__': ['Project code must be exactly 3 letters.']}
+
+======================================================================
+ERROR: test_ajax_update_status (experiment_flow.tests.test_views.ViewTests.test_ajax_update_status)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/tests/test_views.py", line 26, in setUp
+    self.project1 = Project.objects.create(project_name="P1", project_code="PR1", group=self.group1)
+                    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/query.py", line 663, in create
+    obj.save(force_insert=True, using=self.db)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/models.py", line 50, in save
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/base.py", line 1679, in full_clean
+    raise ValidationError(errors)
+django.core.exceptions.ValidationError: {'__all__': ['Project code must be exactly 3 letters.']}
+
+======================================================================
+ERROR: test_copy_steps (experiment_flow.tests.test_views.ViewTests.test_copy_steps)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/tests/test_views.py", line 26, in setUp
+    self.project1 = Project.objects.create(project_name="P1", project_code="PR1", group=self.group1)
+                    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/query.py", line 663, in create
+    obj.save(force_insert=True, using=self.db)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/models.py", line 50, in save
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/base.py", line 1679, in full_clean
+    raise ValidationError(errors)
+django.core.exceptions.ValidationError: {'__all__': ['Project code must be exactly 3 letters.']}
+
+======================================================================
+ERROR: test_experiment_detail_permissions (experiment_flow.tests.test_views.ViewTests.test_experiment_detail_permissions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/tests/test_views.py", line 26, in setUp
+    self.project1 = Project.objects.create(project_name="P1", project_code="PR1", group=self.group1)
+                    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/query.py", line 663, in create
+    obj.save(force_insert=True, using=self.db)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/models.py", line 50, in save
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/base.py", line 1679, in full_clean
+    raise ValidationError(errors)
+django.core.exceptions.ValidationError: {'__all__': ['Project code must be exactly 3 letters.']}
+
+======================================================================
+ERROR: test_index_view_permissions (experiment_flow.tests.test_views.ViewTests.test_index_view_permissions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/tests/test_views.py", line 26, in setUp
+    self.project1 = Project.objects.create(project_name="P1", project_code="PR1", group=self.group1)
+                    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/query.py", line 663, in create
+    obj.save(force_insert=True, using=self.db)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yizhou/Experiment-Tracking-App/experiment_app/experiment_flow/models.py", line 50, in save
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/Users/yizhou/Experiment-Tracking-App/exptrack/lib/python3.13/site-packages/django/db/models/base.py", line 1679, in full_clean
+    raise ValidationError(errors)
+django.core.exceptions.ValidationError: {'__all__': ['Project code must be exactly 3 letters.']}
+
+----------------------------------------------------------------------
+Ran 17 tests in 2.555s
+
+FAILED (errors=7)
+Destroying test database for alias 'default'...
+[PosixPath('/Users/yizhou/Experiment-Tracking-App/experiment_app/static')]
+/Users/yizhou/Experiment-Tracking-App/experiment_app/staticfiles
+Found 17 test(s).
+System check identified no issues (0 silenced).

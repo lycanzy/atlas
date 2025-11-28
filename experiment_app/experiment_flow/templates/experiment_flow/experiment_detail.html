@@ -684,17 +684,8 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
                 const modal = new bootstrap.Modal(document.getElementById('editStepModal'));
                 modal.show();
                 
-                // Initialize Select2 on the parent and tool fields after modal content loads
-                setTimeout(function() {
-                    if ($('#id_parent').length) {
-                        $('#id_parent').select2({
-                            theme: 'bootstrap-5',
-                            dropdownParent: $('#editStepModal'),
-                            width: '100%',
-                            placeholder: 'Search for a previous step...',
-                            allowClear: true
-                        });
-                    }
+                // Initialize Select2 on the tool field after modal content loads
+                setTimeout(async function() {
                     if ($('#id_tool').length) {
                         $('#id_tool').select2({
                             theme: 'bootstrap-5',
@@ -704,6 +695,187 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
                             allowClear: true
                         });
                     }
+                    
+                    // Setup parent step dropdown
+                    try {
+                        console.log('Setting up parent step dropdown for edit...');
+                        const response = await fetch('/api/steps/');
+                        const data = await response.json();
+                        const steps = data.steps || [];
+                        console.log('Fetched steps:', steps.length);
+                        
+                        const parentInput = document.getElementById('id_parent');
+                        const parentValue = document.getElementById('id_parent_value');
+                        const parentDropdown = document.getElementById('parent-steps-dropdown');
+                        
+                        console.log('Elements found:', { 
+                            parentInput: !!parentInput, 
+                            parentValue: !!parentValue, 
+                            parentDropdown: !!parentDropdown 
+                        });
+                        
+                        if (!parentInput || !parentDropdown || !parentValue) {
+                            console.error('Parent dropdown elements not found!');
+                            return;
+                        }
+                        
+                        function updateParentOptions(filteredSteps) {
+                            console.log('Updating parent options, filtered steps:', filteredSteps.length);
+                            if (filteredSteps.length === 0) {
+                                parentDropdown.innerHTML = '<div class="dropdown-item-empty">No steps found</div>';
+                                return;
+                            }
+                            
+                            parentDropdown.innerHTML = '';
+                            
+                            // Add "No parent" option
+                            const noParentItem = document.createElement('div');
+                            noParentItem.className = 'dropdown-item-custom';
+                            noParentItem.textContent = 'No parent (top-level step)';
+                            noParentItem.style.fontStyle = 'italic';
+                            noParentItem.style.color = '#6c757d';
+                            noParentItem.addEventListener('click', function() {
+                                parentInput.value = '';
+                                parentValue.value = '';
+                                parentDropdown.style.display = 'none';
+                            });
+                            parentDropdown.appendChild(noParentItem);
+                            
+                            // Add divider
+                            const divider = document.createElement('div');
+                            divider.style.borderTop = '1px solid #dee2e6';
+                            divider.style.margin = '0.25rem 0';
+                            parentDropdown.appendChild(divider);
+                            
+                            filteredSteps.forEach(step => {
+                                const item = document.createElement('div');
+                                item.className = 'dropdown-item-custom';
+                                item.textContent = `${step.full_step} (${step.experiment})`;
+                                item.dataset.stepId = step.id;
+                                item.addEventListener('click', function() {
+                                    parentInput.value = step.full_step;
+                                    parentValue.value = step.id;
+                                    parentDropdown.style.display = 'none';
+                                });
+                                parentDropdown.appendChild(item);
+                            });
+                        }
+                        
+                        // Initial population
+                        updateParentOptions(steps);
+                        
+                        // Show dropdown on focus
+                        parentInput.addEventListener('focus', function() {
+                            console.log('Parent input focused');
+                            updateParentOptions(steps);
+                            parentDropdown.style.display = 'block';
+                        });
+                        
+                        // Filter dropdown on input
+                        parentInput.addEventListener('input', function() {
+                            console.log('Parent input changed:', this.value);
+                            const searchTerm = this.value.toLowerCase();
+                            if (!searchTerm) {
+                                updateParentOptions(steps);
+                            } else {
+                                const filtered = steps.filter(step => 
+                                    step.full_step.toLowerCase().includes(searchTerm) ||
+                                    step.experiment.toLowerCase().includes(searchTerm)
+                                );
+                                updateParentOptions(filtered);
+                            }
+                            parentDropdown.style.display = 'block';
+                            console.log('Dropdown display set to block');
+                        });
+                        
+                        // Hide dropdown when clicking outside
+                        document.addEventListener('click', function(e) {
+                            if (!parentInput.contains(e.target) && !parentDropdown.contains(e.target)) {
+                                parentDropdown.style.display = 'none';
+                            }
+                        });
+                        
+                        console.log('Parent step dropdown setup complete');
+                    } catch (error) {
+                        console.error('Error setting up parent dropdown:', error);
+                    }
+                    
+                    // Setup dropdowns for existing components in edit modal
+                    try {
+                        console.log('Setting up dropdowns for existing components...');
+                        const existingInputs = document.querySelectorAll('input[id^="material-input-existing-"]');
+                        console.log('Found existing component inputs:', existingInputs.length);
+                        
+                        if (existingInputs.length > 0) {
+                            const response = await fetch('/api/steps/');
+                            const data = await response.json();
+                            const steps = data.steps || [];
+                            console.log('Fetched steps for existing components:', steps.length);
+                            
+                            existingInputs.forEach((input, index) => {
+                                const counter = index + 1;
+                                const dropdown = document.getElementById(`steps-dropdown-existing-${counter}`);
+                                
+                                if (!dropdown) {
+                                    console.warn('Dropdown not found for existing component', counter);
+                                    return;
+                                }
+                                
+                                console.log('Setting up existing component', counter);
+                                
+                                // Helper function to update dropdown options
+                                function updateOptions(filteredSteps) {
+                                    if (filteredSteps.length === 0) {
+                                        dropdown.innerHTML = '<div class="dropdown-item-empty">No steps found</div>';
+                                        return;
+                                    }
+                                    
+                                    dropdown.innerHTML = '';
+                                    filteredSteps.forEach(step => {
+                                        const item = document.createElement('div');
+                                        item.className = 'dropdown-item-custom';
+                                        item.textContent = `${step.full_step} (${step.experiment})`;
+                                        item.addEventListener('click', function() {
+                                            input.value = step.full_step;
+                                            dropdown.style.display = 'none';
+                                        });
+                                        dropdown.appendChild(item);
+                                    });
+                                }
+                                
+                                // Initial population
+                                updateOptions(steps);
+                                
+                                // Show dropdown on focus
+                                input.addEventListener('focus', function() {
+                                    updateOptions(steps);
+                                    dropdown.style.display = 'block';
+                                });
+                                
+                                // Filter dropdown on input
+                                input.addEventListener('input', function() {
+                                    const searchTerm = this.value.toLowerCase();
+                                    const filtered = steps.filter(step => 
+                                        step.full_step.toLowerCase().includes(searchTerm) ||
+                                        step.experiment.toLowerCase().includes(searchTerm)
+                                    );
+                                    updateOptions(filtered);
+                                    dropdown.style.display = 'block';
+                                });
+                                
+                                // Hide dropdown when clicking outside
+                                document.addEventListener('click', function(e) {
+                                    if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                                        dropdown.style.display = 'none';
+                                    }
+                                });
+                            });
+                            
+                            console.log('Existing component dropdowns setup complete');
+                        }
+                    } catch (error) {
+                        console.error('Error setting up existing component dropdowns:', error);
+                    }
                 }, 100);
             });
     });
@@ -712,10 +884,7 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
 // Reset modal content when closed
 document.getElementById('editStepModal').addEventListener('hidden.bs.modal', function () {
     // Destroy Select2 instances before clearing modal
-    if ($('#id_parent').hasClass('select2-hidden-accessible')) {
-        $('#id_parent').select2('destroy');
-    }
-    if ($('#id_tool').hasClass('select2-hidden-accessible')) {
+    if (typeof $ !== 'undefined' && $('#id_tool').length && $('#id_tool').hasClass('select2-hidden-accessible')) {
         $('#id_tool').select2('destroy');
     }
     document.getElementById('editStepModalBody').innerHTML = '';
@@ -792,17 +961,8 @@ document.querySelectorAll('.add-step-btn').forEach(function(btn) {
                 const modal = new bootstrap.Modal(document.getElementById('addStepModal'));
                 modal.show();
                 
-                // Initialize Select2 on the parent and tool fields after modal content loads
-                setTimeout(function() {
-                    if ($('#id_parent').length) {
-                        $('#id_parent').select2({
-                            theme: 'bootstrap-5',
-                            dropdownParent: $('#addStepModal'),
-                            width: '100%',
-                            placeholder: 'Search for a previous step...',
-                            allowClear: true
-                        });
-                    }
+                // Initialize Select2 on the tool field after modal content loads
+                setTimeout(async function() {
                     if ($('#id_tool').length) {
                         $('#id_tool').select2({
                             theme: 'bootstrap-5',
@@ -812,6 +972,110 @@ document.querySelectorAll('.add-step-btn').forEach(function(btn) {
                             allowClear: true
                         });
                     }
+                    
+                    // Setup parent step dropdown
+                    try {
+                        console.log('Setting up parent step dropdown...');
+                        const response = await fetch('/api/steps/');
+                        const data = await response.json();
+                        const steps = data.steps || [];
+                        console.log('Fetched steps:', steps.length);
+                        
+                        const parentInput = document.getElementById('id_parent');
+                        const parentValue = document.getElementById('id_parent_value');
+                        const parentDropdown = document.getElementById('parent-steps-dropdown');
+                        
+                        console.log('Elements found:', { 
+                            parentInput: !!parentInput, 
+                            parentValue: !!parentValue, 
+                            parentDropdown: !!parentDropdown 
+                        });
+                        
+                        if (!parentInput || !parentDropdown || !parentValue) {
+                            console.error('Parent dropdown elements not found!');
+                            return;
+                        }
+                        
+                        function updateParentOptions(filteredSteps) {
+                            console.log('Updating parent options, filtered steps:', filteredSteps.length);
+                            if (filteredSteps.length === 0) {
+                                parentDropdown.innerHTML = '<div class="dropdown-item-empty">No steps found</div>';
+                                return;
+                            }
+                            
+                            parentDropdown.innerHTML = '';
+                            
+                            // Add "No parent" option
+                            const noParentItem = document.createElement('div');
+                            noParentItem.className = 'dropdown-item-custom';
+                            noParentItem.textContent = 'No parent (top-level step)';
+                            noParentItem.style.fontStyle = 'italic';
+                            noParentItem.style.color = '#6c757d';
+                            noParentItem.addEventListener('click', function() {
+                                parentInput.value = '';
+                                parentValue.value = '';
+                                parentDropdown.style.display = 'none';
+                            });
+                            parentDropdown.appendChild(noParentItem);
+                            
+                            // Add divider
+                            const divider = document.createElement('div');
+                            divider.style.borderTop = '1px solid #dee2e6';
+                            divider.style.margin = '0.25rem 0';
+                            parentDropdown.appendChild(divider);
+                            
+                            filteredSteps.forEach(step => {
+                                const item = document.createElement('div');
+                                item.className = 'dropdown-item-custom';
+                                item.textContent = `${step.full_step} (${step.experiment})`;
+                                item.dataset.stepId = step.id;
+                                item.addEventListener('click', function() {
+                                    parentInput.value = step.full_step;
+                                    parentValue.value = step.id;
+                                    parentDropdown.style.display = 'none';
+                                });
+                                parentDropdown.appendChild(item);
+                            });
+                        }
+                        
+                        // Initial population
+                        updateParentOptions(steps);
+                        
+                        // Show dropdown on focus
+                        parentInput.addEventListener('focus', function() {
+                            console.log('Parent input focused');
+                            updateParentOptions(steps);
+                            parentDropdown.style.display = 'block';
+                        });
+                        
+                        // Filter dropdown on input
+                        parentInput.addEventListener('input', function() {
+                            console.log('Parent input changed:', this.value);
+                            const searchTerm = this.value.toLowerCase();
+                            if (!searchTerm) {
+                                updateParentOptions(steps);
+                            } else {
+                                const filtered = steps.filter(step => 
+                                    step.full_step.toLowerCase().includes(searchTerm) ||
+                                    step.experiment.toLowerCase().includes(searchTerm)
+                                );
+                                updateParentOptions(filtered);
+                            }
+                            parentDropdown.style.display = 'block';
+                            console.log('Dropdown display set to block');
+                        });
+                        
+                        // Hide dropdown when clicking outside
+                        document.addEventListener('click', function(e) {
+                            if (!parentInput.contains(e.target) && !parentDropdown.contains(e.target)) {
+                                parentDropdown.style.display = 'none';
+                            }
+                        });
+                        
+                        console.log('Parent step dropdown setup complete');
+                    } catch (error) {
+                        console.error('Error setting up parent dropdown:', error);
+                    }
                 }, 100);
             });
     });
@@ -820,10 +1084,7 @@ document.querySelectorAll('.add-step-btn').forEach(function(btn) {
 // Reset add step modal content when closed
 document.getElementById('addStepModal').addEventListener('hidden.bs.modal', function () {
     // Destroy Select2 instances before clearing modal
-    if ($('#id_parent').hasClass('select2-hidden-accessible')) {
-        $('#id_parent').select2('destroy');
-    }
-    if ($('#id_tool').hasClass('select2-hidden-accessible')) {
+    if (typeof $ !== 'undefined' && $('#id_tool').length && $('#id_tool').hasClass('select2-hidden-accessible')) {
         $('#id_tool').select2('destroy');
     }
     document.getElementById('addStepModalBody').innerHTML = '';
@@ -1214,7 +1475,10 @@ let componentCounter = 0;
 
 // Add component button - using event delegation
 document.addEventListener('click', function(e) {
-    if (e.target && e.target.id === 'add-component-btn') {
+    const addBtn = e.target.closest('#add-component-btn');
+    if (addBtn) {
+        e.preventDefault();
+        e.stopPropagation();
         componentCounter++;
         const tbody = document.getElementById('components-container');
         if (!tbody) return;
@@ -1262,21 +1526,30 @@ let allStepsCache = null;
 
 // Setup searchable dropdown for steps
 async function setupStepsDropdown(counter) {
+    console.log('setupStepsDropdown called for counter:', counter);
     const input = document.getElementById(`material-input-${counter}`);
     const dropdown = document.getElementById(`steps-dropdown-${counter}`);
     
-    if (!input || !dropdown) return;
+    console.log('Elements found:', { input: !!input, dropdown: !!dropdown });
+    if (!input || !dropdown) {
+        console.error('Missing elements for counter:', counter);
+        return;
+    }
     
     // Fetch steps if not already cached
     if (!allStepsCache) {
+        console.log('Fetching steps from API...');
         try {
             const response = await fetch('/api/steps/');
             const data = await response.json();
             allStepsCache = data.steps || [];
+            console.log('Cached steps:', allStepsCache.length);
         } catch (error) {
             console.error('Error fetching steps:', error);
             allStepsCache = [];
         }
+    } else {
+        console.log('Using cached steps:', allStepsCache.length);
     }
     
     // Populate dropdown initially
