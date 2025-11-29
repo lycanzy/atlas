@@ -472,6 +472,53 @@ def update_step_status(request, step_id):
     return JsonResponse({'success': False, 'error': 'Invalid request'})
 
 @login_required
+def bulk_update_status(request, exp_id):
+    """Bulk update status for multiple steps"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            step_ids = data.get('step_ids', [])
+            new_status = data.get('status', '')
+            
+            if not step_ids:
+                return JsonResponse({'success': False, 'error': 'No steps selected'})
+            
+            # Validate status
+            valid_statuses = ['Planned', 'Completed', 'Canceled']
+            if new_status not in valid_statuses:
+                return JsonResponse({'success': False, 'error': 'Invalid status'})
+            
+            # Get all steps and verify they belong to this experiment
+            steps = ExpStep.objects.filter(
+                id__in=step_ids,
+                flow__exp_id=exp_id
+            )
+            
+            if not steps.exists():
+                return JsonResponse({'success': False, 'error': 'No valid steps found'})
+            
+            # Update all steps
+            from django.utils import timezone
+            updated_count = 0
+            for step in steps:
+                step.status = new_status
+                if new_status == 'Completed':
+                    step.completed_on = timezone.now()
+                step.save()
+                updated_count += 1
+            
+            return JsonResponse({
+                'success': True,
+                'updated_count': updated_count,
+                'message': f'Successfully updated {updated_count} step(s) to {new_status}'
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+@login_required
 def copy_steps(request, exp_id):
     if request.method == 'POST':
         try:
@@ -782,3 +829,36 @@ def get_experiments_with_flows(request):
     
     return JsonResponse({'experiments': experiments_data})
 
+
+@login_required
+def global_search(request):
+    """
+    Global search for flows and steps by their full codes.
+    Searches full_flow (e.g., MLO001AB) or full_step (e.g., MLO001AB-MX00).
+    Redirects to the experiment detail page with the flow expanded.
+    """
+    query = request.GET.get('q', '').strip().upper()
+    
+    if not query:
+        messages.warning(request, 'Please enter a search term.')
+        return redirect('index')
+    
+    # First, try to find a flow by full_flow code
+    try:
+        flow = ExpFlow.objects.get(full_flow=query)
+        # Redirect to the experiment with the flow expanded
+        return redirect(f'/experiment/{flow.exp.id}/?expanded_flow={flow.id}')
+    except ExpFlow.DoesNotExist:
+        pass
+    
+    # Next, try to find a step by full_step code
+    try:
+        step = ExpStep.objects.get(full_step=query)
+        # Redirect to the experiment with the flow expanded
+        return redirect(f'/experiment/{step.flow.exp.id}/?expanded_flow={step.flow.id}&highlight_step={step.id}')
+    except ExpStep.DoesNotExist:
+        pass
+    
+    # If nothing found, show error and redirect back
+    messages.error(request, f'No flow or step found matching "{query}".')
+    return redirect('index')

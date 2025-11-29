@@ -399,6 +399,16 @@
                             <button class="btn btn-sm btn-primary copy-steps-btn" data-flow-id="{{ flow.id }}" style="display:none;">
                                 <i class="bi bi-clipboard"></i> Copy Steps
                             </button>
+                            <div class="btn-group" role="group" style="display:none;" id="bulk-status-group-{{ flow.id }}">
+                                <button type="button" class="btn btn-sm btn-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-check-circle"></i> Update Status
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item bulk-status-update" href="#" data-flow-id="{{ flow.id }}" data-status="Planned">Mark as Planned</a></li>
+                                    <li><a class="dropdown-item bulk-status-update" href="#" data-flow-id="{{ flow.id }}" data-status="Completed">Mark as Completed</a></li>
+                                    <li><a class="dropdown-item bulk-status-update" href="#" data-flow-id="{{ flow.id }}" data-status="Canceled">Mark as Canceled</a></li>
+                                </ul>
+                            </div>
                             <button class="btn btn-sm btn-danger delete-steps-btn" data-flow-id="{{ flow.id }}" style="display:none;">
                                 <i class="bi bi-trash"></i> Delete Steps
                             </button>
@@ -580,6 +590,7 @@ document.querySelectorAll('.expand-btn').forEach(function(btn) {
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const expandedFlowId = urlParams.get('expanded_flow');
+    const highlightStepId = urlParams.get('highlight_step');
     
     if (expandedFlowId) {
         const row = document.getElementById('steps-' + expandedFlowId);
@@ -591,7 +602,33 @@ document.addEventListener('DOMContentLoaded', function() {
             if (icon) {
                 icon.className = 'bi bi-chevron-down';
             }
+            
+            // Scroll to the flow
+            setTimeout(() => {
+                btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
         }
+    }
+    
+    // Highlight the specific step if highlight_step parameter is present
+    if (highlightStepId) {
+        setTimeout(() => {
+            // Find the row containing this step
+            const stepRow = document.querySelector(`[data-step-id="${highlightStepId}"]`)?.closest('tr');
+            if (stepRow) {
+                // Add highlight class
+                stepRow.style.backgroundColor = '#fff3cd';
+                stepRow.style.transition = 'background-color 0.3s ease';
+                
+                // Scroll to the step
+                stepRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Remove highlight after 3 seconds
+                setTimeout(() => {
+                    stepRow.style.backgroundColor = '';
+                }, 3000);
+            }
+        }, 300);
     }
 });
 
@@ -1275,13 +1312,6 @@ document.addEventListener('change', function(e) {
             if (data.success) {
                 // Update the data-current-status attribute
                 dropdown.setAttribute('data-current-status', newStatus);
-                
-                // Show success message with completion date if applicable
-                let message = `Status updated to ${newStatus}.`;
-                if (newStatus === 'Completed' && data.completed_on) {
-                    message += ` Completed on: ${data.completed_on}`;
-                }
-                showToast('Success', message, 'success');
             } else {
                 showToast('Error', 'Failed to update status: ' + (data.error || 'Unknown error'), 'danger');
                 // Revert to old status on error
@@ -1336,12 +1366,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const checkedCount = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`).length;
         const copyBtn = document.querySelector(`.copy-steps-btn[data-flow-id="${flowId}"]`);
         const deleteBtn = document.querySelector(`.delete-steps-btn[data-flow-id="${flowId}"]`);
+        const bulkStatusGroup = document.getElementById(`bulk-status-group-${flowId}`);
         
         if (copyBtn) {
             copyBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
         }
         if (deleteBtn) {
             deleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+        }
+        if (bulkStatusGroup) {
+            bulkStatusGroup.style.display = checkedCount > 0 ? 'inline-block' : 'none';
         }
     }
     
@@ -1486,6 +1520,63 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(err => {
                 console.error('Error:', err);
                 alert('Network error: ' + err);
+            });
+        });
+    });
+    
+    // Handle bulk status update
+    document.querySelectorAll('.bulk-status-update').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const flowId = this.getAttribute('data-flow-id');
+            const newStatus = this.getAttribute('data-status');
+            const checkedSteps = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`);
+            
+            if (checkedSteps.length === 0) {
+                showToast('Warning', 'Please select at least one step to update.', 'warning');
+                return;
+            }
+            
+            // Get step IDs
+            const stepIds = Array.from(checkedSteps).map(cb => cb.getAttribute('data-step-id'));
+            
+            // Send bulk update request
+            const expId = {{ experiment.id }};
+            
+            fetch(`/experiment/${expId}/bulk_update_status/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    step_ids: stepIds,
+                    status: newStatus
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Success', data.message, 'success');
+                    // Update the status dropdowns for all updated steps
+                    stepIds.forEach(stepId => {
+                        const dropdown = document.querySelector(`.status-dropdown[data-step-id="${stepId}"]`);
+                        if (dropdown) {
+                            dropdown.value = newStatus;
+                            dropdown.setAttribute('data-current-status', newStatus);
+                        }
+                    });
+                    // Uncheck all checkboxes
+                    checkedSteps.forEach(cb => cb.checked = false);
+                    // Update button visibility
+                    updateCopyButtonVisibility(flowId);
+                } else {
+                    showToast('Error', data.error || 'Failed to update status', 'danger');
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                showToast('Network Error', 'Failed to update status: ' + err, 'danger');
             });
         });
     });

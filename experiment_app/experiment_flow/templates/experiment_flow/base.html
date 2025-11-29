@@ -348,7 +348,7 @@
                             type="text" 
                             name="search" 
                             class="search-input" 
-                            placeholder="Search..." 
+                            placeholder="Search experiments or flow/step codes..." 
                             value="{{ search_query|default:'' }}"
                             id="searchInput">
                         <button type="button" class="clear-search" onclick="clearSearch()" title="Clear search">
@@ -465,20 +465,46 @@
                 const searchInput = document.getElementById('searchInput');
                 const searchForm = document.getElementById('searchForm');
                 
+                // Function to check if input looks like a flow/step code
+                function looksLikeFlowOrStepCode(value) {
+                    // Flow pattern: 3 letters + 3+ digits + 2 letters (e.g., MLO001AB)
+                    // Step pattern: flow code + dash + 2 letters + 2 digits (e.g., MLO001AB-MX00)
+                    const flowPattern = /^[A-Z]{3}\d{3,}[A-Z]{2}$/i;
+                    const stepPattern = /^[A-Z]{3}\d{3,}[A-Z]{2}-[A-Z]{2}\d{2}$/i;
+                    return flowPattern.test(value) || stepPattern.test(value);
+                }
+                
+                // Function to handle search submission
+                function handleSearch(searchValue) {
+                    searchValue = searchValue.trim().toUpperCase();
+                    
+                    if (!searchValue) {
+                        // Clear search
+                        const url = new URL(window.location.href);
+                        url.searchParams.delete('search');
+                        url.searchParams.set('page', '1');
+                        window.location.href = url.toString();
+                        return;
+                    }
+                    
+                    // Check if it looks like a flow or step code
+                    if (looksLikeFlowOrStepCode(searchValue)) {
+                        // Redirect to global search
+                        window.location.href = `/search/?q=${encodeURIComponent(searchValue)}`;
+                    } else {
+                        // Normal experiment search
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('search', searchValue);
+                        url.searchParams.set('page', '1');
+                        window.location.href = url.toString();
+                    }
+                }
+                
                 if (searchInput && searchForm) {
                     searchInput.addEventListener('input', function() {
                         clearTimeout(searchTimeout);
                         searchTimeout = setTimeout(function() {
-                            const url = new URL(window.location.href);
-                            const searchValue = searchInput.value.trim();
-                            
-                            if (searchValue) {
-                                url.searchParams.set('search', searchValue);
-                            } else {
-                                url.searchParams.delete('search');
-                            }
-                            url.searchParams.set('page', '1');
-                            window.location.href = url.toString();
+                            handleSearch(searchInput.value);
                         }, 500); // 500ms debounce
                     });
                     
@@ -487,16 +513,7 @@
                         if (e.key === 'Enter') {
                             e.preventDefault();
                             clearTimeout(searchTimeout);
-                            const url = new URL(window.location.href);
-                            const searchValue = searchInput.value.trim();
-                            
-                            if (searchValue) {
-                                url.searchParams.set('search', searchValue);
-                            } else {
-                                url.searchParams.delete('search');
-                            }
-                            url.searchParams.set('page', '1');
-                            window.location.href = url.toString();
+                            handleSearch(searchInput.value);
                         }
                     });
                 }
