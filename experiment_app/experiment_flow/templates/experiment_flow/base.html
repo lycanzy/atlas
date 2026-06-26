@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 {% load static %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Experiment App</title>
+    <title>Atlas</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -276,6 +276,7 @@
     <!-- Select2 for searchable dropdowns -->
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2.min.css' %}" />
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2-bootstrap-5-theme.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=1" />
     <script src="{% static 'vendor/jquery/jquery-3.7.0.min.js' %}?v=2"></script>
     <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'vendor/select2/js/select2.min.js' %}"></script>
@@ -285,27 +286,27 @@
     <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
         <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header">
-                <strong class="me-auto" id="toast-title">Notification</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                <strong class="me-auto" id="toast-title">通知</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="关闭"></button>
             </div>
             <div class="toast-body" id="toast-body">
-                Message
+                消息
             </div>
         </div>
     </div>
     
     <div class="navbar">
-        <div>Experiment Tracking App</div>
+        <div>Atlas</div>
         <!-- Bootstrap primary buttons with right alignment -->
         <div class="ms-auto d-flex gap-2 align-items-center">
                 <button type="button"
                     class="btn btn-primary btn-sm"
                     data-url="{% url 'index' %}"
-                    onclick="window.location.href=this.dataset.url;">Experiment</button>
+                    onclick="window.location.href=this.dataset.url;">实验</button>
                 <button type="button"
                     class="btn btn-primary btn-sm"
                     data-url="{% url 'equipment_list' %}"
-                    onclick="window.location.href=this.dataset.url;">Equipment</button>
+                    onclick="window.location.href=this.dataset.url;">设备</button>
             {% if user.is_authenticated %}
                 <span class="text-white mx-2">
                     <i class="bi bi-person-circle"></i> 
@@ -322,13 +323,13 @@
                         class="btn btn-outline-light btn-sm me-2"
                         data-url="{% url 'change_password' %}"
                         onclick="window.location.href=this.dataset.url;">
-                    <i class="bi bi-key"></i> Change Password
+                    <i class="bi bi-key"></i> 修改密码
                 </button>
                 <button type="button"
                         class="btn btn-outline-light btn-sm"
                         data-url="{% url 'logout' %}"
                         onclick="window.location.href=this.dataset.url;">
-                    <i class="bi bi-box-arrow-right"></i> Logout
+                    <i class="bi bi-box-arrow-right"></i> 退出登录
                 </button>
             {% endif %}
         </div>
@@ -337,7 +338,7 @@
     <div class="main-layout">
         <div class="sidebar">
             <div class="sidebar-header">
-                <h3 style="margin:0;">Experiments</h3>
+                <h3 style="margin:0;">项目列表</h3>
             </div>
             
             <!-- Search Bar with Buttons with Buttons -->
@@ -348,10 +349,10 @@
                             type="text" 
                             name="search" 
                             class="search-input" 
-                            placeholder="Search experiments or flow/step codes..." 
+                            placeholder="搜索项目、实验或步骤编号..."
                             value="{{ search_query|default:'' }}"
                             id="searchInput">
-                        <button type="button" class="clear-search" onclick="clearSearch()" title="Clear search">
+                        <button type="button" class="clear-search" onclick="clearSearch()" title="清空搜索">
                             <i class="bi bi-x-circle-fill"></i>
                         </button>
                         <i class="bi bi-search search-icon"></i>
@@ -361,14 +362,14 @@
                 <button onclick="toggleMyExperiments()" 
                         class="btn btn-sm {% if request.GET.my_experiments == '1' %}btn-primary{% else %}btn-outline-primary{% endif %}" 
                         id="myExpBtn"
-                        title="Show only my experiments"
+                        title="只显示我的项目"
                         style="flex-shrink: 0;">
                     <i class="bi bi-person-check"></i>
                 </button>
                 <!-- Add Experiment Button -->
                 <button type="button"
                     class="btn btn-outline-primary btn-sm"
-                    title="Add Experiment"
+                    title="新增项目"
                     style="flex-shrink: 0;"
                     data-url="{% url 'add_experiment' %}"
                     onclick="window.location.href=this.dataset.url;">
@@ -381,16 +382,20 @@
                 <a href="{% url 'experiment_detail' exp.id %}?page={{ page_obj.number|default:1 }}{% if search_query %}&search={{ search_query }}{% endif %}{% if request.GET.my_experiments %}&my_experiments={{ request.GET.my_experiments }}{% endif %}" 
                    class="experiment-card{% if experiment.id == exp.id %} active{% endif %}">
                     <div class="card-header-row">
-                        <span class="experiment-heading">{{ exp.exp_name }}</span>
+                        <div>
+                            <span class="experiment-heading">{{ exp.exp_name }}</span>
+                        </div>
                         <span class="experiment-date">{{ exp.created_on|date:"M d, Y" }}</span>
                     </div>
+                    <span class="experiment-team">
+                        {{ exp.project.group.group_name|default:exp.project.project_code }}
+                    </span>
                     
                     {% if exp.exp_description %}
                     <div class="experiment-description">{{ exp.exp_description }}</div>
                     {% endif %}
                     
                     <div class="card-footer-row">
-                        <span class="project-badge">{{ exp.project.project_name }}</span>
                         <span class="experiment-owner">
                             {% if exp.owner.first_name and exp.owner.last_name %}
                                 {{ exp.owner.first_name }} {{ exp.owner.last_name }}
@@ -401,15 +406,15 @@
                     </div>
                 </a>
             {% empty %}
-                <p>No experiments found.</p>
+                <p>未找到实验。</p>
             {% endfor %}
             
             <!-- Pagination Controls -->
             {% if page_obj %}
             <div class="pagination-controls">
                 {% if page_obj.has_previous %}
-                    <button onclick="navigateToPage(1)" title="First page">«</button>
-                        <button title="Previous page"
+                    <button onclick="navigateToPage(1)" title="第一页">«</button>
+                        <button title="上一页"
                             data-page="{{ page_obj.previous_page_number }}"
                             onclick="navigateToPage(Number(this.dataset.page));">‹</button>
                 {% else %}
@@ -417,13 +422,13 @@
                     <button disabled>‹</button>
                 {% endif %}
                 
-                <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                <span>第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
                 
                 {% if page_obj.has_next %}
-                        <button title="Next page"
+                        <button title="下一页"
                             data-page="{{ page_obj.next_page_number }}"
                             onclick="navigateToPage(Number(this.dataset.page));">›</button>
-                        <button title="Last page"
+                        <button title="最后一页"
                             data-page="{{ page_obj.paginator.num_pages }}"
                             onclick="navigateToPage(Number(this.dataset.page));">»</button>
                 {% else %}

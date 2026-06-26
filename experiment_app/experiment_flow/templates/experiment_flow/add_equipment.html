@@ -1,7 +1,7 @@
 {% extends "experiment_flow/base_no_sidebar.html" %}
 {% load static %}
 
-{% block title %}Add Equipment{% endblock %}
+{% block title %}新增设备{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -9,9 +9,9 @@
         <div class="col-12">
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2>Add New Equipment</h2>
+                <h2>新增设备</h2>
                 <a href="{% url 'equipment_list' %}" class="btn btn-secondary">
-                    <i class="bi bi-arrow-left"></i> Back to Equipment List
+	                    <i class="bi bi-arrow-left"></i> 返回设备列表
                 </a>
             </div>
 
@@ -24,12 +24,12 @@
                         <!-- Basic Information Section -->
                         <div class="mb-4">
                             <h5 class="text-primary mb-3">
-                                <i class="bi bi-info-circle"></i> Basic Information
+	                                <i class="bi bi-info-circle"></i> 基本信息
                             </h5>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label for="{{ form.equipment_name.id_for_label }}" class="form-label fw-bold">
-                                        Equipment Name <span class="text-danger">*</span>
+	                                        设备名称 <span class="text-danger">*</span>
                                     </label>
                                     {{ form.equipment_name }}
                                     {% if form.equipment_name.errors %}
@@ -38,7 +38,7 @@
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="{{ form.equipment_id.id_for_label }}" class="form-label fw-bold">
-                                        Equipment ID
+	                                        设备编号
                                     </label>
                                     {{ form.equipment_id }}
                                     {% if form.equipment_id.errors %}
@@ -47,7 +47,7 @@
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="{{ form.owner.id_for_label }}" class="form-label fw-bold">
-                                        Owner <span class="text-danger">*</span>
+	                                        负责人 <span class="text-danger">*</span>
                                     </label>
                                     {{ form.owner }}
                                     {% if form.owner.errors %}
@@ -56,7 +56,7 @@
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="{{ form.location.id_for_label }}" class="form-label fw-bold">
-                                        Location
+	                                        位置
                                     </label>
                                     {{ form.location }}
                                     {% if form.location.errors %}
@@ -65,7 +65,7 @@
                                 </div>
                                 <div class="col-12 mb-3">
                                     <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">
-                                        Description
+	                                        描述
                                     </label>
                                     {{ form.description }}
                                     {% if form.description.errors %}
@@ -76,7 +76,7 @@
                                     <div class="form-check">
                                         {{ form.is_active }}
                                         <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
-                                            Active
+	                                            启用
                                         </label>
                                     </div>
                                     {% if form.is_active.errors %}
@@ -91,15 +91,15 @@
                         <!-- Physical Specifications Section -->
                         <div class="mb-4">
                             <h5 class="text-primary mb-3">
-                                <i class="bi bi-rulers"></i> Physical Specifications
+	                                <i class="bi bi-rulers"></i> 物理规格
                             </h5>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label for="{{ form.size.id_for_label }}" class="form-label fw-bold">
-                                        Size/Dimensions
+	                                        尺寸
                                     </label>
                                     {{ form.size }}
-                                    <small class="form-text text-muted">e.g., "60cm x 40cm x 80cm" or "2m x 1m"</small>
+	                                    <small class="form-text text-muted">例如："60cm x 40cm x 80cm" 或 "2m x 1m"</small>
                                     {% if form.size.errors %}
                                         <div class="text-danger">{{ form.size.errors }}</div>
                                     {% endif %}
@@ -112,35 +112,35 @@
                         <!-- Power Requirements Section -->
                         <div class="mb-4">
                             <h5 class="text-primary mb-3">
-                                <i class="bi bi-lightning-charge"></i> Power Requirements
+	                                <i class="bi bi-lightning-charge"></i> 电力需求
                             </h5>
                             <div class="row">
                                 <div class="col-md-4 mb-3">
                                     <label for="{{ form.power_requirement.id_for_label }}" class="form-label fw-bold">
-                                        Power Requirement
+	                                        功率需求
                                     </label>
                                     {{ form.power_requirement }}
-                                    <small class="form-text text-muted">e.g., "5 kW" or "500 W"</small>
+	                                    <small class="form-text text-muted">例如："5 kW" 或 "500 W"</small>
                                     {% if form.power_requirement.errors %}
                                         <div class="text-danger">{{ form.power_requirement.errors }}</div>
                                     {% endif %}
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="{{ form.voltage.id_for_label }}" class="form-label fw-bold">
-                                        Voltage
+	                                        电压
                                     </label>
                                     {{ form.voltage }}
-                                    <small class="form-text text-muted">e.g., "220V" or "110V"</small>
+	                                    <small class="form-text text-muted">例如："220V" 或 "110V"</small>
                                     {% if form.voltage.errors %}
                                         <div class="text-danger">{{ form.voltage.errors }}</div>
                                     {% endif %}
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="{{ form.current.id_for_label }}" class="form-label fw-bold">
-                                        Current
+	                                        电流
                                     </label>
                                     {{ form.current }}
-                                    <small class="form-text text-muted">e.g., "10A" or "15A"</small>
+	                                    <small class="form-text text-muted">例如："10A" 或 "15A"</small>
                                     {% if form.current.errors %}
                                         <div class="text-danger">{{ form.current.errors }}</div>
                                     {% endif %}
@@ -153,35 +153,35 @@
                         <!-- Utility Requirements Section -->
                         <div class="mb-4">
                             <h5 class="text-primary mb-3">
-                                <i class="bi bi-droplet"></i> Utility Requirements
+	                                <i class="bi bi-droplet"></i> 公用工程需求
                             </h5>
                             <div class="row">
                                 <div class="col-md-4 mb-3">
                                     <label for="{{ form.water_requirement.id_for_label }}" class="form-label fw-bold">
-                                        Water Requirement
+	                                        用水需求
                                     </label>
                                     {{ form.water_requirement }}
-                                    <small class="form-text text-muted">e.g., "10 L/min" or "None"</small>
+	                                    <small class="form-text text-muted">例如："10 L/min" 或 "无"</small>
                                     {% if form.water_requirement.errors %}
                                         <div class="text-danger">{{ form.water_requirement.errors }}</div>
                                     {% endif %}
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="{{ form.gas_input.id_for_label }}" class="form-label fw-bold">
-                                        Gas Input
+	                                        气体输入
                                     </label>
                                     {{ form.gas_input }}
-                                    <small class="form-text text-muted">e.g., "N2", "Ar", "Air"</small>
+	                                    <small class="form-text text-muted">例如："N2"、"Ar"、"Air"</small>
                                     {% if form.gas_input.errors %}
                                         <div class="text-danger">{{ form.gas_input.errors }}</div>
                                     {% endif %}
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="{{ form.exhaust_requirement.id_for_label }}" class="form-label fw-bold">
-                                        Exhaust Requirement
+	                                        排风需求
                                     </label>
                                     {{ form.exhaust_requirement }}
-                                    <small class="form-text text-muted">e.g., "Fume hood required"</small>
+	                                    <small class="form-text text-muted">例如："需要通风橱"</small>
                                     {% if form.exhaust_requirement.errors %}
                                         <div class="text-danger">{{ form.exhaust_requirement.errors }}</div>
                                     {% endif %}
@@ -192,10 +192,10 @@
                         <!-- Form Actions -->
                         <div class="d-flex justify-content-end gap-2">
                             <a href="{% url 'equipment_list' %}" class="btn btn-secondary">
-                                <i class="bi bi-x-circle"></i> Cancel
+	                                <i class="bi bi-x-circle"></i> 取消
                             </a>
                             <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Add Equipment
+	                                <i class="bi bi-check-circle"></i> 添加设备
                             </button>
                         </div>
                     </form>
@@ -214,7 +214,7 @@
             $('#id_owner').select2({
                 theme: 'bootstrap-5',
                 width: '100%',
-                placeholder: 'Search for owner...',
+                placeholder: '搜索负责人...',
                 allowClear: false
             });
         }

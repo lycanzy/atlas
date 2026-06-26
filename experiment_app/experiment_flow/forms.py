@@ -12,36 +12,39 @@ class ExpFlowForm(forms.ModelForm):
 class ExpStepForm(forms.ModelForm):
     # Override step_name to use a dropdown
     step_name = forms.ChoiceField(
+        label='步骤名称',
         required=True,
         widget=forms.Select(attrs={
             'class': 'form-select',
             'id': 'id_step_name'
         }),
-        help_text='Select a predefined step name'
+        help_text='选择预设的步骤名称'
     )
     
     # Override parent to use a searchable select for all steps across experiments
     parent = forms.ModelChoiceField(
+        label='前置步骤',
         queryset=ExpStep.objects.none(),  # Will be set in __init__
         required=False,
         widget=forms.Select(attrs={
             'class': 'form-select searchable-select',
             'id': 'id_parent',
-            'data-placeholder': 'Search for a previous step...'
+            'data-placeholder': '搜索前置步骤...'
         }),
-        help_text='Search and select any step from any experiment'
+        help_text='可搜索并选择任意实验中的历史步骤'
     )
     
     # Override tool to use equipment dropdown
     tool = forms.ModelChoiceField(
+        label='设备',
         queryset=Equipment.objects.none(),  # Will be set in __init__
         required=False,
         widget=forms.Select(attrs={
             'class': 'form-select searchable-select',
             'id': 'id_tool',
-            'data-placeholder': 'Search for equipment...'
+            'data-placeholder': '搜索设备...'
         }),
-        help_text='Select equipment from database'
+        help_text='从设备数据库中选择设备'
     )
     
     class Meta:
@@ -77,11 +80,16 @@ class ExpStepForm(forms.ModelForm):
         
     def __init__(self, *args, flow=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['status'].choices = [
+            ('Planned', '计划中'),
+            ('Completed', '已完成'),
+            ('Canceled', '已取消'),
+        ]
         
         # Populate step_name choices from StepNameTemplate
         active_templates = StepNameTemplate.objects.filter(is_active=True).order_by('category', 'step_code')
         
-        choices = [('', '--- Select a step name ---')]
+        choices = [('', '--- 请选择步骤名称 ---')]
         current_category = None
         
         for template in active_templates:
@@ -115,11 +123,11 @@ class ExpStepForm(forms.ModelForm):
         
         # Make parent field have a blank option
         self.fields['parent'].required = False
-        self.fields['parent'].empty_label = "No parent (top-level step)"
+        self.fields['parent'].empty_label = "无前置步骤（顶层步骤）"
         
         # Populate equipment choices
         self.fields['tool'].queryset = Equipment.objects.filter(is_active=True).order_by('equipment_name')
-        self.fields['tool'].empty_label = "No equipment selected"
+        self.fields['tool'].empty_label = "未选择设备"
         
         # Auto-populate description from template if available
         self.step_templates = {t.step_code: t for t in active_templates}
@@ -127,26 +135,27 @@ class ExpStepForm(forms.ModelForm):
     def clean_step_name(self):
         step_name = self.cleaned_data['step_name'].upper()
         if not (len(step_name) == 2 and step_name.isalpha()):
-            raise forms.ValidationError('Step name must be exactly 2 letters.')
+            raise forms.ValidationError('步骤名称必须是 2 个英文字母。')
         return step_name
     
     def clean_parent(self):
         parent = self.cleaned_data.get('parent')
         # Additional validation: prevent setting self as parent (in case queryset filtering fails)
         if parent and self.instance and parent.id == self.instance.id:
-            raise forms.ValidationError('A step cannot be its own parent.')
+            raise forms.ValidationError('步骤不能将自己设为前置步骤。')
         return parent
 class EquipmentForm(forms.ModelForm):
     # Override owner to use a searchable select
     owner = forms.ModelChoiceField(
+        label='负责人',
         queryset=User.objects.none(),  # Will be set in __init__
         required=True,
         widget=forms.Select(attrs={
             'class': 'form-select searchable-select',
             'id': 'id_owner',
-            'data-placeholder': 'Search for owner...'
+            'data-placeholder': '搜索负责人...'
         }),
-        help_text='Select the equipment owner'
+        help_text='选择设备负责人'
     )
     
     class Meta:
@@ -184,23 +193,23 @@ class CustomPasswordChangeForm(PasswordChangeForm):
     Custom password change form with styled widgets
     """
     old_password = forms.CharField(
-        label="Current Password",
+        label="当前密码",
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Enter your current password'
+            'placeholder': '请输入当前密码'
         })
     )
     new_password1 = forms.CharField(
-        label="New Password",
+        label="新密码",
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Enter your new password'
+            'placeholder': '请输入新密码'
         })
     )
     new_password2 = forms.CharField(
-        label="Confirm New Password",
+        label="确认新密码",
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Confirm your new password'
+            'placeholder': '请再次输入新密码'
         })
     )

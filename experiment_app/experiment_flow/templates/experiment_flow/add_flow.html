@@ -1,7 +1,7 @@
 {% extends "experiment_flow/base.html" %}
 
 {% block content %}
-<h2>Add New Flow</h2>
+<h2>新增实验</h2>
 {% if error %}
 <div style="background-color: #ffebee; color: #c62828; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">
     {{ error }}
@@ -10,11 +10,11 @@
 <form method="post" action="{% url 'add_flow' experiment.id %}">
     {% csrf_token %}
     <div style="margin-bottom: 1rem;">
-        <label for="name" style="display:block; margin-bottom:0.5rem;">Flow Name (2 letters only):</label>
+        <label for="name" style="display:block; margin-bottom:0.5rem;">实验代码（仅 2 个英文字母）：</label>
         <input type="text" name="flow_name" required maxlength="2" pattern="[A-Za-z]{2}" 
                style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;"
-               title="Please enter exactly 2 letters">
+               title="请输入 2 个英文字母">
     </div>
-    <button type="submit" style="background-color:#007bff; color:#fff; padding:0.5rem 1rem; border:none; border-radius:4px; cursor:pointer;">Add Flow</button>
+    <button type="submit" style="background-color:#007bff; color:#fff; padding:0.5rem 1rem; border:none; border-radius:4px; cursor:pointer;">添加实验</button>
 </form>
 {% endblock %}

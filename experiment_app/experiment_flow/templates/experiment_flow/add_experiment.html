@@ -1,7 +1,7 @@
 {% extends "experiment_flow/base.html" %}
 
 {% block content %}
-<h2>Add New Experiment</h2>
+<h2>新增项目</h2>
 {% if error %}
 <div class="alert alert-danger" role="alert">
     {{ error }}
@@ -10,19 +10,19 @@
 <form method="post" action="{% url 'add_experiment' %}">
     {% csrf_token %}
     <div style="margin-bottom: 1rem;">
-        <label for="project" style="display:block; margin-bottom:0.5rem;">Select Project:</label>
+        <label for="project" style="display:block; margin-bottom:0.5rem;">选择 Team：</label>
         <select id="project" name="project" required class="form-select" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
-            <option value="">Choose a project...</option>
+            <option value="">请选择 Team...</option>
             {% for project in projects %}
-                <option value="{{ project.id }}">{{ project.project_name }} ({{ project.project_code }})</option>
+                <option value="{{ project.id }}">{{ project.project_code }} - {{ project.project_name }}</option>
             {% endfor %}
         </select>
     </div>
     <div style="margin-bottom: 1rem;">
-        <label for="exp_description" style="display:block; margin-bottom:0.5rem;">Experiment Description:</label>
+        <label for="exp_description" style="display:block; margin-bottom:0.5rem;">项目描述：</label>
         <textarea id="exp_description" name="exp_description" class="form-control" rows="3" 
-                  placeholder="Enter experiment description"></textarea>
+                  placeholder="请输入项目描述"></textarea>
     </div>
-    <button type="submit" class="btn btn-primary">Create Experiment</button>
+    <button type="submit" class="btn btn-primary">创建项目</button>
 </form>
 {% endblock %}

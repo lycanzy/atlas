@@ -12,8 +12,12 @@ class ResearchGroup(models.Model):
     group_name = models.CharField(max_length = 25)
     created_on = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        verbose_name = "Team"
+        verbose_name_plural = "Teams"
+
     def __str__(self):
-        return str(self.group_name) if self.group_name else "Unnamed Group"
+        return str(self.group_name) if self.group_name else "未命名研究组"
 
 class UserProfile(models.Model):
     """Extended user profile linked to research group"""
@@ -22,7 +26,7 @@ class UserProfile(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.research_group.group_name if self.research_group else 'No Group'}"
+        return f"{self.user.username} - {self.research_group.group_name if self.research_group else '无研究组'}"
 
 class Project(models.Model):
     
@@ -31,19 +35,21 @@ class Project(models.Model):
     group = models.ForeignKey(ResearchGroup, on_delete = models.CASCADE, related_name = 'project', null = True)
     created_on = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        verbose_name = "Team Code"
+        verbose_name_plural = "Team Codes"
+
     def generate_experiment_name(self):
-        # Count existing experiments for this project
+        # Business naming: team code (e.g. PCA) + sequence => project code (e.g. PCA001).
         exp_count = self.experiment.count()
-        # Generate the 3-digit number
         number = str(exp_count + 1).zfill(3)
-        # Combine project code with number
         return f"{self.project_code}{number}"
 
     def clean(self):
         if self.project_code:
             # Ensure project code is exactly 3 uppercase letters
             if not (len(self.project_code) == 3 and self.project_code.isalpha()):
-                raise ValidationError('Project code must be exactly 3 letters.')
+                raise ValidationError('项目代码必须是 3 个英文字母。')
             self.project_code = self.project_code.upper()
 
     def save(self, *args, **kwargs):
@@ -55,7 +61,7 @@ class Project(models.Model):
             if self.project_code:
                 return f"{self.project_name} ({self.project_code})"
             return str(self.project_name)
-        return "Unnamed Project"
+        return "未命名项目"
 
 class Exp(models.Model):
 
@@ -65,8 +71,12 @@ class Exp(models.Model):
     project = models.ForeignKey(Project, on_delete = models.CASCADE, related_name = 'experiment', null = True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='experiments')
 
+    class Meta:
+        verbose_name = "Project"
+        verbose_name_plural = "Projects"
+
     def __str__(self):
-        return str(self.exp_name) if self.exp_name else "Unnamed Experiment"
+        return str(self.exp_name) if self.exp_name else "未命名实验"
     
 class ExpFlow(models.Model):
 
@@ -77,17 +87,21 @@ class ExpFlow(models.Model):
     full_flow = models.CharField(max_length=35, editable=False, db_index=True, null = True)  # Adding index for faster queries
     barcode = models.CharField(max_length=100, blank=True, unique=True, null=True, help_text="Unique barcode identifier for this flow")
 
+    class Meta:
+        verbose_name = "Experiment"
+        verbose_name_plural = "Experiments"
+
     def clean(self):
         if self.flow_name:
             # Check if the input contains exactly 2 alphabetic characters
             if not (len(self.flow_name) == 2 and self.flow_name.isalpha()):
-                raise ValidationError('Flow name must be exactly 2 letters.')
+                raise ValidationError('流程代码必须是 2 个英文字母。')
             # Convert to uppercase
             self.flow_name = self.flow_name.upper()
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        # Update full_flow before saving
+        # Business naming: project code (e.g. PCA001) + experiment suffix (e.g. AA).
         if self.exp:
             self.full_flow = f"{self.exp.exp_name}{self.flow_name}"
         else:
@@ -99,7 +113,7 @@ class ExpFlow(models.Model):
             return str(self.full_flow)
         if self.flow_name:
             return str(self.flow_name)
-        return "Unnamed Flow"
+        return "未命名流程"
     
     @property
     def flow(self):
@@ -183,7 +197,7 @@ class ExpStep(models.Model):
         # Clean step name
         self.step_name = self.step_name.upper()
         if len(self.step_name) != 2 or not self.step_name.isalpha():
-            raise ValidationError('Step name must be exactly 2 letters (e.g., AA)')
+            raise ValidationError('步骤名称必须是 2 个英文字母（例如 AA）。')
 
         super().save(*args, **kwargs)
 
@@ -192,7 +206,7 @@ class ExpStep(models.Model):
             return str(self.full_step)
         if self.step_name:
             return f"{self.step_name}{self.step_number or '00'}"
-        return "Unnamed Step"
+        return "未命名步骤"
 
 class StepNameTemplate(models.Model):
     """Predefined step name templates that can be selected when adding/editing steps"""
@@ -213,7 +227,7 @@ class StepNameTemplate(models.Model):
         if self.step_code:
             # Ensure step code is exactly 2 uppercase letters
             if not (len(self.step_code) == 2 and self.step_code.isalpha()):
-                raise ValidationError('Step code must be exactly 2 letters.')
+                raise ValidationError('步骤代码必须是 2 个英文字母。')
             self.step_code = self.step_code.upper()
     
     def save(self, *args, **kwargs):
@@ -230,7 +244,7 @@ class Sample(models.Model):
     flow = models.ForeignKey(ExpStep, on_delete = models.CASCADE, related_name = 'sample', null = True)
 
     def __str__(self):
-        return str(self.sample_name) if self.sample_name else "Unnamed Sample"
+        return str(self.sample_name) if self.sample_name else "未命名样品"
 
 class Equipment(models.Model):
     """Equipment/Tool database for tracking lab equipment"""

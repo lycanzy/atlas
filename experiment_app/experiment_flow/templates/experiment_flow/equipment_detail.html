@@ -1,7 +1,7 @@
 {% extends "experiment_flow/base_no_sidebar.html" %}
 {% load static %}
 
-{% block title %}{{ equipment.equipment_name }} - Equipment Detail{% endblock %}
+{% block title %}{{ equipment.equipment_name }} - 设备详情{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -12,21 +12,21 @@
                 <div>
                     <h2>{{ equipment.equipment_name }}</h2>
                     <p class="text-muted mb-0">
-                        <i class="bi bi-person"></i> {{ equipment.owner.username }} | 
-                        <i class="bi bi-calendar"></i> Created: {{ equipment.created_on|date:"M d, Y" }}
+	                        <i class="bi bi-person"></i> {{ equipment.owner.username }} |
+	                        <i class="bi bi-calendar"></i> 创建于：{{ equipment.created_on|date:"Y-m-d" }}
                     </p>
                 </div>
                 <div>
                     {% if equipment.is_active %}
-                        <span class="badge bg-success me-2">Active</span>
+	                        <span class="badge bg-success me-2">启用</span>
                     {% else %}
-                        <span class="badge bg-danger me-2">Inactive</span>
+	                        <span class="badge bg-danger me-2">停用</span>
                     {% endif %}
                     <a href="{% url 'edit_equipment' equipment.id %}" class="btn btn-warning btn-sm">
-                        <i class="bi bi-pencil"></i> Edit
+	                        <i class="bi bi-pencil"></i> 编辑
                     </a>
                     <a href="{% url 'equipment_list' %}" class="btn btn-secondary btn-sm">
-                        <i class="bi bi-arrow-left"></i> Back to List
+	                        <i class="bi bi-arrow-left"></i> 返回列表
                     </a>
                 </div>
             </div>
@@ -37,38 +37,38 @@
                     <!-- Basic Information Section -->
                     <div class="mb-4">
                         <h5 class="text-primary mb-3">
-                            <i class="bi bi-info-circle"></i> Basic Information
+	                            <i class="bi bi-info-circle"></i> 基本信息
                         </h5>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold">Equipment Name:</label>
+	                                <label class="fw-bold">设备名称：</label>
                                 <p>{{ equipment.equipment_name }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold">Equipment ID:</label>
+	                                <label class="fw-bold">设备编号：</label>
                                 <p>{% if equipment.equipment_id %}<code>{{ equipment.equipment_id }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold">Owner:</label>
+	                                <label class="fw-bold">负责人：</label>
                                 <p>{{ equipment.owner.get_full_name|default:equipment.owner.username }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold">Location:</label>
-                                <p>{{ equipment.location|default:"Not specified" }}</p>
+	                                <label class="fw-bold">位置：</label>
+	                                <p>{{ equipment.location|default:"未填写" }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold">Status:</label>
+	                                <label class="fw-bold">状态：</label>
                                 <p>
                                     {% if equipment.is_active %}
-                                        <span class="badge bg-success">Active</span>
+	                                        <span class="badge bg-success">启用</span>
                                     {% else %}
-                                        <span class="badge bg-danger">Inactive</span>
+	                                        <span class="badge bg-danger">停用</span>
                                     {% endif %}
                                 </p>
                             </div>
                             <div class="col-12 mb-3">
-                                <label class="fw-bold">Description:</label>
-                                <p>{{ equipment.description|default:"No description provided" }}</p>
+	                                <label class="fw-bold">描述：</label>
+	                                <p>{{ equipment.description|default:"暂无描述" }}</p>
                             </div>
                         </div>
                     </div>
@@ -78,12 +78,12 @@
                     <!-- Physical Specifications Section -->
                     <div class="mb-4">
                         <h5 class="text-primary mb-3">
-                            <i class="bi bi-rulers"></i> Physical Specifications
+	                            <i class="bi bi-rulers"></i> 物理规格
                         </h5>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold">Size/Dimensions:</label>
-                                <p>{{ equipment.size|default:"Not specified" }}</p>
+	                                <label class="fw-bold">尺寸：</label>
+	                                <p>{{ equipment.size|default:"未填写" }}</p>
                             </div>
                         </div>
                     </div>
@@ -93,20 +93,20 @@
                     <!-- Power Requirements Section -->
                     <div class="mb-4">
                         <h5 class="text-primary mb-3">
-                            <i class="bi bi-lightning-charge"></i> Power Requirements
+	                            <i class="bi bi-lightning-charge"></i> 电力需求
                         </h5>
                         <div class="row">
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold">Power Requirement:</label>
-                                <p>{{ equipment.power_requirement|default:"Not specified" }}</p>
+	                                <label class="fw-bold">功率需求：</label>
+	                                <p>{{ equipment.power_requirement|default:"未填写" }}</p>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold">Voltage:</label>
-                                <p>{{ equipment.voltage|default:"Not specified" }}</p>
+	                                <label class="fw-bold">电压：</label>
+	                                <p>{{ equipment.voltage|default:"未填写" }}</p>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold">Current:</label>
-                                <p>{{ equipment.current|default:"Not specified" }}</p>
+	                                <label class="fw-bold">电流：</label>
+	                                <p>{{ equipment.current|default:"未填写" }}</p>
                             </div>
                         </div>
                     </div>
@@ -116,20 +116,20 @@
                     <!-- Utility Requirements Section -->
                     <div class="mb-4">
                         <h5 class="text-primary mb-3">
-                            <i class="bi bi-droplet"></i> Utility Requirements
+	                            <i class="bi bi-droplet"></i> 公用工程需求
                         </h5>
                         <div class="row">
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold">Water Requirement:</label>
-                                <p>{{ equipment.water_requirement|default:"Not specified" }}</p>
+	                                <label class="fw-bold">用水需求：</label>
+	                                <p>{{ equipment.water_requirement|default:"未填写" }}</p>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold">Gas Input:</label>
-                                <p>{{ equipment.gas_input|default:"Not specified" }}</p>
+	                                <label class="fw-bold">气体输入：</label>
+	                                <p>{{ equipment.gas_input|default:"未填写" }}</p>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="fw-bold">Exhaust Requirement:</label>
-                                <p>{{ equipment.exhaust_requirement|default:"Not specified" }}</p>
+	                                <label class="fw-bold">排风需求：</label>
+	                                <p>{{ equipment.exhaust_requirement|default:"未填写" }}</p>
                             </div>
                         </div>
                     </div>
@@ -139,16 +139,16 @@
                     <!-- Timestamps Section -->
                     <div class="mb-2">
                         <h5 class="text-primary mb-3">
-                            <i class="bi bi-clock-history"></i> Timestamps
+	                            <i class="bi bi-clock-history"></i> 时间记录
                         </h5>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold">Created On:</label>
-                                <p>{{ equipment.created_on|date:"M d, Y H:i" }}</p>
+	                                <label class="fw-bold">创建时间：</label>
+	                                <p>{{ equipment.created_on|date:"Y-m-d H:i" }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="fw-bold">Last Updated:</label>
-                                <p>{{ equipment.updated_on|date:"M d, Y H:i" }}</p>
+	                                <label class="fw-bold">最近更新：</label>
+	                                <p>{{ equipment.updated_on|date:"Y-m-d H:i" }}</p>
                             </div>
                         </div>
                     </div>
@@ -158,9 +158,9 @@
             <!-- Actions Card -->
             <div class="card shadow-sm mt-3">
                 <div class="card-body">
-                    <h5 class="card-title">Actions</h5>
+	                    <h5 class="card-title">操作</h5>
                     <a href="{% url 'edit_equipment' equipment.id %}" class="btn btn-warning me-2">
-                        <i class="bi bi-pencil"></i> Edit Equipment
+	                        <i class="bi bi-pencil"></i> 编辑设备
                     </a>
                 </div>
             </div>

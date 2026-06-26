@@ -223,35 +223,35 @@
   
   <!-- Main Form Section -->
   <div class="form-section">
-    <div class="section-title">Step Information</div>
+    <div class="section-title">步骤信息</div>
     <div class="compact-grid">
       <div class="form-group col-span-2">
-        <label for="id_step_name">Step Name *</label>
+        <label for="id_step_name">步骤名称 *</label>
         {{ form.step_name }}
         {% if form.step_name.errors %}
           <div class="error-message">{{ form.step_name.errors.0 }}</div>
         {% endif %}
       </div>
       <div class="form-group">
-        <label for="id_status">Status *</label>
+        <label for="id_status">状态 *</label>
         {{ form.status }}
         {% if form.status.errors %}
           <div class="error-message">{{ form.status.errors.0 }}</div>
         {% endif %}
       </div>
       <div class="form-group col-span-2">
-        <label for="id_parent">Previous Step</label>
+        <label for="id_parent">前置步骤</label>
         <div style="position: relative;">
           <input type="text" 
                  class="form-control form-control-sm" 
                  id="id_parent" 
                  name="parent_search"
-                 placeholder="Search for a previous step..."
+                 placeholder="搜索前置步骤..."
                  autocomplete="off"
                  value="{% if step.parent %}{{ step.parent.full_step }}{% endif %}">
           <input type="hidden" id="id_parent_value" name="parent" value="{% if step.parent %}{{ step.parent.id }}{% endif %}">
           <div class="steps-dropdown" id="parent-steps-dropdown" style="display: none;">
-            <div class="dropdown-loading">Loading steps...</div>
+            <div class="dropdown-loading">正在加载步骤...</div>
           </div>
         </div>
         {% if form.parent.errors %}
@@ -259,28 +259,28 @@
         {% endif %}
       </div>
       <div class="form-group">
-        <label for="id_completed_on">Completed On</label>
+        <label for="id_completed_on">完成时间</label>
         {{ form.completed_on }}
         {% if form.completed_on.errors %}
           <div class="error-message">{{ form.completed_on.errors.0 }}</div>
         {% endif %}
       </div>
       <div class="form-group">
-        <label for="id_tool">Equipment</label>
+        <label for="id_tool">设备</label>
         {{ form.tool }}
         {% if form.tool.errors %}
           <div class="error-message">{{ form.tool.errors.0 }}</div>
         {% endif %}
       </div>
       <div class="form-group col-span-2">
-        <label for="id_recipe">Recipe</label>
+        <label for="id_recipe">配方</label>
         {{ form.recipe }}
         {% if form.recipe.errors %}
           <div class="error-message">{{ form.recipe.errors.0 }}</div>
         {% endif %}
       </div>
       <div class="form-group col-span-3">
-        <label for="id_step_description">Description</label>
+        <label for="id_step_description">描述</label>
         {{ form.step_description }}
         {% if form.step_description.errors %}
           <div class="error-message">{{ form.step_description.errors.0 }}</div>
@@ -291,13 +291,13 @@
   
   <!-- Components Section -->
   <div class="form-section">
-    <div class="section-title">Components / Raw Materials</div>
+    <div class="section-title">组分 / 原材料</div>
     <table class="table table-sm table-bordered" id="components-table">
       <thead class="table-light">
         <tr>
-          <th style="width: 45%;">Material Name</th>
-          <th style="width: 20%;">Quantity</th>
-          <th style="width: 20%;">Unit</th>
+          <th style="width: 45%;">材料名称</th>
+          <th style="width: 20%;">用量</th>
+          <th style="width: 20%;">单位</th>
           <th style="width: 15%; text-align: center;">
             <button type="button" class="btn btn-xs btn-success" id="add-component-btn" style="font-size: 0.7rem; padding: 0.1rem 0.3rem;">
               <i class="bi bi-plus-circle"></i>
@@ -312,16 +312,16 @@
             <input type="text" class="form-control form-control-sm component-material" 
                    id="material-input-existing-{{ forloop.counter }}"
                    value="{{ component.material_name }}" 
-                   placeholder="Type custom name or select step..."
+                   placeholder="输入自定义名称或选择步骤..."
                    autocomplete="off">
             <div class="steps-dropdown" id="steps-dropdown-existing-{{ forloop.counter }}" style="display: none;">
-              <div class="dropdown-loading">Loading steps...</div>
+	              <div class="dropdown-loading">正在加载步骤...</div>
             </div>
           </td>
           <td><input type="number" step="0.001" class="form-control form-control-sm component-quantity" value="{{ component.quantity }}"></td>
           <td><input type="text" class="form-control form-control-sm component-unit" value="{{ component.unit }}"></td>
           <td class="text-center">
-            <button type="button" class="btn btn-sm btn-danger remove-component-btn" title="Remove" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">
+	            <button type="button" class="btn btn-sm btn-danger remove-component-btn" title="移除" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">
               <i class="bi bi-trash"></i>
             </button>
           </td>
@@ -333,9 +333,9 @@
   
   <!-- Notes Section -->
   <div class="form-section">
-    <div class="section-title">Notes</div>
+    <div class="section-title">备注</div>
     <div class="form-group">
-      <label for="id_notes">Additional Notes</label>
+      <label for="id_notes">补充备注</label>
       {{ form.notes }}
       {% if form.notes.errors %}
         <div class="error-message">{{ form.notes.errors.0 }}</div>
@@ -345,9 +345,9 @@
   
   <!-- Form Actions -->
   <div class="modal-footer-custom">
-    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
     <button type="submit" class="btn btn-primary">
-      <i class="bi bi-check-lg"></i> Save Changes
+      <i class="bi bi-check-lg"></i> 保存修改
     </button>
   </div>
 </form>

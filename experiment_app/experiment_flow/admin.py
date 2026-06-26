@@ -14,7 +14,7 @@ class BaseModelAdmin(admin.ModelAdmin):
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
-    verbose_name_plural = 'Profile'
+    verbose_name_plural = 'Team Profile'
     fk_name = 'user'
 
 # Extended User Admin
@@ -38,8 +38,8 @@ class UserAdmin(BaseUserAdmin):
     )
     
     def get_research_group(self, obj):
-        return obj.profile.research_group if hasattr(obj, 'profile') and obj.profile.research_group else 'No Group'
-    get_research_group.short_description = 'Research Group'
+        return obj.profile.research_group if hasattr(obj, 'profile') and obj.profile.research_group else 'No Team'
+    get_research_group.short_description = 'Team'
 
 # Unregister the original User admin and register the new one
 admin.site.unregister(User)
@@ -48,11 +48,18 @@ admin.site.register(User, UserAdmin)
 @admin.register(Exp)
 class ExpAdmin(BaseModelAdmin):
     readonly_fields = ("created_on",)
-    list_display = ("exp_name", "created_on")
+    list_display = ("exp_name", "get_team_code", "exp_description", "owner", "created_on")
+    search_fields = ("exp_name", "exp_description", "project__project_code", "project__project_name")
+    list_filter = ("project__project_code", "owner")
+
+    def get_team_code(self, obj):
+        return obj.project.project_code if obj.project else "-"
+    get_team_code.short_description = "Team"
 
 @admin.register(ExpFlow)
 class ExpFlowAdmin(BaseModelAdmin):
-    list_display = ("flow_name", "exp", "created_on")
+    list_display = ("full_flow", "flow_name", "exp", "flow_description", "created_on")
+    search_fields = ("full_flow", "flow_name", "flow_description", "exp__exp_name")
 
 @admin.register(ExpStep)
 class ExpStepAdmin(BaseModelAdmin):
@@ -60,11 +67,13 @@ class ExpStepAdmin(BaseModelAdmin):
 
 @admin.register(Project)
 class ProjectAdmin(BaseModelAdmin):
-    list_display = ("project_name", "project_code", "created_on")
+    list_display = ("project_code", "project_name", "group", "created_on")
+    search_fields = ("project_code", "project_name", "group__group_name")
 
 @admin.register(ResearchGroup)
 class ResearchGroupAdmin(BaseModelAdmin):
     list_display = ("group_name", "created_on")
+    search_fields = ("group_name",)
 
 @admin.register(Sample)
 class SampleAdmin(BaseModelAdmin):

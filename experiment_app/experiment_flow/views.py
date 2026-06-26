@@ -12,6 +12,13 @@ import json
 import string
 
 
+STATUS_LABELS_ZH = {
+    'Planned': '计划中',
+    'Completed': '已完成',
+    'Canceled': '已取消',
+}
+
+
 # Helpe r to return experiments visible to the current user (by research group)
 def get_experiments_for_user(user, search_query='', my_experiments=''):
     """Return a queryset of Exp filtered to the user's research group.
@@ -43,7 +50,9 @@ def get_experiments_for_user(user, search_query='', my_experiments=''):
         qs = qs.filter(
             Q(exp_name__icontains=search_query) |
             Q(exp_description__icontains=search_query) |
-            Q(project__project_name__icontains=search_query)
+            Q(project__project_name__icontains=search_query) |
+            Q(project__project_code__icontains=search_query) |
+            Q(project__group__group_name__icontains=search_query)
         )
 
     return qs
@@ -64,13 +73,13 @@ def login_view(request):
             next_url = request.GET.get('next', 'index')
             return redirect(next_url)
         else:
-            messages.error(request, 'Invalid username or password.')
+            messages.error(request, '用户名或密码不正确。')
     
     return render(request, 'experiment_flow/login.html')
 
 def logout_view(request):
     auth_logout(request)
-    messages.success(request, 'You have been successfully logged out.')
+    messages.success(request, '已成功退出登录。')
     return redirect('login')
 
 @login_required
@@ -81,10 +90,10 @@ def change_password(request):
             user = form.save()
             # Update session auth hash to prevent logout
             update_session_auth_hash(request, user)
-            messages.success(request, 'Your password was successfully updated!')
+            messages.success(request, '密码已更新。')
             return redirect('index')
         else:
-            messages.error(request, 'Please correct the errors below.')
+            messages.error(request, '请修正下面的错误。')
     else:
         form = CustomPasswordChangeForm(request.user)
     
@@ -137,7 +146,7 @@ def experiment_detail(request, exp_id):
         profile = getattr(request.user, 'profile', None)
         user_group = getattr(profile, 'research_group', None)
         if not user_group or not getattr(experiment, 'project', None) or experiment.project.group != user_group:
-            messages.error(request, 'You do not have permission to view this experiment.')
+            messages.error(request, '你没有权限查看该实验。')
             return redirect('index')
     flows = ExpFlow.objects.filter(exp=experiment).order_by('created_on')
     available_flow_codes = get_available_flow_codes(experiment)
@@ -227,7 +236,7 @@ def add_experiment(request):
                     'experiments': page_obj,
                     'page_obj': page_obj,
                     'search_query': search_query,
-                    'error': 'Selected project not found.'
+                    'error': '未找到所选项目。Selected project not found.'
                 })
             except ValidationError as e:
                 return render(request, 'experiment_flow/add_experiment.html', {
@@ -255,7 +264,7 @@ def add_flow(request, exp_id):
             profile = getattr(request.user, 'profile', None)
             user_group = getattr(profile, 'research_group', None)
             if not user_group or not getattr(experiment, 'project', None) or experiment.project.group != user_group:
-                messages.error(request, "You do not have permission to access this experiment.")
+                messages.error(request, "你没有权限访问该实验。")
                 return redirect('index')
         
         if request.method == 'POST':
@@ -313,7 +322,7 @@ def add_flow(request, exp_id):
             'search_query': search_query
         })
     except Exp.DoesNotExist:
-        return HttpResponse('Experiment not found', status=404)
+        return HttpResponse('未找到实验', status=404)
 
 @login_required
 def add_step(request, exp_id, flow_id):
@@ -435,8 +444,8 @@ def update_step_desc(request, step_id):
             step.save()
             return JsonResponse({'success': True})
         except ExpStep.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'Step not found'})
-    return JsonResponse({'success': False, 'error': 'Invalid request'})
+            return JsonResponse({'success': False, 'error': '未找到步骤'})
+    return JsonResponse({'success': False, 'error': '无效请求'})
 
 @login_required
 def update_step_status(request, step_id):
@@ -449,7 +458,7 @@ def update_step_status(request, step_id):
             # Validate status
             valid_statuses = ['Planned', 'Completed', 'Canceled']
             if new_status not in valid_statuses:
-                return JsonResponse({'success': False, 'error': 'Invalid status'})
+                return JsonResponse({'success': False, 'error': '无效状态'})
             
             # Update status
             step.status = new_status
@@ -468,8 +477,8 @@ def update_step_status(request, step_id):
             
             return JsonResponse(response_data)
         except ExpStep.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'Step not found'})
-    return JsonResponse({'success': False, 'error': 'Invalid request'})
+            return JsonResponse({'success': False, 'error': '未找到步骤'})
+    return JsonResponse({'success': False, 'error': '无效请求'})
 
 @login_required
 def bulk_update_status(request, exp_id):
@@ -481,12 +490,12 @@ def bulk_update_status(request, exp_id):
             new_status = data.get('status', '')
             
             if not step_ids:
-                return JsonResponse({'success': False, 'error': 'No steps selected'})
+                return JsonResponse({'success': False, 'error': '未选择步骤'})
             
             # Validate status
             valid_statuses = ['Planned', 'Completed', 'Canceled']
             if new_status not in valid_statuses:
-                return JsonResponse({'success': False, 'error': 'Invalid status'})
+                return JsonResponse({'success': False, 'error': '无效状态'})
             
             # Get all steps and verify they belong to this experiment
             steps = ExpStep.objects.filter(
@@ -495,7 +504,7 @@ def bulk_update_status(request, exp_id):
             )
             
             if not steps.exists():
-                return JsonResponse({'success': False, 'error': 'No valid steps found'})
+                return JsonResponse({'success': False, 'error': '未找到有效步骤'})
             
             # Update all steps
             from django.utils import timezone
@@ -510,7 +519,7 @@ def bulk_update_status(request, exp_id):
             return JsonResponse({
                 'success': True,
                 'updated_count': updated_count,
-                'message': f'Successfully updated {updated_count} step(s) to {new_status}'
+                'message': f'已将 {updated_count} 个步骤更新为 {STATUS_LABELS_ZH.get(new_status, new_status)}'
             })
             
         except Exception as e:
@@ -527,10 +536,10 @@ def copy_steps(request, exp_id):
             target_flow_name = data.get('target_flow_name', '')  # Full flow name like "MLO001AA"
             
             if not step_ids:
-                return JsonResponse({'success': False, 'error': 'No steps selected'})
+                return JsonResponse({'success': False, 'error': '未选择步骤'})
             
             if not target_flow_name:
-                return JsonResponse({'success': False, 'error': 'Target flow name is required'})
+                return JsonResponse({'success': False, 'error': '请输入目标实验编号'})
             
             # Get all experiments accessible to the user
             experiments = get_experiments_for_user(request.user)
@@ -545,13 +554,13 @@ def copy_steps(request, exp_id):
                     continue
             
             if not target_flow:
-                return JsonResponse({'success': False, 'error': f'Flow "{target_flow_name}" does not exist or you do not have access to it'})
+                return JsonResponse({'success': False, 'error': f'实验 "{target_flow_name}" 不存在，或你没有访问权限'})
             
             # Get the selected steps
             steps_to_copy = ExpStep.objects.filter(id__in=step_ids).order_by('step_number')
             
             if not steps_to_copy:
-                return JsonResponse({'success': False, 'error': 'Selected steps not found'})
+                return JsonResponse({'success': False, 'error': '未找到所选步骤'})
             
             copied_count = 0
 
@@ -613,17 +622,17 @@ def copy_steps(request, exp_id):
                     new_step.parent = new_parent
                     new_step.save()
 
-            target_exp_name = target_flow.exp.exp_name if target_flow.exp else "Unknown"
+            target_exp_name = target_flow.exp.exp_name if target_flow.exp else "未知"
             return JsonResponse({
                 'success': True,
-                'message': f'Successfully copied {copied_count} step(s) to {target_flow.full_flow} in experiment {target_exp_name}',
+                'message': f'已复制 {copied_count} 个步骤到实验 {target_flow.full_flow}（项目 {target_exp_name}）',
                 'copied_count': copied_count
             })
             
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     
-    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+    return JsonResponse({'success': False, 'error': '无效请求方式'})
 
 @login_required
 def delete_steps(request, exp_id):
@@ -633,13 +642,13 @@ def delete_steps(request, exp_id):
             step_ids = data.get('step_ids', [])
             
             if not step_ids:
-                return JsonResponse({'success': False, 'error': 'No steps selected'})
+                return JsonResponse({'success': False, 'error': '未选择步骤'})
             
             # Get the steps to delete
             steps_to_delete = ExpStep.objects.filter(id__in=step_ids)
             
             if not steps_to_delete:
-                return JsonResponse({'success': False, 'error': 'Selected steps not found'})
+                return JsonResponse({'success': False, 'error': '未找到所选步骤'})
             
             # Count before deletion
             deleted_count = steps_to_delete.count()
@@ -649,14 +658,14 @@ def delete_steps(request, exp_id):
             
             return JsonResponse({
                 'success': True,
-                'message': f'Successfully deleted {deleted_count} step(s)',
+                'message': f'已删除 {deleted_count} 个步骤',
                 'deleted_count': deleted_count
             })
             
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     
-    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+    return JsonResponse({'success': False, 'error': '无效请求方式'})
 
 
 # Equipment views
@@ -731,7 +740,7 @@ def flow_barcode(request, flow_id):
     # Staff and superusers can access all flows
     if not (request.user.is_staff or request.user.is_superuser):
         if not flow.exp or flow.exp.project.group != request.user.profile.research_group:
-            messages.error(request, "You don't have permission to access this flow.")
+            messages.error(request, "你没有权限访问该实验。")
             return redirect('index')
     
     # Generate barcode if it doesn't exist
@@ -754,7 +763,7 @@ def step_barcode(request, step_id):
     # Staff and superusers can access all steps
     if not (request.user.is_staff or request.user.is_superuser):
         if not step.flow or not step.flow.exp or step.flow.exp.project.group != request.user.profile.research_group:
-            messages.error(request, "You don't have permission to access this step.")
+            messages.error(request, "你没有权限访问该步骤。")
             return redirect('index')
     
     # Generate barcode if it doesn't exist
@@ -840,7 +849,7 @@ def global_search(request):
     query = request.GET.get('q', '').strip().upper()
     
     if not query:
-        messages.warning(request, 'Please enter a search term.')
+        messages.warning(request, '请输入搜索内容。')
         return redirect('index')
     
     # First, try to find a flow by full_flow code
@@ -860,5 +869,5 @@ def global_search(request):
         pass
     
     # If nothing found, show error and redirect back
-    messages.error(request, f'No flow or step found matching "{query}".')
+    messages.error(request, f'未找到匹配 "{query}" 的实验或步骤。')
     return redirect('index')
