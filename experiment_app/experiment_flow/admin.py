@@ -45,6 +45,15 @@ class UserAdmin(BaseUserAdmin):
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 
+
+class TeamCodeInline(admin.TabularInline):
+    model = Project
+    extra = 0
+    fields = ("project_code", "project_name", "created_on")
+    readonly_fields = ("created_on",)
+    verbose_name = "Team Code"
+    verbose_name_plural = "Team Codes"
+
 @admin.register(Exp)
 class ExpAdmin(BaseModelAdmin):
     readonly_fields = ("created_on",)
@@ -65,15 +74,21 @@ class ExpFlowAdmin(BaseModelAdmin):
 class ExpStepAdmin(BaseModelAdmin):
     list_display = ("step_name", "flow", "status", "started_on")
 
-@admin.register(Project)
-class ProjectAdmin(BaseModelAdmin):
-    list_display = ("project_code", "project_name", "group", "created_on")
-    search_fields = ("project_code", "project_name", "group__group_name")
-
 @admin.register(ResearchGroup)
 class ResearchGroupAdmin(BaseModelAdmin):
-    list_display = ("group_name", "created_on")
-    search_fields = ("group_name",)
+    list_display = ("team", "team_codes", "created_on")
+    search_fields = ("group_name", "project__project_code")
+    inlines = (TeamCodeInline,)
+
+    def team(self, obj):
+        return obj.group_name
+    team.short_description = "Team"
+    team.admin_order_field = "group_name"
+
+    def team_codes(self, obj):
+        codes = obj.project.exclude(project_code__isnull=True).exclude(project_code="").values_list("project_code", flat=True)
+        return ", ".join(codes) if codes else "-"
+    team_codes.short_description = "Team Codes"
 
 @admin.register(Sample)
 class SampleAdmin(BaseModelAdmin):
