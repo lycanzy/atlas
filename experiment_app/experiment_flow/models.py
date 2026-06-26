@@ -10,13 +10,26 @@ import re
 class ResearchGroup(models.Model):
 
     group_name = models.CharField(max_length = 25)
+    team_code = models.CharField(max_length=3, unique=True, null=True, blank=True)
     created_on = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = "Team"
         verbose_name_plural = "Teams"
 
+    def clean(self):
+        if self.team_code:
+            if not (len(self.team_code) == 3 and self.team_code.isalpha()):
+                raise ValidationError('团队代码必须是 3 个英文字母。')
+            self.team_code = self.team_code.upper()
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
+        if self.group_name and self.team_code:
+            return f"{self.group_name} ({self.team_code})"
         return str(self.group_name) if self.group_name else "未命名研究组"
 
 class UserProfile(models.Model):
@@ -43,7 +56,8 @@ class Project(models.Model):
         # Business naming: team code (e.g. PCA) + sequence => project code (e.g. PCA001).
         exp_count = self.experiment.count()
         number = str(exp_count + 1).zfill(3)
-        return f"{self.project_code}{number}"
+        team_code = self.group.team_code if self.group and self.group.team_code else self.project_code
+        return f"{team_code}{number}"
 
     def clean(self):
         if self.project_code:

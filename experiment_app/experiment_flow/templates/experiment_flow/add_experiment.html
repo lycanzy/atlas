@@ -14,7 +14,7 @@
         <select id="project" name="project" required class="form-select" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
             <option value="">请选择 Team...</option>
             {% for project in projects %}
-                <option value="{{ project.id }}">{{ project.project_code }} - {{ project.project_name }}</option>
+                <option value="{{ project.id }}">{{ project.group.team_code|default:project.project_code }} - {{ project.project_name }}</option>
             {% endfor %}
         </select>
     </div>

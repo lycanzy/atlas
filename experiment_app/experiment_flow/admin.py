@@ -54,6 +54,8 @@ class ExpAdmin(BaseModelAdmin):
     list_filter = ("project__project_code", "owner")
 
     def get_team_code(self, obj):
+        if obj.project and obj.project.group and obj.project.group.team_code:
+            return obj.project.group.team_code
         return obj.project.project_code if obj.project else "-"
     get_team_code.short_description = "Team"
 
@@ -68,20 +70,22 @@ class ExpStepAdmin(BaseModelAdmin):
 
 @admin.register(ResearchGroup)
 class ResearchGroupAdmin(BaseModelAdmin):
-    list_display = ("team", "team_codes", "created_on")
-    search_fields = ("group_name", "project__project_code")
+    list_display = ("team", "team_code", "created_on")
+    search_fields = ("group_name", "team_code")
     readonly_fields = ("created_on",)
-    fields = ("group_name", "created_on")
+    fields = ("group_name", "team_code", "created_on")
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == "team_code":
+            formfield.required = True
+            formfield.help_text = "3 uppercase letters, for example PCA."
+        return formfield
 
     def team(self, obj):
         return obj.group_name
     team.short_description = "Team"
     team.admin_order_field = "group_name"
-
-    def team_codes(self, obj):
-        codes = obj.project.exclude(project_code__isnull=True).exclude(project_code="").values_list("project_code", flat=True)
-        return ", ".join(codes) if codes else "-"
-    team_codes.short_description = "Team Codes"
 
 @admin.register(Sample)
 class SampleAdmin(BaseModelAdmin):

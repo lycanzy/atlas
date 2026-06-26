@@ -52,6 +52,7 @@ def get_experiments_for_user(user, search_query='', my_experiments=''):
             Q(exp_description__icontains=search_query) |
             Q(project__project_name__icontains=search_query) |
             Q(project__project_code__icontains=search_query) |
+            Q(project__group__team_code__icontains=search_query) |
             Q(project__group__group_name__icontains=search_query)
         )
 

@@ -389,6 +389,9 @@
                     </div>
                     <span class="experiment-team">
                         {{ exp.project.group.group_name|default:exp.project.project_code }}
+                        {% if exp.project.group.team_code %}
+                            · {{ exp.project.group.team_code }}
+                        {% endif %}
                     </span>
                     
                     {% if exp.exp_description %}

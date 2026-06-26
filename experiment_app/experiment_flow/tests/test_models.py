@@ -41,6 +41,21 @@ class ModelTests(TestCase):
         project.save()
         self.assertEqual(project.project_code, "ABC")
 
+    def test_team_code_validation(self):
+        """Test that team code must be 3 uppercase letters when provided"""
+        group = ResearchGroup(group_name="Bad Team", team_code="AB")
+        with self.assertRaises(ValidationError):
+            group.full_clean()
+
+        group.team_code = "123"
+        with self.assertRaises(ValidationError):
+            group.full_clean()
+
+        group.team_code = "abc"
+        group.full_clean()
+        group.save()
+        self.assertEqual(group.team_code, "ABC")
+
     def test_generate_experiment_name(self):
         """Test experiment name generation"""
         # First experiment
