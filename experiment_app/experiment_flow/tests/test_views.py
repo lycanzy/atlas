@@ -157,3 +157,48 @@ class ViewTests(TestCase):
         
         # Verify copy
         self.assertTrue(ExpStep.objects.filter(flow=flow2, step_name="AA", step_description="Source").exists())
+
+    def test_copy_step_preserves_external_parent(self):
+        self.client.login(username="user1", password="password")
+
+        parent = ExpStep.objects.create(step_name="MX", flow=self.flow1)
+        child = ExpStep.objects.create(step_name="CA", flow=self.flow1, parent=parent)
+        flow2 = ExpFlow.objects.create(flow_name="BB", exp=self.exp1)
+
+        response = self.client.post(
+            reverse('copy_steps', args=[self.exp1.id]),
+            json.dumps({
+                'step_ids': [child.id],
+                'target_flow_name': flow2.full_flow
+            }),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['success'], True)
+
+        copied_child = ExpStep.objects.get(flow=flow2, step_name="CA")
+        self.assertEqual(copied_child.parent, parent)
+
+    def test_copy_steps_remaps_parent_when_parent_is_copied(self):
+        self.client.login(username="user1", password="password")
+
+        parent = ExpStep.objects.create(step_name="MX", flow=self.flow1)
+        child = ExpStep.objects.create(step_name="CA", flow=self.flow1, parent=parent)
+        flow2 = ExpFlow.objects.create(flow_name="BB", exp=self.exp1)
+
+        response = self.client.post(
+            reverse('copy_steps', args=[self.exp1.id]),
+            json.dumps({
+                'step_ids': [parent.id, child.id],
+                'target_flow_name': flow2.full_flow
+            }),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['success'], True)
+
+        copied_parent = ExpStep.objects.get(flow=flow2, step_name="MX")
+        copied_child = ExpStep.objects.get(flow=flow2, step_name="CA")
+        self.assertEqual(copied_child.parent, copied_parent)

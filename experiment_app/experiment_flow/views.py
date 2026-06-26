@@ -615,7 +615,7 @@ def copy_steps(request, exp_id):
                     step_number=new_step_number,  # The number part (e.g., "01")
                     step_description=original_step.step_description,
                     flow=target_flow,
-                    parent=None,  # Parent relationships are flow-specific, so reset
+                    parent=None,  # Parent is assigned after all selected steps are copied.
                     tool=original_step.tool,  # Copy equipment/tool used for the step
                     recipe=original_step.recipe,
                     notes=original_step.notes,
@@ -629,14 +629,15 @@ def copy_steps(request, exp_id):
                 orig_to_new[original_step.id] = new_step
                 copied_count += 1
             
-            # Second pass: restore parent relationships when parent was also copied
+            # Second pass: restore parent relationships.
+            # If the parent was copied in the same batch, point to the copied parent.
+            # Otherwise keep the original parent so a copied child still preserves traceability.
             for original_step in steps_to_copy:
                 new_step = orig_to_new.get(original_step.id)
                 if not new_step:
                     continue
-                if original_step.parent and original_step.parent.id in orig_to_new:
-                    new_parent = orig_to_new[original_step.parent.id]
-                    new_step.parent = new_parent
+                if original_step.parent:
+                    new_step.parent = orig_to_new.get(original_step.parent.id, original_step.parent)
                     new_step.save()
 
             target_exp_name = target_flow.exp.exp_name if target_flow.exp else "未知"
