@@ -11,8 +11,8 @@ class ViewTests(TestCase):
         self.client = Client()
         
         # Setup users and groups
-        self.group1 = ResearchGroup.objects.create(group_name="Group 1")
-        self.group2 = ResearchGroup.objects.create(group_name="Group 2")
+        self.group1 = ResearchGroup.objects.create(group_name="Group 1", team_code="PRA")
+        self.group2 = ResearchGroup.objects.create(group_name="Group 2", team_code="PRB")
         
         self.user1 = User.objects.create_user(username="user1", password="password")
         UserProfile.objects.create(user=self.user1, research_group=self.group1)
@@ -74,7 +74,7 @@ class ViewTests(TestCase):
         
         # Post valid data
         response = self.client.post(reverse('add_experiment'), {
-            'project': self.project1.id,
+            'team': self.group1.id,
             'exp_description': 'New Exp'
         })
         self.assertEqual(response.status_code, 302) # Redirects to index
@@ -82,15 +82,15 @@ class ViewTests(TestCase):
         # Check created
         self.assertTrue(Exp.objects.filter(exp_name="PRA002").exists())
         
-        # Try to add to project 2 (not in group)
+        # Try to add to team 2 (not in group)
         response = self.client.post(reverse('add_experiment'), {
-            'project': self.project2.id,
+            'team': self.group2.id,
             'exp_description': 'Hacked Exp'
         })
         # Should fail (likely 404 or validation error caught in view)
-        # The view catches Project.DoesNotExist if filtered by group
+        # The view catches ResearchGroup.DoesNotExist if filtered by group
         self.assertEqual(response.status_code, 200) # Renders form with error
-        self.assertContains(response, "Selected project not found")
+        self.assertContains(response, "Selected team not found")
 
     def test_add_flow(self):
         self.client.login(username="user1", password="password")

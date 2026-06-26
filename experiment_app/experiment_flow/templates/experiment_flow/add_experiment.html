@@ -10,11 +10,11 @@
 <form method="post" action="{% url 'add_experiment' %}">
     {% csrf_token %}
     <div style="margin-bottom: 1rem;">
-        <label for="project" style="display:block; margin-bottom:0.5rem;">选择 Team：</label>
-        <select id="project" name="project" required class="form-select" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
+        <label for="team" style="display:block; margin-bottom:0.5rem;">选择 Team：</label>
+        <select id="team" name="team" required class="form-select" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
             <option value="">请选择 Team...</option>
-            {% for project in projects %}
-                <option value="{{ project.id }}">{{ project.group.team_code|default:project.project_code }} - {{ project.project_name }}</option>
+            {% for team in teams %}
+                <option value="{{ team.id }}">{{ team.team_code }} - {{ team.group_name }}</option>
             {% endfor %}
         </select>
     </div>

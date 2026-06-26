@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Exp, ExpFlow, ExpStep, Project, Equipment
+from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Equipment
 from .forms import ExpStepForm, ExpFlowForm, EquipmentForm, CustomPasswordChangeForm
 import json
 import string
@@ -188,17 +188,17 @@ def delete_step(request, exp_id, flow_id, step_id):
 
 @login_required
 def add_experiment(request):
-    # Show only projects in the user's research group
-    # Staff and superusers can see all projects
+    # Show Teams directly. The Project row is now an internal backing record
+    # used to keep existing experiment relationships intact.
     if request.user.is_staff or request.user.is_superuser:
-        projects = Project.objects.all().order_by('project_name')
+        teams = ResearchGroup.objects.exclude(team_code__isnull=True).exclude(team_code="").order_by('group_name')
     else:
         profile = getattr(request.user, 'profile', None)
         user_group = getattr(profile, 'research_group', None)
         if user_group:
-            projects = Project.objects.filter(group=user_group).order_by('project_name')
+            teams = ResearchGroup.objects.filter(id=user_group.id).exclude(team_code__isnull=True).exclude(team_code="")
         else:
-            projects = Project.objects.none()
+            teams = ResearchGroup.objects.none()
 
     search_query = request.GET.get('search', '')
     my_experiments = request.GET.get('my_experiments', '')
@@ -209,17 +209,33 @@ def add_experiment(request):
     page_obj = paginator.get_page(page_number)
 
     if request.method == 'POST':
-        project_id = request.POST.get('project')
-        if project_id:
+        team_id = request.POST.get('team')
+        if team_id:
             try:
-                # Staff and superusers can use any project
+                # Staff and superusers can use any Team
                 if request.user.is_staff or request.user.is_superuser:
-                    project = Project.objects.get(id=project_id)
+                    team = ResearchGroup.objects.get(id=team_id)
                 else:
-                    # Regular users: ensure the selected project belongs to user's group
+                    # Regular users: ensure the selected Team is their own Team
                     profile = getattr(request.user, 'profile', None)
                     user_group = getattr(profile, 'research_group', None)
-                    project = Project.objects.get(id=project_id, group=user_group)
+                    if not user_group or str(user_group.id) != str(team_id):
+                        raise ResearchGroup.DoesNotExist
+                    team = user_group
+
+                if not team.team_code:
+                    raise ValidationError('请先在后台为该 Team 设置 3 位 Team Code。')
+
+                project = Project.objects.filter(group=team).order_by("id").first()
+                if not project:
+                    project = Project.objects.create(
+                        group=team,
+                        project_code=team.team_code,
+                        project_name=team.group_name,
+                    )
+                elif project.project_code != team.team_code:
+                    project.project_code = team.team_code
+                    project.save(update_fields=["project_code"])
                 
                 exp_name = project.generate_experiment_name()
                 exp_description = request.POST.get('exp_description')
@@ -231,17 +247,17 @@ def add_experiment(request):
                 )
                 new_exp.save()
                 return redirect('index')
-            except Project.DoesNotExist:
+            except ResearchGroup.DoesNotExist:
                 return render(request, 'experiment_flow/add_experiment.html', {
-                    'projects': projects,
+                    'teams': teams,
                     'experiments': page_obj,
                     'page_obj': page_obj,
                     'search_query': search_query,
-                    'error': '未找到所选项目。Selected project not found.'
+                    'error': '未找到所选 Team。Selected team not found.'
                 })
             except ValidationError as e:
                 return render(request, 'experiment_flow/add_experiment.html', {
-                    'projects': projects,
+                    'teams': teams,
                     'experiments': page_obj,
                     'page_obj': page_obj,
                     'search_query': search_query,
@@ -249,7 +265,7 @@ def add_experiment(request):
                 })
         
     return render(request, 'experiment_flow/add_experiment.html', {
-        'projects': projects, 
+        'teams': teams,
         'experiments': page_obj, 
         'page_obj': page_obj,
         'search_query': search_query
