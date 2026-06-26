@@ -46,14 +46,6 @@ admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 
 
-class TeamCodeInline(admin.TabularInline):
-    model = Project
-    extra = 0
-    fields = ("project_code", "project_name", "created_on")
-    readonly_fields = ("created_on",)
-    verbose_name = "Team Code"
-    verbose_name_plural = "Team Codes"
-
 @admin.register(Exp)
 class ExpAdmin(BaseModelAdmin):
     readonly_fields = ("created_on",)
@@ -78,7 +70,8 @@ class ExpStepAdmin(BaseModelAdmin):
 class ResearchGroupAdmin(BaseModelAdmin):
     list_display = ("team", "team_codes", "created_on")
     search_fields = ("group_name", "project__project_code")
-    inlines = (TeamCodeInline,)
+    readonly_fields = ("created_on",)
+    fields = ("group_name", "created_on")
 
     def team(self, obj):
         return obj.group_name
