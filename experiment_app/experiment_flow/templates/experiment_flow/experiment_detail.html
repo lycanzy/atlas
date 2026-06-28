@@ -345,7 +345,7 @@
                 <th style="width:auto;">描述</th>
                 <th style="width:100px; text-align:center;">
                     <div class="add-flow-dropdown">
-                        <button class="add-flow-btn" id="addFlowBtn" title="新增实验">
+                        <button class="add-flow-btn" id="addFlowBtn" title="新增实验" data-add-flow-url="{% url 'add_flow' experiment.id %}">
                             <i class="bi bi-plus-lg"></i>
                         </button>
                         <div class="flow-dropdown-menu" id="flowDropdownMenu">
@@ -390,9 +390,6 @@
                     </button>
                     <a href="{% url 'delete_flow' experiment.id flow.id %}" class="btn-no-style" title="删除实验">
                         <i class="bi bi-trash"></i>
-                    </a>
-                    <a href="{% url 'flow_barcode' flow.id %}" class="btn-no-style" title="生成条码" target="_blank">
-                        <i class="bi bi-upc-scan"></i>
                     </a>
                 </td>
             </tr>
@@ -457,9 +454,12 @@
                                     <a href="{% url 'delete_step' experiment.id flow.id step.id %}" class="btn-no-style">
                                         <i class="bi bi-trash"></i>
                                     </a>
-                                    <a href="{% url 'step_barcode' step.id %}" class="btn-no-style" title="生成条码" target="_blank">
-                                        <i class="bi bi-upc-scan"></i>
-                                    </a>
+                                    <button type="button"
+                                            class="btn-no-style genealogy-modal-btn"
+                                            title="查看谱系"
+                                            data-genealogy-url="{% url 'step_genealogy' step.id %}">
+                                        <i class="bi bi-diagram-3"></i>
+                                    </button>
                                 </td>
                             </tr>
                             {% empty %}
@@ -478,6 +478,28 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
+
+<!-- Genealogy Modal -->
+<div class="modal fade" id="genealogyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-diagram-3 me-2"></i>Genealogy
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body" id="genealogyModalBody">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">正在加载...</span>
+                    </div>
+                    <p class="mt-3 text-muted">正在加载谱系...</p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Edit Step Modal -->
@@ -574,6 +596,95 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// Add Flow dropdown is initialized early so unrelated page scripts cannot break it.
+(function initAddFlowDropdown() {
+    const addFlowBtn = document.getElementById('addFlowBtn');
+    const flowDropdownMenu = document.getElementById('flowDropdownMenu');
+    const flowCodeSearch = document.getElementById('flowCodeSearch');
+    const flowCodeList = document.getElementById('flowCodeList');
+
+    if (!addFlowBtn || !flowDropdownMenu) {
+        return;
+    }
+
+    function positionDropdown() {
+        const rect = addFlowBtn.getBoundingClientRect();
+        flowDropdownMenu.style.position = 'fixed';
+        flowDropdownMenu.style.top = `${rect.bottom + 6}px`;
+        flowDropdownMenu.style.right = 'auto';
+        flowDropdownMenu.style.left = `${Math.max(12, rect.right - flowDropdownMenu.offsetWidth)}px`;
+        flowDropdownMenu.style.zIndex = '2000';
+    }
+
+    function closeDropdown() {
+        flowDropdownMenu.classList.remove('show');
+    }
+
+    addFlowBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        flowDropdownMenu.classList.toggle('show');
+        if (flowDropdownMenu.classList.contains('show')) {
+            positionDropdown();
+            if (flowCodeSearch) {
+                flowCodeSearch.focus();
+            }
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!flowDropdownMenu.contains(e.target) && !addFlowBtn.contains(e.target)) {
+            closeDropdown();
+        }
+    });
+
+    window.addEventListener('resize', closeDropdown);
+    window.addEventListener('scroll', closeDropdown, true);
+
+    if (flowCodeSearch && flowCodeList) {
+        flowCodeSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            flowCodeList.querySelectorAll('.flow-dropdown-item').forEach(function(item) {
+                const code = item.getAttribute('data-code').toLowerCase();
+                item.style.display = code.includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+    }
+
+    if (flowCodeList) {
+        flowCodeList.addEventListener('click', function(e) {
+            const item = e.target.closest('.flow-dropdown-item');
+            if (!item) {
+                return;
+            }
+            const flowCode = item.getAttribute('data-code');
+            fetch(addFlowBtn.dataset.addFlowUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: new URLSearchParams({ flow_name: flowCode }).toString()
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('添加实验失败：' + (data.error || '未知错误'));
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('网络错误：' + err);
+                });
+
+            closeDropdown();
+        });
+    }
+})();
 
 // Expand/collapse flows
 document.querySelectorAll('.expand-btn').forEach(function(btn) {
@@ -714,6 +825,79 @@ function attachInlineHandler(selector, urlPrefix, dataAttr) {
 attachInlineHandler('.flow-desc', '/update_flow_desc/', 'data-flow-id');
 attachInlineHandler('.step-desc', '/update_step_desc/', 'data-step-id');
 
+function buildGenealogyPartialUrl(url) {
+    const partialUrl = new URL(url, window.location.origin);
+    partialUrl.searchParams.set('partial', '1');
+    return partialUrl.toString();
+}
+
+function showGenealogyLoading() {
+    if (window.AtlasGenealogyGraph) {
+        window.AtlasGenealogyGraph.destroy();
+    }
+    document.getElementById('genealogyModalBody').innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">正在加载...</span>
+            </div>
+            <p class="mt-3 text-muted">正在加载谱系...</p>
+        </div>
+    `;
+}
+
+function loadGenealogyModal(url) {
+    showGenealogyLoading();
+    return fetch(buildGenealogyPartialUrl(url), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to load genealogy');
+            }
+            return response.text();
+        })
+        .then(html => {
+            document.getElementById('genealogyModalBody').innerHTML = html;
+            if (window.AtlasGenealogyGraph) {
+                window.AtlasGenealogyGraph.init({
+                    onStepTap: loadGenealogyModal
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error loading genealogy:', error);
+            document.getElementById('genealogyModalBody').innerHTML = `
+                <div class="alert alert-danger mb-0">谱系加载失败，请稍后重试。</div>
+            `;
+        });
+}
+
+document.querySelectorAll('.genealogy-modal-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const genealogyUrl = btn.getAttribute('data-genealogy-url');
+        const modalEl = document.getElementById('genealogyModal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+        loadGenealogyModal(genealogyUrl);
+    });
+});
+
+document.getElementById('genealogyModalBody').addEventListener('click', function(e) {
+    const genealogyLink = e.target.closest('.genealogy-modal-link');
+    if (!genealogyLink) {
+        return;
+    }
+    e.preventDefault();
+    loadGenealogyModal(genealogyLink.href);
+});
+
+document.getElementById('genealogyModal').addEventListener('hidden.bs.modal', function () {
+    if (window.AtlasGenealogyGraph) {
+        window.AtlasGenealogyGraph.destroy();
+    }
+    showGenealogyLoading();
+});
+
 // Edit step modal handler
 document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -842,83 +1026,7 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
                     } catch (error) {
                         console.error('Error setting up parent dropdown:', error);
                     }
-                    
-                    // Setup dropdowns for existing components in edit modal
-                    try {
-                        console.log('Setting up dropdowns for existing components...');
-                        const existingInputs = document.querySelectorAll('input[id^="material-input-existing-"]');
-                        console.log('Found existing component inputs:', existingInputs.length);
-                        
-                        if (existingInputs.length > 0) {
-                            const response = await fetch('/api/steps/');
-                            const data = await response.json();
-                            const steps = data.steps || [];
-                            console.log('Fetched steps for existing components:', steps.length);
-                            
-                            existingInputs.forEach((input, index) => {
-                                const counter = index + 1;
-                                const dropdown = document.getElementById(`steps-dropdown-existing-${counter}`);
-                                
-                                if (!dropdown) {
-                                    console.warn('Dropdown not found for existing component', counter);
-                                    return;
-                                }
-                                
-                                console.log('Setting up existing component', counter);
-                                
-                                // Helper function to update dropdown options
-                                function updateOptions(filteredSteps) {
-                                    if (filteredSteps.length === 0) {
-	                                        dropdown.innerHTML = '<div class="dropdown-item-empty">未找到步骤</div>';
-                                        return;
-                                    }
-                                    
-                                    dropdown.innerHTML = '';
-                                    filteredSteps.forEach(step => {
-                                        const item = document.createElement('div');
-                                        item.className = 'dropdown-item-custom';
-                                        item.textContent = `${step.full_step} (${step.experiment})`;
-                                        item.addEventListener('click', function() {
-                                            input.value = step.full_step;
-                                            dropdown.style.display = 'none';
-                                        });
-                                        dropdown.appendChild(item);
-                                    });
-                                }
-                                
-                                // Initial population
-                                updateOptions(steps);
-                                
-                                // Show dropdown on focus
-                                input.addEventListener('focus', function() {
-                                    updateOptions(steps);
-                                    dropdown.style.display = 'block';
-                                });
-                                
-                                // Filter dropdown on input
-                                input.addEventListener('input', function() {
-                                    const searchTerm = this.value.toLowerCase();
-                                    const filtered = steps.filter(step => 
-                                        step.full_step.toLowerCase().includes(searchTerm) ||
-                                        step.experiment.toLowerCase().includes(searchTerm)
-                                    );
-                                    updateOptions(filtered);
-                                    dropdown.style.display = 'block';
-                                });
-                                
-                                // Hide dropdown when clicking outside
-                                document.addEventListener('click', function(e) {
-                                    if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-                                        dropdown.style.display = 'none';
-                                    }
-                                });
-                            });
-                            
-                            console.log('Existing component dropdowns setup complete');
-                        }
-                    } catch (error) {
-                        console.error('Error setting up existing component dropdowns:', error);
-                    }
+                    initializeRawMaterialSelects($('#editStepModal'));
                 }, 100);
             });
     });
@@ -930,6 +1038,9 @@ document.getElementById('editStepModal').addEventListener('hidden.bs.modal', fun
     if (typeof $ !== 'undefined' && $('#id_tool').length && $('#id_tool').hasClass('select2-hidden-accessible')) {
         $('#id_tool').select2('destroy');
     }
+    if (typeof $ !== 'undefined') {
+        $('#editStepModal .raw-material-select.select2-hidden-accessible').select2('destroy');
+    }
     document.getElementById('editStepModalBody').innerHTML = '';
 });
 
@@ -938,25 +1049,8 @@ document.addEventListener('submit', function(e) {
     if (e.target && e.target.id === 'expstepEditForm') {
         e.preventDefault();
         
-        // Collect component data from this form only
-        const components = [];
-        e.target.querySelectorAll('.component-row').forEach(row => {
-            const material = row.querySelector('.component-material')?.value;
-            const quantity = row.querySelector('.component-quantity')?.value;
-            const unit = row.querySelector('.component-unit')?.value;
-            
-            if (material && quantity && unit) {
-                components.push({
-                    material_name: material,
-                    quantity: parseFloat(quantity),
-                    unit: unit
-                });
-            }
-        });
-        
-        // Create FormData and add components
         const formData = new FormData(e.target);
-        formData.append('components', JSON.stringify(components));
+        formData.append('raw_material_usages', JSON.stringify(collectRawMaterialUsages(e.target)));
         
         fetch(e.target.action || window.location.href, {
             method: "POST",
@@ -1129,6 +1223,7 @@ document.querySelectorAll('.add-step-btn').forEach(function(btn) {
                     } catch (error) {
                         console.error('Error setting up parent dropdown:', error);
                     }
+                    initializeRawMaterialSelects($('#addStepModal'));
                 }, 100);
             });
     });
@@ -1140,6 +1235,9 @@ document.getElementById('addStepModal').addEventListener('hidden.bs.modal', func
     if (typeof $ !== 'undefined' && $('#id_tool').length && $('#id_tool').hasClass('select2-hidden-accessible')) {
         $('#id_tool').select2('destroy');
     }
+    if (typeof $ !== 'undefined') {
+        $('#addStepModal .raw-material-select.select2-hidden-accessible').select2('destroy');
+    }
     document.getElementById('addStepModalBody').innerHTML = '';
 });
 
@@ -1148,25 +1246,8 @@ document.addEventListener('submit', function(e) {
     if (e.target && e.target.id === 'addStepForm') {
         e.preventDefault();
         
-        // Collect component data from this form only
-        const components = [];
-        e.target.querySelectorAll('.component-row').forEach(row => {
-            const material = row.querySelector('.component-material')?.value;
-            const quantity = row.querySelector('.component-quantity')?.value;
-            const unit = row.querySelector('.component-unit')?.value;
-            
-            if (material && quantity && unit) {
-                components.push({
-                    material_name: material,
-                    quantity: parseFloat(quantity),
-                    unit: unit
-                });
-            }
-        });
-        
-        // Create FormData and add components
         const formData = new FormData(e.target);
-        formData.append('components', JSON.stringify(components));
+        formData.append('raw_material_usages', JSON.stringify(collectRawMaterialUsages(e.target)));
         
         fetch(e.target.action || window.location.href, {
             method: "POST",
@@ -1211,83 +1292,6 @@ document.addEventListener('submit', function(e) {
         });
     }
 });
-
-// Add Flow Dropdown functionality
-const addFlowBtn = document.getElementById('addFlowBtn');
-const flowDropdownMenu = document.getElementById('flowDropdownMenu');
-const flowCodeSearch = document.getElementById('flowCodeSearch');
-const flowCodeList = document.getElementById('flowCodeList');
-
-// Toggle dropdown
-if (addFlowBtn) {
-    addFlowBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        flowDropdownMenu.classList.toggle('show');
-        if (flowDropdownMenu.classList.contains('show')) {
-            flowCodeSearch.focus();
-        }
-    });
-}
-
-// Close dropdown when clicking outside
-document.addEventListener('click', function(e) {
-    if (flowDropdownMenu && !flowDropdownMenu.contains(e.target) && e.target !== addFlowBtn) {
-        flowDropdownMenu.classList.remove('show');
-    }
-});
-
-// Search functionality
-if (flowCodeSearch) {
-    flowCodeSearch.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
-        const items = flowCodeList.querySelectorAll('.flow-dropdown-item');
-        
-        items.forEach(item => {
-            const code = item.getAttribute('data-code').toLowerCase();
-            if (code.includes(searchTerm)) {
-                item.style.display = 'block';
-            } else {
-                item.style.display = 'none';
-            }
-        });
-    });
-}
-
-// Handle flow code selection
-if (flowCodeList) {
-    flowCodeList.addEventListener('click', function(e) {
-        if (e.target.classList.contains('flow-dropdown-item')) {
-            const flowCode = e.target.getAttribute('data-code');
-            
-            // Send AJAX request to create the flow
-            fetch(`/experiment/{{ experiment.id }}/add_flow/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: `flow_name=${flowCode}`
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    // Reload the page to show the new flow
-                    location.reload();
-                } else {
-	                    alert('添加实验失败：' + (data.error || '未知错误'));
-                }
-            })
-            .catch(err => {
-                console.error('Error:', err);
-	                alert('网络错误：' + err);
-            });
-            
-            // Close dropdown
-            flowDropdownMenu.classList.remove('show');
-        }
-    });
-}
 
 // Handle status dropdown changes - direct update without confirmation
 document.addEventListener('change', function(e) {
@@ -1588,134 +1592,113 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Component Management - Using event delegation for dynamically loaded modals
-let componentCounter = 0;
+// Raw material usage management for dynamically loaded modals
+let rawMaterialCounter = 0;
+let rawMaterialsCache = null;
 
-// Add component button - using event delegation
 document.addEventListener('click', function(e) {
-    const addBtn = e.target.closest('#add-component-btn');
+    const addBtn = e.target.closest('#add-raw-material-btn');
     if (addBtn) {
         e.preventDefault();
         e.stopPropagation();
-        componentCounter++;
-        const tbody = document.getElementById('components-container');
+        rawMaterialCounter++;
+        const tbody = document.getElementById('raw-materials-container');
         if (!tbody) return;
         
         const newRow = document.createElement('tr');
-        newRow.className = 'component-row';
-        newRow.setAttribute('data-component-id', 'new-' + componentCounter);
+        newRow.className = 'raw-material-row';
+        newRow.setAttribute('data-raw-material-row-id', 'new-' + rawMaterialCounter);
         newRow.innerHTML = `
-            <td style="position: relative;">
-                <input type="text" class="form-control form-control-sm component-material" 
-                       id="material-input-${componentCounter}"
-	                       placeholder="输入自定义名称或选择步骤..."
-                       autocomplete="off">
-                <div class="steps-dropdown" id="steps-dropdown-${componentCounter}" style="display: none;">
-	                    <div class="dropdown-loading">正在加载步骤...</div>
-                </div>
+            <td>
+                <select class="form-select form-select-sm raw-material-select">
+                    <option value="">选择原材料...</option>
+                </select>
             </td>
             <td>
-                <input type="number" step="0.001" class="form-control form-control-sm component-quantity">
+                <input type="number" step="0.0001" class="form-control form-control-sm raw-material-quantity">
             </td>
             <td>
-                <input type="text" class="form-control form-control-sm component-unit">
+                <input type="text" class="form-control form-control-sm raw-material-unit">
             </td>
             <td>
-                <button type="button" class="btn btn-sm btn-danger remove-component-btn">
+                <input type="text" class="form-control form-control-sm raw-material-notes">
+            </td>
+            <td>
+                <button type="button" class="btn btn-sm btn-danger remove-raw-material-btn">
                     <i class="bi bi-trash"></i>
                 </button>
             </td>
         `;
         tbody.appendChild(newRow);
-        
-        // Setup the searchable dropdown
-        setupStepsDropdown(componentCounter);
+        initializeRawMaterialSelects($(newRow).closest('.modal'));
     }
     
-    // Remove component button
-    if (e.target.closest('.remove-component-btn')) {
-        const row = e.target.closest('.component-row');
+    if (e.target.closest('.remove-raw-material-btn')) {
+        const row = e.target.closest('.raw-material-row');
+        if (row && typeof $ !== 'undefined') {
+            const select = $(row).find('.raw-material-select');
+            if (select.hasClass('select2-hidden-accessible')) {
+                select.select2('destroy');
+            }
+        }
         if (row) row.remove();
     }
 });
 
-// Cache for steps data
-let allStepsCache = null;
+async function getRawMaterials() {
+    if (rawMaterialsCache) return rawMaterialsCache;
+    try {
+        const response = await fetch('/api/raw_materials/');
+        const data = await response.json();
+        rawMaterialsCache = data.raw_materials || [];
+    } catch (error) {
+        console.error('Error fetching raw materials:', error);
+        rawMaterialsCache = [];
+    }
+    return rawMaterialsCache;
+}
 
-// Setup searchable dropdown for steps
-async function setupStepsDropdown(counter) {
-    console.log('setupStepsDropdown called for counter:', counter);
-    const input = document.getElementById(`material-input-${counter}`);
-    const dropdown = document.getElementById(`steps-dropdown-${counter}`);
-    
-    console.log('Elements found:', { input: !!input, dropdown: !!dropdown });
-    if (!input || !dropdown) {
-        console.error('Missing elements for counter:', counter);
-        return;
-    }
-    
-    // Fetch steps if not already cached
-    if (!allStepsCache) {
-        console.log('Fetching steps from API...');
-        try {
-            const response = await fetch('/api/steps/');
-            const data = await response.json();
-            allStepsCache = data.steps || [];
-            console.log('Cached steps:', allStepsCache.length);
-        } catch (error) {
-            console.error('Error fetching steps:', error);
-            allStepsCache = [];
+async function initializeRawMaterialSelects(modal) {
+    const rawMaterials = await getRawMaterials();
+    const modalElement = modal && modal.length ? modal : $('.modal.show');
+
+    $('.raw-material-select').each(function() {
+        const select = $(this);
+        const selectedValue = select.val();
+        if (select.hasClass('select2-hidden-accessible')) {
+            return;
         }
-    } else {
-        console.log('Using cached steps:', allStepsCache.length);
-    }
-    
-    // Populate dropdown initially
-    updateDropdownOptions(dropdown, allStepsCache, input);
-    
-    // Show dropdown on focus
-    input.addEventListener('focus', function() {
-        updateDropdownOptions(dropdown, allStepsCache, input);
-        dropdown.style.display = 'block';
-    });
-    
-    // Filter dropdown on input
-    input.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
-        const filtered = allStepsCache.filter(step => 
-            step.full_step.toLowerCase().includes(searchTerm) ||
-            step.experiment.toLowerCase().includes(searchTerm)
-        );
-        updateDropdownOptions(dropdown, filtered, input);
-        dropdown.style.display = 'block';
-    });
-    
-    // Hide dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-            dropdown.style.display = 'none';
+
+        if (select.find('option').length <= 1) {
+            rawMaterials.forEach(material => {
+                select.append(new Option(material.label, material.id, false, String(material.id) === String(selectedValue)));
+            });
         }
+
+        select.select2({
+            theme: 'bootstrap-5',
+            dropdownParent: modalElement,
+            width: '100%',
+            placeholder: '搜索原材料...',
+            allowClear: true
+        });
     });
 }
 
-// Update dropdown options
-function updateDropdownOptions(dropdown, steps, input) {
-    if (steps.length === 0) {
-	        dropdown.innerHTML = '<div class="dropdown-item-empty">未找到步骤</div>';
-        return;
-    }
-    
-    dropdown.innerHTML = '';
-    steps.forEach(step => {
-        const item = document.createElement('div');
-        item.className = 'dropdown-item-custom';
-        item.textContent = `${step.full_step} (${step.experiment})`;
-        item.addEventListener('click', function() {
-            input.value = step.full_step;
-            dropdown.style.display = 'none';
+function collectRawMaterialUsages(form) {
+    const usages = [];
+    form.querySelectorAll('.raw-material-row').forEach(row => {
+        const rawMaterialId = row.querySelector('.raw-material-select')?.value;
+        if (!rawMaterialId) return;
+
+        usages.push({
+            raw_material_id: rawMaterialId,
+            quantity: row.querySelector('.raw-material-quantity')?.value || '',
+            unit: row.querySelector('.raw-material-unit')?.value || '',
+            notes: row.querySelector('.raw-material-notes')?.value || ''
         });
-        dropdown.appendChild(item);
     });
+    return usages;
 }
 </script>
 

@@ -1,0 +1,42 @@
+<div class="genealogy-content">
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <h2 class="mb-1">Genealogy</h2>
+            <div class="text-muted">{{ step.full_step }}</div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'experiment_detail' experiment.id %}?expanded_flow={{ step.flow.id }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> 返回实验
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12">
+            <section class="genealogy-visualizer">
+                <div class="genealogy-visualizer-header">
+                    <div>
+                        <h5 class="mb-1">工艺流程图</h5>
+                        <div class="text-muted small">拖动查看流程，滚轮缩放；原材料作为输入节点连接到使用它的步骤</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="genealogyFitBtn">
+                            <i class="bi bi-arrows-fullscreen"></i> Fit
+                        </button>
+                        <a href="{% url 'experiment_detail' experiment.id %}?expanded_flow={{ step.flow.id }}" class="btn btn-sm btn-outline-secondary">打开实验</a>
+                    </div>
+                </div>
+
+                <div class="cytoscape-legend">
+                    <span><i class="legend-swatch step-swatch"></i>步骤</span>
+                    <span><i class="legend-swatch current-swatch"></i>当前步骤</span>
+                    <span><i class="legend-swatch material-swatch"></i>原材料</span>
+                </div>
+                <div class="genealogy-cy-wrap">
+                    <div id="genealogyCy" aria-label="工艺流程图"></div>
+                </div>
+                {{ genealogy_graph_json|json_script:"genealogyGraphData" }}
+            </section>
+        </div>
+    </div>
+</div>

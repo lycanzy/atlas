@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment
+from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, StepRawMaterialUsage
 
 # Base admin class with custom CSS
 class BaseModelAdmin(admin.ModelAdmin):
@@ -135,3 +135,31 @@ class EquipmentAdmin(BaseModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+@admin.register(RawMaterial)
+class RawMaterialAdmin(BaseModelAdmin):
+    list_display = ("material_code", "batch_number", "received_date", "material_name", "material_type", "owner", "location", "is_active", "created_on")
+    list_filter = ("is_active", "material_type", "owner")
+    search_fields = ("material_code", "batch_number", "material_name", "material_type", "description", "supplier", "location")
+    readonly_fields = ("batch_number", "created_on", "updated_on")
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('material_code', 'received_date', 'batch_number', 'material_type', 'material_name', 'description', 'owner', 'is_active')
+        }),
+        ('Storage and Supplier', {
+            'fields': ('supplier', 'location')
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+        ('Metadata', {
+            'fields': ('created_on', 'updated_on'),
+            'classes': ('collapse',)
+        }),
+    )
+
+@admin.register(StepRawMaterialUsage)
+class StepRawMaterialUsageAdmin(BaseModelAdmin):
+    list_display = ("step", "raw_material", "quantity", "unit", "updated_on")
+    search_fields = ("step__full_step", "raw_material__material_code", "raw_material__batch_number", "raw_material__material_name")
+    list_filter = ("raw_material__material_type",)

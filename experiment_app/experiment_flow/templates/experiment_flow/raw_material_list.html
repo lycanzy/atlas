@@ -1,0 +1,184 @@
+{% extends "experiment_flow/base_no_sidebar.html" %}
+{% load static %}
+
+{% block title %}原材料数据库{% endblock %}
+
+{% block content %}
+<style>
+    .content-container { max-width: 1400px; margin: 0 auto; }
+    .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .search-container { display: flex; gap: 0.35rem; align-items: center; }
+    .search-wrapper { flex: 1; position: relative; }
+    .search-input {
+        width: 100%;
+        padding: 0.3rem 2rem 0.4rem 0.65rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        box-sizing: border-box;
+    }
+    .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    .search-icon, .clear-search {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+    .search-icon { color: #666; pointer-events: none; }
+    .clear-search {
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        padding: 0.25rem;
+        font-size: 1rem;
+        display: none;
+    }
+    .search-input:not(:placeholder-shown) ~ .clear-search { display: block; }
+    .search-input:not(:placeholder-shown) ~ .search-icon { display: none; }
+    .raw-material-table {
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .raw-material-table th {
+        background-color: #3b6ef6;
+        color: white;
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+    }
+    .raw-material-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #eee;
+    }
+    .raw-material-table tr:hover { background: #f8f9fa; }
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .status-active { background: #d4edda; color: #155724; }
+    .status-inactive { background: #f8d7da; color: #721c24; }
+    .pagination-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 1.5rem;
+    }
+    .pagination-controls a, .pagination-controls span {
+        padding: 0.4rem 0.8rem;
+        border-radius: 4px;
+    }
+</style>
+
+<div class="content-container">
+    <div class="header-section">
+        <h2>原材料数据库</h2>
+        <div class="search-container">
+            <div class="search-wrapper">
+                <form method="get" action="" id="searchForm">
+                    <input type="text" name="search" class="search-input" placeholder="搜索原材料..." value="{{ search_query|default:'' }}" id="searchInput">
+                    <button type="button" class="clear-search" onclick="clearSearch()" title="清空搜索">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </button>
+                    <i class="bi bi-search search-icon"></i>
+                </form>
+            </div>
+            <a href="{% url 'add_raw_material' %}" class="btn btn-outline-primary btn-sm" title="新增原材料">
+                <i class="bi bi-plus-lg"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="raw-material-table">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>原材料</th>
+                    <th>批次</th>
+                    <th>种类</th>
+                    <th>负责人</th>
+                    <th>位置</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for raw_material in raw_material_list %}
+                <tr>
+                    <td>
+                        <strong><code>{{ raw_material.material_code }}</code> {{ raw_material.material_name|default:"" }}</strong>
+                        {% if raw_material.description %}
+                        <br><small class="text-muted">{{ raw_material.description|truncatewords:15 }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <code>{{ raw_material.batch_number }}</code>
+                        {% if raw_material.received_date %}
+                            <br><small class="text-muted">{{ raw_material.received_date|date:"Y-m-d" }}</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ raw_material.material_type|default:"—" }}</td>
+                    <td>
+                        {% if raw_material.owner %}
+                            <i class="bi bi-person"></i>
+                            {{ raw_material.owner.get_full_name|default:raw_material.owner.username }}
+                        {% else %}
+                            <span class="text-muted">未分配</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ raw_material.location|default:"—" }}</td>
+                    <td>
+                        {% if raw_material.is_active %}
+                            <span class="status-badge status-active">启用</span>
+                        {% else %}
+                            <span class="status-badge status-inactive">停用</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'raw_material_detail' raw_material.id %}" class="btn btn-sm btn-info" title="查看详情">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <a href="{% url 'edit_raw_material' raw_material.id %}" class="btn btn-sm btn-warning" title="编辑">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted">未找到原材料</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-controls">
+        {% if page_obj.has_previous %}
+            <a class="btn btn-primary btn-sm" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">上一页</a>
+        {% endif %}
+        <span>第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+        {% if page_obj.has_next %}
+            <a class="btn btn-primary btn-sm" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">下一页</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchForm').submit();
+}
+</script>
+{% endblock %}

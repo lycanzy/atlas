@@ -1,9 +1,10 @@
 # Test script to verify copy_steps copies step details and parent relationships
 from django.contrib.auth import get_user_model
 from django.test import Client
+from datetime import date
 import json
 
-from experiment_flow.models import Exp, ExpFlow, ExpStep, Project
+from experiment_flow.models import Exp, ExpFlow, ExpStep, Project, RawMaterial, StepRawMaterialUsage
 
 User = get_user_model()
 
@@ -28,6 +29,13 @@ flow_tgt = ExpFlow.objects.create(flow_name='BB', exp=exp)
 # create steps in source flow
 s1 = ExpStep.objects.create(step_name='MX', step_number='00', step_description='Original step 1', flow=flow_src, status='Planned')
 s2 = ExpStep.objects.create(step_name='MY', step_number='00', step_description='Original step 2 (child)', flow=flow_src, parent=s1, status='Planned')
+raw_material = RawMaterial.objects.create(
+    material_code='RMTEST',
+    received_date=date.today(),
+    material_name='Test Raw Material',
+    owner=user,
+)
+StepRawMaterialUsage.objects.create(step=s1, raw_material=raw_material, quantity='1.0000', unit='g')
 
 print('Setup complete:')
 print('Exp', exp.id, exp.exp_name)
@@ -55,7 +63,11 @@ except Exception:
 # Verify copied steps in target flow
 print('\nTarget flow steps after copy:')
 for s in ExpStep.objects.filter(flow=flow_tgt).order_by('id'):
-    print(s.id, s.step_name, s.step_number, 'parent->', s.parent.id if s.parent else None, 'desc:', s.step_description, 'components:', s.components)
+    usages = [
+        f"{usage.raw_material.material_code}/{usage.raw_material.batch_number}: {usage.quantity} {usage.unit or ''}".strip()
+        for usage in s.raw_material_usages.select_related('raw_material')
+    ]
+    print(s.id, s.step_name, s.step_number, 'parent->', s.parent.id if s.parent else None, 'desc:', s.step_description, 'raw materials:', usages)
 
 # Clean up created objects (optional - commented out if you want to inspect data)
 # Exp.objects.filter(id=exp.id).delete()

@@ -276,10 +276,12 @@
     <!-- Select2 for searchable dropdowns -->
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2.min.css' %}" />
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2-bootstrap-5-theme.min.css' %}" />
-    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=1" />
+    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=4" />
     <script src="{% static 'vendor/jquery/jquery-3.7.0.min.js' %}?v=2"></script>
     <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'vendor/select2/js/select2.min.js' %}"></script>
+    <script src="{% static 'vendor/cytoscape/cytoscape.min.js' %}"></script>
+    <script src="{% static 'app/js/genealogy_graph.js' %}"></script>
 </head>
 <body>
     <!-- Toast container for notifications -->
@@ -307,6 +309,10 @@
                     class="btn btn-primary btn-sm"
                     data-url="{% url 'equipment_list' %}"
                     onclick="window.location.href=this.dataset.url;">设备</button>
+                <button type="button"
+                    class="btn btn-primary btn-sm"
+                    data-url="{% url 'raw_material_list' %}"
+                    onclick="window.location.href=this.dataset.url;">原材料</button>
             {% if user.is_authenticated %}
                 <span class="text-white mx-2">
                     <i class="bi bi-person-circle"></i> 
@@ -385,27 +391,28 @@
                         <div>
                             <span class="experiment-heading">{{ exp.exp_name }}</span>
                         </div>
-                        <span class="experiment-date">{{ exp.created_on|date:"M d, Y" }}</span>
+                        <span class="experiment-owner-date" title="{% if exp.owner.first_name and exp.owner.last_name %}{{ exp.owner.first_name }} {{ exp.owner.last_name }}{% else %}{{ exp.owner.username }}{% endif %} {{ exp.created_on|date:"m/d/Y" }}">
+                            {% if exp.owner.first_name and exp.owner.last_name %}
+                                {{ exp.owner.first_name }} {{ exp.owner.last_name }}
+                            {% else %}
+                                {{ exp.owner.username }}
+                            {% endif %}
+                            {{ exp.created_on|date:"m/d/Y" }}
+                        </span>
                     </div>
-                    <span class="experiment-team">
+                    <span class="experiment-team" title="{{ exp.project.group.group_name|default:exp.project.project_code }}{% if exp.project.group.team_code %} · {{ exp.project.group.team_code }}{% endif %}">
                         {{ exp.project.group.group_name|default:exp.project.project_code }}
                         {% if exp.project.group.team_code %}
                             · {{ exp.project.group.team_code }}
                         {% endif %}
                     </span>
                     
-                    {% if exp.exp_description %}
-                    <div class="experiment-description">{{ exp.exp_description }}</div>
-                    {% endif %}
-                    
-                    <div class="card-footer-row">
-                        <span class="experiment-owner">
-                            {% if exp.owner.first_name and exp.owner.last_name %}
-                                {{ exp.owner.first_name }} {{ exp.owner.last_name }}
-                            {% else %}
-                                {{ exp.owner.username }}
-                            {% endif %}
-                        </span>
+                    <div class="card-detail-row">
+                        {% if exp.exp_description %}
+                        <span class="experiment-description" title="{{ exp.exp_description }}">{{ exp.exp_description }}</span>
+                        {% else %}
+                        <span class="experiment-description text-muted" title="无描述">无描述</span>
+                        {% endif %}
                     </div>
                 </a>
             {% empty %}

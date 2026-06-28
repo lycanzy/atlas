@@ -1,0 +1,166 @@
+{% extends "experiment_flow/base_no_sidebar.html" %}
+{% load static %}
+
+{% block title %}编辑 {{ raw_material.material_code }} / {{ raw_material.batch_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>编辑原材料</h2>
+                    <p class="text-muted mb-0">{{ raw_material.material_code }} / {{ raw_material.batch_number }}</p>
+                </div>
+                <div>
+                    <a href="{% url 'raw_material_detail' raw_material.id %}" class="btn btn-secondary me-2">
+                        <i class="bi bi-arrow-left"></i> 返回详情
+                    </a>
+                    <a href="{% url 'raw_material_list' %}" class="btn btn-secondary">
+                        <i class="bi bi-list"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="bi bi-info-circle"></i> 基本信息
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.material_code.id_for_label }}" class="form-label fw-bold">
+                                        原材料代号 <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.material_code }}
+                                    {% if form.material_code.errors %}<div class="text-danger">{{ form.material_code.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.received_date.id_for_label }}" class="form-label fw-bold">
+                                        接收时间 <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.received_date }}
+                                    {% if form.received_date.errors %}<div class="text-danger">{{ form.received_date.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="batchPreview" class="form-label fw-bold">自动生成批次</label>
+                                    <input type="text" class="form-control" id="batchPreview" value="{{ raw_material.batch_number }}" readonly>
+                                    <small class="form-text text-muted">格式：原材料代号-MMDDYY，例如 GR01-061926。</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.material_name.id_for_label }}" class="form-label fw-bold">
+                                        原材料名称
+                                    </label>
+                                    {{ form.material_name }}
+                                    {% if form.material_name.errors %}<div class="text-danger">{{ form.material_name.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.material_type.id_for_label }}" class="form-label fw-bold">原材料种类</label>
+                                    {{ form.material_type }}
+                                    {% if form.material_type.errors %}<div class="text-danger">{{ form.material_type.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.owner.id_for_label }}" class="form-label fw-bold">
+                                        负责人 <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.owner }}
+                                    {% if form.owner.errors %}<div class="text-danger">{{ form.owner.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.location.id_for_label }}" class="form-label fw-bold">存放位置</label>
+                                    {{ form.location }}
+                                    {% if form.location.errors %}<div class="text-danger">{{ form.location.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">描述</label>
+                                    {{ form.description }}
+                                    {% if form.description.errors %}<div class="text-danger">{{ form.description.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check">
+                                        {{ form.is_active }}
+                                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">启用</label>
+                                    </div>
+                                    {% if form.is_active.errors %}<div class="text-danger">{{ form.is_active.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="bi bi-box-seam"></i> 存储与供应商
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.supplier.id_for_label }}" class="form-label fw-bold">供应商</label>
+                                    {{ form.supplier }}
+                                    {% if form.supplier.errors %}<div class="text-danger">{{ form.supplier.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label for="{{ form.notes.id_for_label }}" class="form-label fw-bold">备注</label>
+                                    {{ form.notes }}
+                                    {% if form.notes.errors %}<div class="text-danger">{{ form.notes.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong>创建时间：</strong> {{ raw_material.created_on|date:"Y-m-d H:i" }} |
+                            <strong>最近更新：</strong> {{ raw_material.updated_on|date:"Y-m-d H:i" }}
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'raw_material_detail' raw_material.id %}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> 取消
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> 保存修改
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    if ($('#id_owner').length) {
+        $('#id_owner').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: '搜索负责人...',
+            allowClear: false
+        });
+    }
+
+    function updateBatchPreview() {
+        const code = ($('#id_material_code').val() || '').trim().toUpperCase();
+        const receivedDate = $('#id_received_date').val();
+        if (!code || !receivedDate) {
+            $('#batchPreview').val('');
+            return;
+        }
+        const parts = receivedDate.split('-');
+        if (parts.length !== 3) {
+            $('#batchPreview').val('');
+            return;
+        }
+        const yy = parts[0].slice(-2);
+        $('#batchPreview').val(`${code}-${parts[1]}${parts[2]}${yy}`);
+    }
+
+    $('#id_material_code, #id_received_date').on('input change', updateBatchPreview);
+    updateBatchPreview();
+});
+</script>
+{% endblock %}

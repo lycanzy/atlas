@@ -114,16 +114,17 @@
     grid-column: span 3;
 }
 
-#components-table {
+#raw-materials-table {
     font-size: 0.75rem;
 }
 
-#components-table th,
-#components-table td {
+#raw-materials-table th,
+#raw-materials-table td {
     padding: 0.25rem 0.4rem;
 }
 
-#components-table input {
+#raw-materials-table input,
+#raw-materials-table select {
     font-size: 0.75rem;
     padding: 0.2rem 0.3rem;
 }
@@ -289,39 +290,41 @@
     </div>
   </div>
   
-  <!-- Components Section -->
+  <!-- Raw Materials Section -->
   <div class="form-section">
-    <div class="section-title">组分 / 原材料</div>
-    <table class="table table-sm table-bordered" id="components-table">
+    <div class="section-title">原材料使用</div>
+    <table class="table table-sm table-bordered" id="raw-materials-table">
       <thead class="table-light">
         <tr>
-          <th style="width: 45%;">材料名称</th>
-          <th style="width: 20%;">用量</th>
-          <th style="width: 20%;">单位</th>
-          <th style="width: 15%; text-align: center;">
-            <button type="button" class="btn btn-xs btn-success" id="add-component-btn" style="font-size: 0.7rem; padding: 0.1rem 0.3rem;">
+          <th style="width: 42%;">原材料</th>
+          <th style="width: 16%;">用量</th>
+          <th style="width: 14%;">单位</th>
+          <th style="width: 18%;">备注</th>
+          <th style="width: 10%; text-align: center;">
+            <button type="button" class="btn btn-xs btn-success" id="add-raw-material-btn" style="font-size: 0.7rem; padding: 0.1rem 0.3rem;">
               <i class="bi bi-plus-circle"></i>
             </button>
           </th>
         </tr>
       </thead>
-      <tbody id="components-container">
-        {% for component in step.components %}
-        <tr class="component-row">
-          <td style="position: relative;">
-            <input type="text" class="form-control form-control-sm component-material" 
-                   id="material-input-existing-{{ forloop.counter }}"
-                   value="{{ component.material_name }}" 
-                   placeholder="输入自定义名称或选择步骤..."
-                   autocomplete="off">
-            <div class="steps-dropdown" id="steps-dropdown-existing-{{ forloop.counter }}" style="display: none;">
-	              <div class="dropdown-loading">正在加载步骤...</div>
-            </div>
+      <tbody id="raw-materials-container">
+        {% for usage in step.raw_material_usages.all %}
+        <tr class="raw-material-row">
+          <td>
+            <select class="form-select form-select-sm raw-material-select">
+              <option value="">选择原材料...</option>
+              {% for raw_material in raw_materials %}
+                <option value="{{ raw_material.id }}" {% if raw_material.id == usage.raw_material.id %}selected{% endif %}>
+                  {{ raw_material.batch_number }}
+                </option>
+              {% endfor %}
+            </select>
           </td>
-          <td><input type="number" step="0.001" class="form-control form-control-sm component-quantity" value="{{ component.quantity }}"></td>
-          <td><input type="text" class="form-control form-control-sm component-unit" value="{{ component.unit }}"></td>
+          <td><input type="number" step="0.0001" class="form-control form-control-sm raw-material-quantity" value="{{ usage.quantity|default:'' }}"></td>
+          <td><input type="text" class="form-control form-control-sm raw-material-unit" value="{{ usage.unit|default:'' }}"></td>
+          <td><input type="text" class="form-control form-control-sm raw-material-notes" value="{{ usage.notes|default:'' }}"></td>
           <td class="text-center">
-	            <button type="button" class="btn btn-sm btn-danger remove-component-btn" title="移除" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">
+            <button type="button" class="btn btn-sm btn-danger remove-raw-material-btn" title="移除" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">
               <i class="bi bi-trash"></i>
             </button>
           </td>

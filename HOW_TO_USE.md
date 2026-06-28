@@ -68,13 +68,6 @@ The **Experiment Tracking App (ETA)** is designed to help research groups effici
 *   You can **Add**, **Edit**, or **View** details of lab equipment.
 *   Equipment can be linked to specific steps to track usage.
 
-## Barcodes
-*   **Flow Barcodes**: Generate a printable barcode for an entire flow.
-*   **Step Barcodes**: Generate a barcode for a specific step.
-*   These can be used for physical tracking of samples in the lab.
-
----
-
 <a name="chinese"></a>
 # 🇨🇳 ETA 应用使用指南
 
@@ -138,8 +131,3 @@ The **Experiment Tracking App (ETA)** is designed to help research groups effici
 *   导航至 **Equipment (设备)** 部分。
 *   您可以 **添加**、**编辑** 或 **查看** 实验室设备的详情。
 *   设备可以链接到具体的步骤以跟踪使用情况。
-
-## 条形码 (Barcodes)
-*   **流程条形码**: 为整个流程生成可打印的条形码。
-*   **步骤条形码**: 为特定步骤生成条形码。
-*   这些条形码可用于实验室中样品的物理跟踪。

@@ -6,10 +6,11 @@ from django.db.models import Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Equipment
-from .forms import ExpStepForm, ExpFlowForm, EquipmentForm, CustomPasswordChangeForm
+from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Equipment, RawMaterial, StepRawMaterialUsage
+from .forms import ExpStepForm, ExpFlowForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm
 import json
 import string
+from decimal import Decimal, InvalidOperation
 
 
 STATUS_LABELS_ZH = {
@@ -17,6 +18,48 @@ STATUS_LABELS_ZH = {
     'Completed': '已完成',
     'Canceled': '已取消',
 }
+
+
+def save_raw_material_usages(step, usages_json):
+    """Replace structured raw material usage records for a step."""
+    try:
+        usages = json.loads(usages_json or '[]')
+    except json.JSONDecodeError:
+        usages = []
+
+    StepRawMaterialUsage.objects.filter(step=step).delete()
+    seen_material_ids = set()
+
+    for usage in usages:
+        try:
+            raw_material_id = int(usage.get('raw_material_id'))
+        except (TypeError, ValueError):
+            continue
+        if not raw_material_id or raw_material_id in seen_material_ids:
+            continue
+
+        try:
+            raw_material = RawMaterial.objects.get(id=raw_material_id)
+        except RawMaterial.DoesNotExist:
+            continue
+
+        seen_material_ids.add(raw_material_id)
+        quantity = usage.get('quantity')
+        if quantity == '':
+            quantity = None
+        elif quantity is not None:
+            try:
+                quantity = Decimal(str(quantity))
+            except (InvalidOperation, ValueError):
+                quantity = None
+
+        StepRawMaterialUsage.objects.create(
+            step=step,
+            raw_material=raw_material,
+            quantity=quantity,
+            unit=(usage.get('unit') or '').strip() or None,
+            notes=(usage.get('notes') or '').strip() or None,
+        )
 
 
 # Helpe r to return experiments visible to the current user (by research group)
@@ -117,6 +160,178 @@ def get_available_flow_codes(experiment):
     
     return available_codes
 
+
+def user_can_access_experiment(user, experiment):
+    if user.is_staff or user.is_superuser:
+        return True
+    profile = getattr(user, 'profile', None)
+    user_group = getattr(profile, 'research_group', None)
+    return bool(
+        user_group
+        and getattr(experiment, 'project', None)
+        and experiment.project.group == user_group
+    )
+
+
+def user_can_access_step(user, step):
+    experiment = getattr(getattr(step, 'flow', None), 'exp', None)
+    return bool(experiment and user_can_access_experiment(user, experiment))
+
+
+def build_step_ancestor_chain(step):
+    ancestors = []
+    seen_ids = {step.id}
+    current = step.parent
+    while current and current.id not in seen_ids:
+        ancestors.append(current)
+        seen_ids.add(current.id)
+        current = current.parent
+    ancestors.reverse()
+    return ancestors
+
+
+def build_step_descendant_tree(step, user=None, seen_ids=None):
+    seen_ids = seen_ids or set()
+    if step.id in seen_ids:
+        return []
+    seen_ids.add(step.id)
+
+    descendants = []
+    children = (
+        step.child
+        .select_related('flow__exp', 'tool')
+        .prefetch_related('raw_material_usages__raw_material')
+        .order_by('flow__exp__exp_name', 'flow__flow_name', 'step_name', 'step_number')
+    )
+    for child in children:
+        if user and not user_can_access_step(user, child):
+            continue
+        descendants.append({
+            'step': child,
+            'children': build_step_descendant_tree(child, user=user, seen_ids=seen_ids.copy()),
+        })
+    return descendants
+
+
+def format_quantity(value):
+    if value is None:
+        return ''
+    return f"{value:g}"
+
+
+def add_genealogy_step_element(elements, step, x, y, is_current=False):
+    step_node_id = f"step-{step.id}"
+    status_label = STATUS_LABELS_ZH.get(step.status, step.status)
+    elements.append({
+        'group': 'nodes',
+        'data': {
+            'id': step_node_id,
+            'type': 'step',
+            'step_id': step.id,
+            'label': step.full_step or str(step),
+            'status': step.status,
+            'status_label': status_label,
+            'flow': step.flow.full_flow if step.flow else '',
+            'tool': step.tool.equipment_name if step.tool else '未选择设备',
+            'recipe': step.recipe or '',
+            'description': step.step_description or '',
+            'url': f"/step/{step.id}/genealogy/",
+            'is_current': bool(is_current),
+        },
+        'position': {'x': x, 'y': y},
+        'classes': 'step-node current-step' if is_current else 'step-node',
+    })
+
+    material_spacing = 82
+    material_usages = list(step.raw_material_usages.all())
+    material_start_y = y - ((len(material_usages) - 1) * material_spacing / 2)
+    for index, usage in enumerate(material_usages):
+        material = usage.raw_material
+        material_node_id = f"material-{step.id}-{material.id}"
+        material_y = material_start_y + index * material_spacing
+        quantity = format_quantity(usage.quantity)
+        amount = f"{quantity} {usage.unit or ''}".strip()
+        elements.append({
+            'group': 'nodes',
+            'data': {
+                'id': material_node_id,
+                'type': 'material',
+                'label': material.batch_number or material.material_code,
+                'material_code': material.material_code,
+                'amount': amount,
+            },
+            'position': {'x': x, 'y': material_y - 140},
+            'classes': 'material-node',
+        })
+        elements.append({
+            'group': 'edges',
+            'data': {
+                'id': f"material-edge-{step.id}-{material.id}",
+                'source': material_node_id,
+                'target': step_node_id,
+                'type': 'material',
+            },
+            'classes': 'material-edge',
+        })
+
+
+def add_genealogy_descendant_elements(elements, parent_step, descendants, depth, y_cursor, x_origin=220, x_gap=290, y_gap=210):
+    parent_node_id = f"step-{parent_step.id}"
+    for node in descendants:
+        child = node['step']
+        y = y_cursor[0]
+        x = x_origin + depth * x_gap
+        add_genealogy_step_element(elements, child, x, y)
+        elements.append({
+            'group': 'edges',
+            'data': {
+                'id': f"step-edge-{parent_step.id}-{child.id}",
+                'source': parent_node_id,
+                'target': f"step-{child.id}",
+                'type': 'step',
+            },
+            'classes': 'step-edge',
+        })
+        child_start_y = y_cursor[0]
+        y_cursor[0] += y_gap
+        if node['children']:
+            add_genealogy_descendant_elements(elements, child, node['children'], depth + 1, y_cursor, x_origin=x_origin, x_gap=x_gap, y_gap=y_gap)
+            child_end_y = y_cursor[0] - y_gap
+            midpoint_y = (child_start_y + child_end_y) / 2
+            for element in elements:
+                if element.get('data', {}).get('id') == f"step-{child.id}":
+                    element['position']['y'] = midpoint_y
+                    break
+
+
+def build_genealogy_graph(step, upstream_steps, downstream_tree):
+    elements = []
+    x_origin = 220
+    x_gap = 290
+    upstream_count = len(upstream_steps)
+    current_x = x_origin + upstream_count * x_gap
+    current_y = 300
+
+    for index, upstream_step in enumerate(upstream_steps):
+        x = x_origin + index * x_gap
+        add_genealogy_step_element(elements, upstream_step, x, current_y)
+        next_step = upstream_steps[index + 1] if index + 1 < upstream_count else step
+        elements.append({
+            'group': 'edges',
+            'data': {
+                'id': f"step-edge-{upstream_step.id}-{next_step.id}",
+                'source': f"step-{upstream_step.id}",
+                'target': f"step-{next_step.id}",
+                'type': 'step',
+            },
+            'classes': 'step-edge',
+        })
+
+    add_genealogy_step_element(elements, step, current_x, current_y, is_current=True)
+    y_cursor = [current_y]
+    add_genealogy_descendant_elements(elements, step, downstream_tree, upstream_count + 1, y_cursor, x_origin=x_origin, x_gap=x_gap)
+    return {'elements': elements}
+
 # Create your views here.
 
 @login_required
@@ -143,12 +358,9 @@ def experiment_detail(request, exp_id):
     experiment = Exp.objects.get(id=exp_id)
     # Security: ensure the current user is in the same research group as the experiment's project
     # Staff and superusers can access all experiments
-    if not (request.user.is_staff or request.user.is_superuser):
-        profile = getattr(request.user, 'profile', None)
-        user_group = getattr(profile, 'research_group', None)
-        if not user_group or not getattr(experiment, 'project', None) or experiment.project.group != user_group:
-            messages.error(request, '你没有权限查看该实验。')
-            return redirect('index')
+    if not user_can_access_experiment(request.user, experiment):
+        messages.error(request, '你没有权限查看该实验。')
+        return redirect('index')
     flows = ExpFlow.objects.filter(exp=experiment).order_by('created_on')
     available_flow_codes = get_available_flow_codes(experiment)
     
@@ -352,15 +564,8 @@ def add_step(request, exp_id, flow_id):
         if form.is_valid():
             step = form.save(commit=False)
             step.flow = flow
-            
-            # Handle components data from JSON
-            components_json = request.POST.get('components', '[]')
-            try:
-                step.components = json.loads(components_json)
-            except json.JSONDecodeError:
-                step.components = []
-            
             step.save()
+            save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
             
             # Return JSON for AJAX requests
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -385,6 +590,7 @@ def add_step(request, exp_id, flow_id):
         'experiment': experiment,
         'flow': flow,
         'form': form,
+        'raw_materials': RawMaterial.objects.filter(is_active=True).order_by('material_code', 'batch_number'),
         'is_add': True  # Flag to indicate this is add mode, not edit mode
     })
 
@@ -399,15 +605,8 @@ def edit_step(request, exp_id, flow_id, step_id):
             step = form.save(commit=False)
             # Ensure the step is associated with the correct flow
             step.flow = flow
-            
-            # Handle components data from JSON
-            components_json = request.POST.get('components', '[]')
-            try:
-                step.components = json.loads(components_json)
-            except json.JSONDecodeError:
-                step.components = []
-            
             step.save()
+            save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
             
             # Return JSON response for AJAX requests
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -434,8 +633,56 @@ def edit_step(request, exp_id, flow_id, step_id):
             'form': form,
             'step': step,
             'flow': flow,
+            'raw_materials': RawMaterial.objects.filter(Q(is_active=True) | Q(step_usages__step=step)).distinct().order_by('material_code', 'batch_number'),
         }
     )
+
+@login_required
+def step_genealogy(request, step_id):
+    step = get_object_or_404(
+        ExpStep.objects
+        .select_related('flow__exp__project__group', 'parent', 'tool')
+        .prefetch_related('raw_material_usages__raw_material'),
+        id=step_id
+    )
+
+    if not user_can_access_step(request.user, step):
+        messages.error(request, '你没有权限查看该步骤谱系。')
+        return redirect('index')
+
+    ancestor_chain = build_step_ancestor_chain(step)
+    ancestor_ids = [ancestor.id for ancestor in ancestor_chain]
+    ancestors_qs = (
+        ExpStep.objects
+        .filter(id__in=ancestor_ids)
+        .select_related('flow__exp', 'tool')
+        .prefetch_related('raw_material_usages__raw_material')
+    )
+    ancestors = [ancestor for ancestor in ancestors_qs if user_can_access_step(request.user, ancestor)]
+    ancestor_by_id = {ancestor.id: ancestor for ancestor in ancestors}
+    ancestor_chain = [ancestor_by_id[ancestor_id] for ancestor_id in ancestor_ids if ancestor_id in ancestor_by_id]
+    descendant_tree = build_step_descendant_tree(step, user=request.user)
+
+    lineage_steps = ancestor_chain + [step]
+    upstream_steps = ancestor_chain
+    current_step = step
+    downstream_tree = descendant_tree
+    genealogy_graph = build_genealogy_graph(step, upstream_steps, downstream_tree)
+
+    template_name = 'experiment_flow/_step_genealogy_content.html' if (
+        request.GET.get('partial') == '1' or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    ) else 'experiment_flow/step_genealogy.html'
+
+    return render(request, template_name, {
+        'step': step,
+        'lineage_steps': lineage_steps,
+        'descendant_tree': descendant_tree,
+        'upstream_steps': upstream_steps,
+        'current_step': current_step,
+        'downstream_tree': downstream_tree,
+        'genealogy_graph_json': genealogy_graph,
+        'experiment': step.flow.exp,
+    })
 
 @login_required
 def update_flow_desc(request, flow_id):
@@ -619,12 +866,19 @@ def copy_steps(request, exp_id):
                     tool=original_step.tool,  # Copy equipment/tool used for the step
                     recipe=original_step.recipe,
                     notes=original_step.notes,
-                    components=original_step.components or [],  # Copy components/materials list
                     status="Planned",  # Always set to "Planned" regardless of original status
                     started_on=None,  # Reset timestamps for copied steps
                     completed_on=None
                 )
                 new_step.save()
+                for usage in original_step.raw_material_usages.select_related('raw_material').all():
+                    StepRawMaterialUsage.objects.create(
+                        step=new_step,
+                        raw_material=usage.raw_material,
+                        quantity=usage.quantity,
+                        unit=usage.unit,
+                        notes=usage.notes,
+                    )
                 # record mapping
                 orig_to_new[original_step.id] = new_step
                 copied_count += 1
@@ -748,52 +1002,97 @@ def edit_equipment(request, equipment_id):
         'equipment': equipment
     })
 
-# Barcode generation views
+# Raw material views
 @login_required
-def flow_barcode(request, flow_id):
-    """Generate a printable barcode page for a flow"""
-    flow = get_object_or_404(ExpFlow, id=flow_id)
-    
-    # Check if user has access to this flow's experiment
-    # Staff and superusers can access all flows
-    if not (request.user.is_staff or request.user.is_superuser):
-        if not flow.exp or flow.exp.project.group != request.user.profile.research_group:
-            messages.error(request, "你没有权限访问该实验。")
-            return redirect('index')
-    
-    # Generate barcode if it doesn't exist
-    if not flow.barcode:
-        barcode_id = f"F{flow.id:06d}"
-        flow.barcode = barcode_id
-        flow.save(update_fields=['barcode'])
-    
-    return render(request, 'experiment_flow/flow_barcode.html', {
-        'flow': flow,
-        'barcode_id': flow.barcode
+def raw_material_list(request):
+    search_query = request.GET.get('search', '')
+    raw_material_list = RawMaterial.objects.all().select_related('owner').order_by('material_code', 'batch_number')
+
+    if search_query:
+        raw_material_list = raw_material_list.filter(
+            Q(material_code__icontains=search_query) |
+            Q(batch_number__icontains=search_query) |
+            Q(material_type__icontains=search_query) |
+            Q(material_name__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(owner__username__icontains=search_query) |
+            Q(owner__first_name__icontains=search_query) |
+            Q(owner__last_name__icontains=search_query) |
+            Q(supplier__icontains=search_query) |
+            Q(location__icontains=search_query)
+        )
+
+    page_number = request.GET.get('page', 1)
+    paginator = Paginator(raw_material_list, 20)
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'experiment_flow/raw_material_list.html', {
+        'raw_material_list': page_obj,
+        'page_obj': page_obj,
+        'search_query': search_query
     })
 
 @login_required
-def step_barcode(request, step_id):
-    """Generate a printable barcode page for a step"""
-    step = get_object_or_404(ExpStep, id=step_id)
-    
-    # Check if user has access to this step's flow
-    # Staff and superusers can access all steps
-    if not (request.user.is_staff or request.user.is_superuser):
-        if not step.flow or not step.flow.exp or step.flow.exp.project.group != request.user.profile.research_group:
-            messages.error(request, "你没有权限访问该步骤。")
-            return redirect('index')
-    
-    # Generate barcode if it doesn't exist
-    if not step.barcode:
-        barcode_id = f"S{step.id:06d}"
-        step.barcode = barcode_id
-        step.save(update_fields=['barcode'])
-    
-    return render(request, 'experiment_flow/step_barcode.html', {
-        'step': step,
-        'barcode_id': step.barcode
+def raw_material_detail(request, raw_material_id):
+    raw_material = get_object_or_404(RawMaterial, id=raw_material_id)
+    usages = raw_material.step_usages.select_related(
+        'step__flow__exp',
+        'raw_material'
+    ).order_by('-updated_on')
+    return render(request, 'experiment_flow/raw_material_detail.html', {
+        'raw_material': raw_material,
+        'usages': usages
     })
+
+@login_required
+def add_raw_material(request):
+    if request.method == 'POST':
+        form = RawMaterialForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('raw_material_list')
+    else:
+        form = RawMaterialForm()
+
+    return render(request, 'experiment_flow/add_raw_material.html', {
+        'form': form
+    })
+
+@login_required
+def edit_raw_material(request, raw_material_id):
+    raw_material = get_object_or_404(RawMaterial, id=raw_material_id)
+
+    if request.method == 'POST':
+        form = RawMaterialForm(request.POST, instance=raw_material)
+        if form.is_valid():
+            form.save()
+            return redirect('raw_material_detail', raw_material_id=raw_material_id)
+    else:
+        form = RawMaterialForm(instance=raw_material)
+
+    return render(request, 'experiment_flow/edit_raw_material.html', {
+        'form': form,
+        'raw_material': raw_material
+    })
+
+@login_required
+def get_raw_materials(request):
+    raw_materials = RawMaterial.objects.filter(is_active=True).select_related('owner').order_by('material_code', 'batch_number')
+    data = []
+    for material in raw_materials:
+        data.append({
+            'id': material.id,
+            'material_code': material.material_code,
+            'batch_number': material.batch_number,
+            'received_date': material.received_date.isoformat() if material.received_date else '',
+            'material_type': material.material_type or '',
+            'material_name': material.material_name,
+            'supplier': material.supplier or '',
+            'location': material.location or '',
+            'owner': material.owner.get_full_name() if material.owner and material.owner.get_full_name() else (material.owner.username if material.owner else ''),
+            'label': material.batch_number,
+        })
+    return JsonResponse({'raw_materials': data})
 
 @login_required
 def get_all_steps(request):
