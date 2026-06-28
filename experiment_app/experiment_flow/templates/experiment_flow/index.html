@@ -1,14 +1,104 @@
 {% extends "experiment_flow/base.html" %}
 
 {% block content %}
-    <h2>项目总览</h2>
-    <!-- <div class="experiment-list">
-        {% for experiment in experiments %}
-            <div class="experiment-item">
-                <strong>{{ experiment.exp_name }}</strong>
+<div class="overview-dashboard">
+    <div class="overview-header">
+        <div>
+            <h2>项目总览</h2>
+            <p>当前可见项目的流程完成状态</p>
+        </div>
+        <div class="overview-total">
+            <span>{{ overview_stats.total_count }}</span>
+            <small>全部项目</small>
+        </div>
+    </div>
+
+    <div class="overview-stats-grid">
+        <section class="overview-stat-card in-progress">
+            <div class="stat-card-icon">
+                <i class="bi bi-activity"></i>
             </div>
-        {% empty %}
-            <p>未找到实验。</p>
-        {% endfor %}
-    </div> -->
+            <div>
+                <div class="stat-label">正在进行</div>
+                <div class="stat-value">{{ overview_stats.in_progress_count }}</div>
+            </div>
+        </section>
+
+        <section class="overview-stat-card completed">
+            <div class="stat-card-icon">
+                <i class="bi bi-check2-circle"></i>
+            </div>
+            <div>
+                <div class="stat-label">已完成</div>
+                <div class="stat-value">{{ overview_stats.completed_count }}</div>
+            </div>
+        </section>
+    </div>
+
+    <div class="overview-lower-grid">
+        <section class="overview-chart-card">
+            <div class="overview-card-header">
+                <div>
+                    <h3>实验增长趋势</h3>
+                    <p>每日累计实验数量</p>
+                </div>
+                <div class="overview-card-metric">
+                    <strong>{{ growth_chart.current_count }}</strong>
+                    <span>实验总数</span>
+                </div>
+            </div>
+            <div class="overview-chart">
+                <svg class="overview-chart-svg" viewBox="0 0 100 44" preserveAspectRatio="none" aria-label="实验累计数量趋势">
+                    <polygon class="overview-chart-area" points="{{ growth_chart.area_points_attr }}"></polygon>
+                    <polyline class="overview-chart-line" points="{{ growth_chart.points_attr }}"></polyline>
+                </svg>
+                <div class="overview-chart-points">
+                    {% for point in growth_chart.points %}
+                        <span class="overview-chart-point" style="left: {{ point.x }}%; top: {{ point.y_percent }}%;" data-tooltip="{{ point.date_label }} · {{ point.count }} 个" tabindex="0" aria-label="{{ point.date_label }} 累计 {{ point.count }} 个实验"></span>
+                    {% endfor %}
+                </div>
+                <div class="overview-chart-axis">
+                    <span>{{ growth_chart.start_label }}</span>
+                    <span>{{ growth_chart.end_label }}</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="overview-updates-card">
+            <div class="overview-card-header">
+                <div>
+                    <h3>最近创建</h3>
+                    <p>新的实验动态</p>
+                </div>
+            </div>
+            <div class="overview-update-list">
+                {% for flow in recent_experiment_updates %}
+                    <a class="overview-update-item" href="{% url 'experiment_detail' flow.exp.id %}?expanded_flow={{ flow.id }}">
+                        <span class="update-avatar">{{ flow.exp.owner.username|slice:":1"|upper }}</span>
+                        <span class="update-body">
+                            <span class="update-line">
+                                <strong>
+                                    {% if flow.exp.owner.first_name and flow.exp.owner.last_name %}
+                                        {{ flow.exp.owner.first_name }} {{ flow.exp.owner.last_name }}
+                                    {% else %}
+                                        {{ flow.exp.owner.username }}
+                                    {% endif %}
+                                </strong>
+                                创建了 {{ flow.full_flow }}
+                            </span>
+                            <small>
+                                {{ flow.created_on|date:"m/d/Y" }}
+                                {% if flow.exp.project and flow.exp.project.group %}
+                                    · {{ flow.exp.project.group.group_name }}
+                                {% endif %}
+                            </small>
+                        </span>
+                    </a>
+                {% empty %}
+                    <div class="overview-empty">暂无创建记录</div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</div>
 {% endblock %}

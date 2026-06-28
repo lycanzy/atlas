@@ -276,7 +276,7 @@
     <!-- Select2 for searchable dropdowns -->
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2.min.css' %}" />
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2-bootstrap-5-theme.min.css' %}" />
-    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=4" />
+    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=10" />
     <script src="{% static 'vendor/jquery/jquery-3.7.0.min.js' %}?v=2"></script>
     <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'vendor/select2/js/select2.min.js' %}"></script>
@@ -298,7 +298,7 @@
     </div>
     
     <div class="navbar">
-        <div>Atlas</div>
+        <a href="{% url 'index' %}" class="brand-link" aria-label="返回主界面">Atlas</a>
         <!-- Bootstrap primary buttons with right alignment -->
         <div class="ms-auto d-flex gap-2 align-items-center">
                 <button type="button"
@@ -314,29 +314,32 @@
                     data-url="{% url 'raw_material_list' %}"
                     onclick="window.location.href=this.dataset.url;">原材料</button>
             {% if user.is_authenticated %}
-                <span class="text-white mx-2">
-                    <i class="bi bi-person-circle"></i> 
-                    {% if user.first_name and user.last_name %}
-                        {{ user.first_name }} {{ user.last_name }}
-                    {% else %}
-                        {{ user.username }}
-                    {% endif %}
-                    {% if user.profile.research_group %}
-                        <small class="text-muted">({{ user.profile.research_group.group_name }})</small>
-                    {% endif %}
-                </span>
-                <button type="button"
-                        class="btn btn-outline-light btn-sm me-2"
-                        data-url="{% url 'change_password' %}"
-                        onclick="window.location.href=this.dataset.url;">
-                    <i class="bi bi-key"></i> 修改密码
-                </button>
-                <button type="button"
-                        class="btn btn-outline-light btn-sm"
-                        data-url="{% url 'logout' %}"
-                        onclick="window.location.href=this.dataset.url;">
-                    <i class="bi bi-box-arrow-right"></i> 退出登录
-                </button>
+                <div class="dropdown user-menu">
+                    <button class="btn btn-outline-light btn-sm dropdown-toggle user-menu-toggle"
+                            type="button"
+                            id="userMenuDropdown"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false">
+                        <i class="bi bi-person-circle"></i>
+                        {% if user.first_name and user.last_name %}
+                            {{ user.first_name }} {{ user.last_name }}
+                        {% else %}
+                            {{ user.username }}
+                        {% endif %}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDropdown">
+                        <li>
+                            <a class="dropdown-item" href="{% url 'change_password' %}">
+                                <i class="bi bi-key me-2"></i>修改密码
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="{% url 'logout' %}">
+                                <i class="bi bi-box-arrow-right me-2"></i>退出登录
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             {% endif %}
         </div>
     </div>
@@ -355,7 +358,9 @@
                             type="text" 
                             name="search" 
                             class="search-input" 
-                            placeholder="搜索项目、实验或步骤编号..."
+                            placeholder=" "
+                            aria-label="搜索项目、实验或步骤编号"
+                            autocomplete="off"
                             value="{{ search_query|default:'' }}"
                             id="searchInput">
                         <button type="button" class="clear-search" onclick="clearSearch()" title="清空搜索">
@@ -375,10 +380,10 @@
                 <!-- Add Experiment Button -->
                 <button type="button"
                     class="btn btn-outline-primary btn-sm"
+                    id="addExperimentModalBtn"
                     title="新增项目"
                     style="flex-shrink: 0;"
-                    data-url="{% url 'add_experiment' %}"
-                    onclick="window.location.href=this.dataset.url;">
+                    data-url="{% url 'add_experiment' %}">
                     <i class="bi bi-plus-lg"></i>
                 </button>
             </div>
@@ -550,8 +555,44 @@
             {% block content %}{% endblock %}
         </div>
     </div>
+
+    <div class="modal fade" id="addExperimentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-plus-lg me-2"></i>新增项目
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body" id="addExperimentModalBody">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">正在加载...</span>
+                        </div>
+                        <p class="mt-3 text-muted mb-0">正在加载表单...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <script>
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
     // Toast notification helper
     function showToast(title, message, type = 'info') {
         const toastEl = document.getElementById('liveToast');
@@ -585,6 +626,95 @@
             delay: 5000
         });
         toast.show();
+    }
+
+    const addExperimentModalBtn = document.getElementById('addExperimentModalBtn');
+    const addExperimentModalEl = document.getElementById('addExperimentModal');
+    const addExperimentModalBody = document.getElementById('addExperimentModalBody');
+
+    function showAddExperimentLoading() {
+        addExperimentModalBody.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">正在加载...</span>
+                </div>
+                <p class="mt-3 text-muted mb-0">正在加载表单...</p>
+            </div>
+        `;
+    }
+
+    function bindAddExperimentForm() {
+        const form = document.getElementById('addExperimentForm');
+        if (!form) {
+            return;
+        }
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const submitButton = form.querySelector('button[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: new FormData(form)
+            })
+                .then(async response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    const html = await response.text();
+                    addExperimentModalBody.innerHTML = html;
+                    bindAddExperimentForm();
+                    throw new Error('Validation failed');
+                })
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = data.redirect_url || window.location.href;
+                    }
+                })
+                .catch(error => {
+                    if (error.message !== 'Validation failed') {
+                        showToast('错误', '创建项目失败，请稍后重试。', 'danger');
+                    }
+                })
+                .finally(() => {
+                    const currentSubmitButton = document.querySelector('#addExperimentForm button[type="submit"]');
+                    if (currentSubmitButton) {
+                        currentSubmitButton.disabled = false;
+                    }
+                });
+        });
+    }
+
+    if (addExperimentModalBtn && addExperimentModalEl && addExperimentModalBody) {
+        addExperimentModalBtn.addEventListener('click', function() {
+            const modal = new bootstrap.Modal(addExperimentModalEl);
+            modal.show();
+            showAddExperimentLoading();
+            fetch(addExperimentModalBtn.dataset.url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load form');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    addExperimentModalBody.innerHTML = html;
+                    bindAddExperimentForm();
+                })
+                .catch(error => {
+                    console.error('Error loading add experiment form:', error);
+                    addExperimentModalBody.innerHTML = '<div class="alert alert-danger mb-0">表单加载失败，请稍后重试。</div>';
+                });
+        });
+
+        addExperimentModalEl.addEventListener('hidden.bs.modal', showAddExperimentLoading);
     }
     </script>
 </body>

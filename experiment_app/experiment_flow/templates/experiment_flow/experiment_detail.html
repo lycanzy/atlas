@@ -340,7 +340,6 @@
         <thead class="table-light">
             <tr>
                 <th style="width:50px;"></th>
-                <th style="width:150px;">项目</th>
                 <th style="width:150px;">实验</th>
                 <th style="width:auto;">描述</th>
                 <th style="width:100px; text-align:center;">
@@ -376,27 +375,28 @@
                         <i class="bi bi-chevron-right"></i>
                     </button>
                 </td>
-                <td>{{ experiment.exp_name }}</td>
                 <td>{{ flow.full_flow }}</td>
                 <td>
                     <span class="flow-desc" data-flow-id="{{ flow.id }}">{{ flow.flow_description | default:"无" }}</span>
                 </td>
-                <td class="text-center d-flex justify-content-center gap-1">
-                    <button type="button" class="btn-no-style add-step-btn" 
-                            data-exp-id="{{ experiment.id }}" 
-                            data-flow-id="{{ flow.id }}" 
-                            title="新增步骤">
-                        <i class="bi bi-plus-lg"></i>
-                    </button>
-                    <a href="{% url 'delete_flow' experiment.id flow.id %}" class="btn-no-style" title="删除实验">
-                        <i class="bi bi-trash"></i>
-                    </a>
+                <td class="text-center">
+                    <div class="table-action-group">
+                        <button type="button" class="btn-no-style add-step-btn" 
+                                data-exp-id="{{ experiment.id }}" 
+                                data-flow-id="{{ flow.id }}" 
+                                title="新增步骤">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                        <a href="{% url 'delete_flow' experiment.id flow.id %}" class="btn-no-style" title="删除实验">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </div>
                 </td>
             </tr>
 
             <!-- Collapsible row for steps -->
             <tr id="steps-{{ flow.id }}" class="bg-light steps-row" style="display:none;">
-                <td colspan="5" class="p-0">
+                <td colspan="4" class="p-0">
                     <div class="d-flex justify-content-end align-items-center p-2 bg-white border-bottom">
                         <div class="d-flex gap-2">
                             <button class="btn btn-sm btn-primary copy-steps-btn" data-flow-id="{{ flow.id }}" style="display:none;">
@@ -446,20 +446,22 @@
                                 <td>
                                     <span class="step-desc" data-step-id="{{ step.id }}">{{ step.step_description | default:"无" }}</span>
                                 </td>
-                                <td class="text-center d-flex justify-content-center gap-1">
-                                    <button type="button" class="btn-no-style edit-step-btn" 
-                                            data-step-id="{{ step.id }}" data-flow-id="{{ flow.id }}" data-exp-id="{{ experiment.id }}">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <a href="{% url 'delete_step' experiment.id flow.id step.id %}" class="btn-no-style">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                    <button type="button"
-                                            class="btn-no-style genealogy-modal-btn"
-                                            title="查看谱系"
-                                            data-genealogy-url="{% url 'step_genealogy' step.id %}">
-                                        <i class="bi bi-diagram-3"></i>
-                                    </button>
+                                <td class="text-center">
+                                    <div class="table-action-group">
+                                        <button type="button" class="btn-no-style edit-step-btn" 
+                                                data-step-id="{{ step.id }}" data-flow-id="{{ flow.id }}" data-exp-id="{{ experiment.id }}">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <a href="{% url 'delete_step' experiment.id flow.id step.id %}" class="btn-no-style">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                        <button type="button"
+                                                class="btn-no-style genealogy-modal-btn"
+                                                title="查看谱系"
+                                                data-genealogy-url="{% url 'step_genealogy' step.id %}">
+                                            <i class="bi bi-diagram-3"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             {% empty %}
@@ -473,7 +475,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="5" class="text-center text-muted">该项目暂无实验。</td>
+                <td colspan="4" class="text-center text-muted">该项目暂无实验。</td>
             </tr>
             {% endfor %}
         </tbody>

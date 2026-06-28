@@ -1,0 +1,26 @@
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    {{ error }}
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'add_experiment' %}" id="addExperimentForm">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="team" class="form-label">选择 Team</label>
+        <select id="team" name="team" required class="form-select">
+            <option value="">请选择 Team...</option>
+            {% for team in teams %}
+                <option value="{{ team.id }}">{{ team.team_code }} - {{ team.group_name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="exp_description" class="form-label">项目描述</label>
+        <textarea id="exp_description" name="exp_description" class="form-control" rows="3" placeholder="请输入项目描述"></textarea>
+    </div>
+    <div class="d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary">创建项目</button>
+    </div>
+</form>

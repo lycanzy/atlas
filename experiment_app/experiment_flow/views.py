@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404, render, redirect
+from django.urls import reverse
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
@@ -10,7 +11,9 @@ from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Equipment, Ra
 from .forms import ExpStepForm, ExpFlowForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm
 import json
 import string
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from django.utils import timezone
 
 
 STATUS_LABELS_ZH = {
@@ -100,6 +103,85 @@ def get_experiments_for_user(user, search_query='', my_experiments=''):
         )
 
     return qs
+
+
+def get_experiment_overview_stats(experiments_qs):
+    experiments = experiments_qs.prefetch_related('flow__step')
+    total_count = 0
+    completed_count = 0
+
+    for experiment in experiments:
+        total_count += 1
+        flows = list(experiment.flow.all())
+        if not flows:
+            continue
+
+        all_flows_completed = True
+        has_any_step = False
+        for flow in flows:
+            steps = list(flow.step.all())
+            if not steps:
+                all_flows_completed = False
+                continue
+            has_any_step = True
+            if any(step.status != 'Completed' for step in steps):
+                all_flows_completed = False
+
+        if has_any_step and all_flows_completed:
+            completed_count += 1
+
+    in_progress_count = total_count - completed_count
+    completion_rate = round((completed_count / total_count) * 100) if total_count else 0
+    return {
+        'total_count': total_count,
+        'in_progress_count': in_progress_count,
+        'completed_count': completed_count,
+        'completion_rate': completion_rate,
+    }
+
+
+def get_experiment_growth_chart(experiment_items_qs, days=14):
+    today = timezone.localdate()
+    start_date = today - timedelta(days=days - 1)
+    date_range = [start_date + timedelta(days=offset) for offset in range(days)]
+    daily_counts = {day: 0 for day in date_range}
+    baseline_count = 0
+
+    for created_on in experiment_items_qs.order_by('created_on').values_list('created_on', flat=True):
+        created_day = timezone.localtime(created_on).date()
+        if created_day < start_date:
+            baseline_count += 1
+        elif created_day in daily_counts:
+            daily_counts[created_day] += 1
+
+    cumulative_count = baseline_count
+    total_count = baseline_count + sum(daily_counts.values())
+    max_count = max(total_count, 1)
+    points = []
+
+    for index, day in enumerate(date_range):
+        cumulative_count += daily_counts[day]
+        x = round((index / (days - 1)) * 100, 2) if days > 1 else 0
+        y = round(40 - ((cumulative_count / max_count) * 32), 2)
+        points.append({
+            'date_label': day.strftime('%m/%d'),
+            'count': cumulative_count,
+            'new_count': daily_counts[day],
+            'x': x,
+            'y': y,
+            'y_percent': round((y / 44) * 100, 2),
+        })
+
+    points_attr = ' '.join(f"{point['x']},{point['y']}" for point in points)
+    area_points_attr = f"0,44 {points_attr} 100,44" if points_attr else ''
+    return {
+        'points': points,
+        'points_attr': points_attr,
+        'area_points_attr': area_points_attr,
+        'start_label': date_range[0].strftime('%m/%d'),
+        'end_label': date_range[-1].strftime('%m/%d'),
+        'current_count': total_count,
+    }
 
 # Authentication views
 def login_view(request):
@@ -341,6 +423,15 @@ def index(request):
     my_experiments = request.GET.get('my_experiments', '')
     # Use group-restricted queryset helper
     latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
+    overview_stats = get_experiment_overview_stats(latest_exp)
+    visible_flows = (
+        ExpFlow.objects
+        .filter(exp__in=latest_exp)
+        .select_related('exp__owner', 'exp__project__group')
+        .order_by('-created_on')
+    )
+    growth_chart = get_experiment_growth_chart(visible_flows)
+    recent_experiment_updates = visible_flows[:5]
     
     page_number = request.GET.get('page', 1)
     paginator = Paginator(latest_exp, 10)  # 10 experiments per page
@@ -349,7 +440,10 @@ def index(request):
     return render(request, 'experiment_flow/index.html', {
         'experiments': page_obj, 
         'page_obj': page_obj,
-        'search_query': search_query
+        'search_query': search_query,
+        'overview_stats': overview_stats,
+        'growth_chart': growth_chart,
+        'recent_experiment_updates': recent_experiment_updates,
     })
 
 @login_required
@@ -419,6 +513,19 @@ def add_experiment(request):
     page_number = request.GET.get('page', 1)
     paginator = Paginator(latest_exp, 10)
     page_obj = paginator.get_page(page_number)
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def render_add_experiment_form(error=None, status=200):
+        context = {
+            'teams': teams,
+            'experiments': page_obj,
+            'page_obj': page_obj,
+            'search_query': search_query,
+        }
+        if error:
+            context['error'] = error
+        template_name = 'experiment_flow/_add_experiment_form.html' if is_ajax else 'experiment_flow/add_experiment.html'
+        return render(request, template_name, context, status=status)
 
     if request.method == 'POST':
         team_id = request.POST.get('team')
@@ -458,30 +565,21 @@ def add_experiment(request):
                     owner=request.user  # Automatically set the logged-in user as owner
                 )
                 new_exp.save()
+                if is_ajax:
+                    return JsonResponse({
+                        'success': True,
+                        'experiment_id': new_exp.id,
+                        'experiment_name': new_exp.exp_name,
+                        'redirect_url': reverse('experiment_detail', args=[new_exp.id])
+                    })
                 return redirect('index')
             except ResearchGroup.DoesNotExist:
-                return render(request, 'experiment_flow/add_experiment.html', {
-                    'teams': teams,
-                    'experiments': page_obj,
-                    'page_obj': page_obj,
-                    'search_query': search_query,
-                    'error': '未找到所选 Team。Selected team not found.'
-                })
+                return render_add_experiment_form('未找到所选 Team。Selected team not found.', status=400 if is_ajax else 200)
             except ValidationError as e:
-                return render(request, 'experiment_flow/add_experiment.html', {
-                    'teams': teams,
-                    'experiments': page_obj,
-                    'page_obj': page_obj,
-                    'search_query': search_query,
-                    'error': str(e)
-                })
-        
-    return render(request, 'experiment_flow/add_experiment.html', {
-        'teams': teams,
-        'experiments': page_obj, 
-        'page_obj': page_obj,
-        'search_query': search_query
-    })
+                return render_add_experiment_form(str(e), status=400 if is_ajax else 200)
+        return render_add_experiment_form('请选择 Team。', status=400 if is_ajax else 200)
+
+    return render_add_experiment_form()
 
 @login_required
 def add_flow(request, exp_id):
