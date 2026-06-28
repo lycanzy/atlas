@@ -1,4 +1,4 @@
-# Atlas | 实验追踪应用
+# Atlas | Experiment Tracking App
 
 [English](#english) | [中文](#中文)
 
@@ -7,115 +7,233 @@
 ## English
 
 ### Overview
-Atlas is a Django web application for research groups to manage **Teams → Projects → Experiments → Steps**, record equipment/material usage, and keep **traceable step history across experiments**.
 
-### Key Concepts
-- **Team**: The 3-letter team title/code, such as `PCA`. This is the top-level access boundary for non-staff users.
-- **Project**: Auto-generated from the team code plus a numeric sequence, such as `PCA001`.
-- **Experiment**: A two-letter experiment suffix under a project, such as `AA`, with full experiment ID `PCA001AA`.
-- **Step (ExpStep)**: Two-letter `step_name` + per-experiment sequence number, such as `MX00`, with full ID `PCA001AA-MX00`.
+Atlas is a Django web application for research teams to manage **research groups, projects, experiments, process steps, equipment, and raw material batches**. It focuses on traceability: each step can carry equipment, recipe, status, material usage, and upstream/downstream genealogy links.
+
+The current UI uses a compact Atlas dashboard style with a left project sidebar, modal-first editing flows, and a Cytoscape.js genealogy visualizer.
+
+### Core Data Model
+
+- **Research Group / Team**: Access boundary for normal users. Staff and superusers can see all data.
+- **Project**: A named research program under a team, with a team code such as `AFE`, `GNY`, or `PCA`.
+- **Project record (`Exp`)**: Auto-numbered project code such as `AFE001`.
+- **Experiment flow (`ExpFlow`)**: Two-letter suffix under a project, such as `AA`; full experiment ID is `AFE001AA`.
+- **Step (`ExpStep`)**: Process step inside an experiment, such as `AFE001AA-MX00`.
+- **Raw material batch**: Batch-level material record that can be attached to process steps with quantity and unit.
 
 ### Features
-- **Auth**: Login/logout, change password.
-- **Team-scoped access control**: Non-staff users can access only projects and experiments under their team.
-- **Project dashboard**: Pagination + search by project name/description/team.
-- **Experiment management**: Create/delete experiments; auto-generated full experiment ID.
-- **Step management**:
-  - Create/edit/delete steps
-  - Status: `Planned` / `Completed` / `Canceled` (completed timestamp set automatically)
-  - Attach equipment/tool, recipe, notes
-  - Link structured raw material batch usage with quantity/unit
-  - **Cross-experiment parent linking**: a step can reference any previous step for sample/history tracing
-- **Step name templates**: Maintain selectable 2-letter step codes with labels/categories (`StepNameTemplate`).
-- **Bulk operations**: Bulk update status; multi-select delete; copy steps to another flow (within accessible experiments).
-- **Equipment database**: Add/edit/view equipment with owner, location, utilities/specs, active flag.
-- **Raw material database**: Add/edit/view raw material batches with owner, supplier, location, active flag, and traceable step usage.
-- **APIs (JSON)**:
-  - `GET /api/steps/` (group-scoped steps)
-  - `GET /api/experiments_with_flows/` (for copy-step dropdown)
-- **Global code search**: Search by full experiment ID or `full_step` and redirect to the right project/experiment page.
+
+- **Authentication and account menu**
+  - Login/logout
+  - Change password
+  - Compact username dropdown in the top navigation
+
+- **Team-scoped access control**
+  - Normal users only see projects and experiments in their research group.
+  - Staff and superusers can access all groups.
+
+- **Overview dashboard**
+  - Counts visible projects by in-progress and completed state.
+  - Tracks cumulative experiment count over time with an interactive hover tooltip.
+  - Shows a recent activity block for newly created experiment IDs such as `GNY001AA`.
+
+- **Project sidebar**
+  - Compact project cards with project code, group, description, owner, and date.
+  - Search across project, experiment, step, and group fields.
+  - Modal-based project creation from the sidebar.
+
+- **Experiment and step management**
+  - Create/delete experiment flows under a project.
+  - Create/edit/delete steps in a modal workflow.
+  - Status support: `Planned`, `Completed`, `Canceled`.
+  - Inline flow and step description editing.
+  - Bulk status updates, multi-select delete, and copy steps to another accessible experiment.
+
+- **Step genealogy**
+  - Steps can reference parent steps to preserve process lineage.
+  - Genealogy opens in a modal instead of navigating away from the current page.
+  - Cytoscape.js visualizer shows step nodes, raw material nodes, and directed edges.
+  - Clicking a step node updates the modal content without changing the main page URL.
+
+- **Equipment database**
+  - Add, edit, list, and view equipment records.
+  - Track owner, location, active state, specifications, and utility requirements.
+  - Equipment can be attached to process steps.
+
+- **Raw material database**
+  - Add, edit, list, and view raw material batches.
+  - Track material code, batch number, supplier, owner, location, active state, and notes.
+  - Raw material detail pages show where each batch is used.
+
+- **Global search and JSON endpoints**
+  - Search full experiment IDs or step IDs and redirect to the matching page.
+  - `GET /api/steps/`
+  - `GET /api/raw_materials/`
+  - `GET /api/experiments_with_flows/`
 
 ### Tech Stack
-- Python + Django (settings indicate Django **5.2.x**, generated by 5.2.6)
-- SQLite (default `db.sqlite3`)
-- Bootstrap/jQuery/select2 (vendored static assets)
+
+- Python + Django 5.2
+- SQLite for local development
+- Bootstrap, Bootstrap Icons, jQuery, Select2, and Cytoscape.js
+- Static frontend assets are vendored locally under `experiment_app/static/vendor/`
+
+### Quick Start
+
+From the repository root:
+
+```zsh
+cd experiment_app
+
+# Use the local environment if it exists
+source .venv/bin/activate
+
+# For a fresh clone, create your own environment first
+# python3 -m venv .venv
+# source .venv/bin/activate
+# pip install "Django>=5.2,<6"
+
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
+```
+
+Open `http://127.0.0.1:8000/`.
+
+### Useful Commands
+
+```zsh
+cd experiment_app
+source .venv/bin/activate
+
+python manage.py check
+python manage.py test
+python manage.py runserver 8000
+```
+
+### Notes
+
+- No barcode module is currently active in the app.
+- No JavaScript build step is required.
+- A sample uWSGI config is available at `experiment_app/uwsgi.ini`.
 
 ---
 
 ## 中文
 
 ### 概览
-Atlas 是一个基于 Django 的 Web 应用，用于研究团队管理 **团队 → 项目 → 实验 → 步骤**，记录设备/材料使用情况，并支持 **跨实验的步骤溯源**（通过父步骤关联形成历史链）。
 
-### 核心概念
-- **团队 (Team)**：3 位字母团队标题/代码，例如 `PCA`。普通用户只能看到本团队数据。
-- **项目 (Project)**：由团队代码加数字序号自动生成，例如 `PCA001`。
-- **实验 (Experiment)**：项目下的 2 位字母实验后缀，例如 `AA`，完整实验编号为 `PCA001AA`。
-- **步骤 (ExpStep)**：2 位 `step_name` + 实验内序号，例如 `MX00`，完整编号 `PCA001AA-MX00`。
+Atlas 是一个基于 Django 的实验追踪应用，用于研究团队管理 **研究组、项目、实验、工艺步骤、设备和原材料批次**。它的重点是可追溯性：每个步骤都可以记录设备、配方、状态、原材料用量，以及上下游谱系关系。
+
+当前 UI 使用紧凑的 Atlas dashboard 风格：左侧项目列表、弹窗式编辑流程，以及基于 Cytoscape.js 的步骤谱系 visualizer。
+
+### 核心数据模型
+
+- **研究组 / Team**：普通用户的数据访问边界；管理员可以查看全部数据。
+- **项目 / Project**：团队下的研究方向，带有团队代码，例如 `AFE`、`GNY`、`PCA`。
+- **项目记录 (`Exp`)**：自动编号的项目代码，例如 `AFE001`。
+- **实验流程 (`ExpFlow`)**：项目下的两位字母实验后缀，例如 `AA`；完整实验编号为 `AFE001AA`。
+- **步骤 (`ExpStep`)**：实验流程中的工艺步骤，例如 `AFE001AA-MX00`。
+- **原材料批次**：可按批次记录，并关联到具体步骤，包含用量和单位。
 
 ### 功能
-- **登录与账户**：登录/退出、修改密码。
-- **按团队隔离数据**：非管理员用户只能访问所属团队的项目与实验数据。
-- **项目仪表盘**：分页展示 + 按项目名/描述/团队搜索。
-- **实验管理**：创建/删除实验；自动生成完整实验编号。
-- **步骤管理**：
-  - 新增/编辑/删除步骤
-  - 状态：`Planned` / `Completed` / `Canceled`（完成时自动写入完成时间）
-  - 记录设备、配方、备注
-  - 关联结构化原材料批次使用记录，并记录用量/单位
-  - **跨实验父步骤关联**：步骤可关联任意历史步骤，用于样品/工艺链追踪
-- **步骤模板**：可维护常用两位步骤码、标签与分类（`StepNameTemplate`）。
-- **批量操作**：批量改状态、批量删除、复制步骤到其它流程（仅限用户可访问的实验范围）。
-- **设备库**：设备新增/编辑/查看，包含负责人、位置、规格/水电气排风等信息、启用状态。
-- **原材料库**：原材料批次新增/编辑/查看，包含负责人、供应商、位置、启用状态，并支持追踪到具体步骤。
-- **条码**：
-  - 自动生成条码 ID（实验 `F000001`，步骤 `S000001`）
-  - 提供实验/步骤条码打印页面
-  - 提供脚本为历史数据补齐条码
-- **JSON 接口**：
-  - `GET /api/steps/`（按研究组返回步骤列表）
-  - `GET /api/experiments_with_flows/`（复制步骤时用于选择目标流程）
-- **全局编号搜索**：输入完整实验编号或 `full_step`，自动跳转到对应项目/实验页面。
 
----
+- **登录与账户菜单**
+  - 登录 / 退出登录
+  - 修改密码
+  - 顶部导航只显示用户名，点击后展开账户操作
 
-## Quick Start (Dev) | 快速开始（开发环境）
+- **按团队隔离数据**
+  - 普通用户只能看到所属研究组的项目和实验。
+  - Staff / superuser 可以访问全部研究组数据。
 
-> This repo includes a local virtualenv at `exptrack/` in your workspace; for a clean GitHub clone, you can create your own venv.
+- **项目总览 dashboard**
+  - 显示当前可见项目的进行中 / 已完成数量。
+  - 用趋势图追踪实验数量随日期的累计增长，并支持鼠标悬停查看数值。
+  - “最近创建”动态显示新创建的实验编号，例如 `GNY001AA`。
+
+- **左侧项目列表**
+  - 更紧凑的项目卡片，同时保留项目代码、团队、描述、owner 和日期。
+  - 支持按项目、实验、步骤和研究组搜索。
+  - 侧边栏可通过弹窗创建新项目。
+
+- **实验与步骤管理**
+  - 在项目下创建 / 删除实验流程。
+  - 通过弹窗新增、编辑、删除步骤。
+  - 支持 `Planned`、`Completed`、`Canceled` 状态。
+  - 支持 inline 编辑实验和步骤描述。
+  - 支持批量改状态、批量删除，以及复制步骤到其它可访问实验。
+
+- **步骤谱系**
+  - 步骤可以关联父步骤，用于保留工艺或样品来源。
+  - 谱系以弹窗显示，不跳转到新页面。
+  - Cytoscape.js visualizer 展示步骤节点、原材料节点和方向连接线。
+  - 点击 visualizer 内的步骤节点会在当前弹窗内切换谱系内容。
+
+- **设备管理**
+  - 新增、编辑、列表和详情页。
+  - 记录负责人、位置、启用状态、规格和水电气排风等需求。
+  - 设备可关联到具体步骤。
+
+- **原材料管理**
+  - 新增、编辑、列表和详情页。
+  - 记录 material code、批次号、供应商、负责人、位置、启用状态和备注。
+  - 原材料详情页可查看该批次被哪些步骤使用。
+
+- **全局搜索与 JSON 接口**
+  - 可搜索完整实验编号或步骤编号，并跳转到对应页面。
+  - `GET /api/steps/`
+  - `GET /api/raw_materials/`
+  - `GET /api/experiments_with_flows/`
+
+### 技术栈
+
+- Python + Django 5.2
+- 本地开发默认 SQLite
+- Bootstrap、Bootstrap Icons、jQuery、Select2、Cytoscape.js
+- 前端静态依赖 vendored 在 `experiment_app/static/vendor/`
+
+### 快速开始
+
+在仓库根目录运行：
 
 ```zsh
 cd experiment_app
 
-# (Option A) use the repo venv if present
-../exptrack/bin/python -m pip install --upgrade pip
+# 如果本地 .venv 已存在
+source .venv/bin/activate
 
-# (Option B) create your own venv
+# 如果是全新 clone，先创建环境
 # python3 -m venv .venv
 # source .venv/bin/activate
-
-# install deps (at minimum Django)
 # pip install "Django>=5.2,<6"
 
-# database setup
-../exptrack/bin/python manage.py migrate
-
-# create admin user
-../exptrack/bin/python manage.py createsuperuser
-
-# run dev server
-../exptrack/bin/python manage.py runserver
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
 ```
 
-Open: `http://127.0.0.1:8000/`
+打开 `http://127.0.0.1:8000/`。
 
----
+### 常用命令
 
-## Deployment Note (uWSGI) | 部署备注（uWSGI）
+```zsh
+cd experiment_app
+source .venv/bin/activate
 
-A sample `uwsgi.ini` is included under `experiment_app/uwsgi.ini` (paths may need adjustment for your server).
+python manage.py check
+python manage.py test
+python manage.py runserver 8000
+```
+
+### 备注
+
+- 当前版本不启用 barcode 模块。
+- 不需要 JavaScript build step。
+- 示例 uWSGI 配置位于 `experiment_app/uwsgi.ini`。
 
 ---
 
 ## License
 
-No license file found in this repository. Add a `LICENSE` if you plan to open source this project.
+No license file is currently included. Add a `LICENSE` file before distributing this project publicly.

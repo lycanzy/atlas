@@ -2,27 +2,5 @@
 
 {% block content %}
 <h2>新增项目</h2>
-{% if error %}
-<div class="alert alert-danger" role="alert">
-    {{ error }}
-</div>
-{% endif %}
-<form method="post" action="{% url 'add_experiment' %}">
-    {% csrf_token %}
-    <div style="margin-bottom: 1rem;">
-        <label for="team" style="display:block; margin-bottom:0.5rem;">选择 Team：</label>
-        <select id="team" name="team" required class="form-select" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
-            <option value="">请选择 Team...</option>
-            {% for team in teams %}
-                <option value="{{ team.id }}">{{ team.team_code }} - {{ team.group_name }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div style="margin-bottom: 1rem;">
-        <label for="exp_description" style="display:block; margin-bottom:0.5rem;">项目描述：</label>
-        <textarea id="exp_description" name="exp_description" class="form-control" rows="3" 
-                  placeholder="请输入项目描述"></textarea>
-    </div>
-    <button type="submit" class="btn btn-primary">创建项目</button>
-</form>
+{% include "experiment_flow/_add_experiment_form.html" %}
 {% endblock %}
