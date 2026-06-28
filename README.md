@@ -24,15 +24,12 @@ Atlas is a Django web application for research groups to manage **Teams → Proj
   - Create/edit/delete steps
   - Status: `Planned` / `Completed` / `Canceled` (completed timestamp set automatically)
   - Attach equipment/tool, recipe, notes
-  - Store materials/components as JSON list (`components`)
+  - Link structured raw material batch usage with quantity/unit
   - **Cross-experiment parent linking**: a step can reference any previous step for sample/history tracing
 - **Step name templates**: Maintain selectable 2-letter step codes with labels/categories (`StepNameTemplate`).
 - **Bulk operations**: Bulk update status; multi-select delete; copy steps to another flow (within accessible experiments).
 - **Equipment database**: Add/edit/view equipment with owner, location, utilities/specs, active flag.
-- **Barcodes**:
-  - Auto-generated IDs (`F000001` for experiments, `S000001` for steps)
-  - Printable pages for experiment/step barcodes
-  - Utility script to backfill barcodes for existing records
+- **Raw material database**: Add/edit/view raw material batches with owner, supplier, location, active flag, and traceable step usage.
 - **APIs (JSON)**:
   - `GET /api/steps/` (group-scoped steps)
   - `GET /api/experiments_with_flows/` (for copy-step dropdown)
@@ -65,11 +62,12 @@ Atlas 是一个基于 Django 的 Web 应用，用于研究团队管理 **团队 
   - 新增/编辑/删除步骤
   - 状态：`Planned` / `Completed` / `Canceled`（完成时自动写入完成时间）
   - 记录设备、配方、备注
-  - 以 JSON 列表形式记录材料/组件（`components`）
+  - 关联结构化原材料批次使用记录，并记录用量/单位
   - **跨实验父步骤关联**：步骤可关联任意历史步骤，用于样品/工艺链追踪
 - **步骤模板**：可维护常用两位步骤码、标签与分类（`StepNameTemplate`）。
 - **批量操作**：批量改状态、批量删除、复制步骤到其它流程（仅限用户可访问的实验范围）。
 - **设备库**：设备新增/编辑/查看，包含负责人、位置、规格/水电气排风等信息、启用状态。
+- **原材料库**：原材料批次新增/编辑/查看，包含负责人、供应商、位置、启用状态，并支持追踪到具体步骤。
 - **条码**：
   - 自动生成条码 ID（实验 `F000001`，步骤 `S000001`）
   - 提供实验/步骤条码打印页面
@@ -109,17 +107,6 @@ cd experiment_app
 ```
 
 Open: `http://127.0.0.1:8000/`
-
----
-
-## Barcode Backfill Script | 条码补齐脚本
-
-If you already have records without barcodes:
-
-```zsh
-cd experiment_app
-../exptrack/bin/python manage.py shell < scripts/generate_barcodes.py
-```
 
 ---
 

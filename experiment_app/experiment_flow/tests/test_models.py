@@ -1,8 +1,10 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from datetime import date
 from experiment_flow.models import (
-    ResearchGroup, UserProfile, Project, Exp, ExpFlow, ExpStep, Equipment
+    ResearchGroup, UserProfile, Project, Exp, ExpFlow, ExpStep, Equipment,
+    RawMaterial, StepRawMaterialUsage
 )
 
 class ModelTests(TestCase):
@@ -91,7 +93,7 @@ class ModelTests(TestCase):
         
         self.assertEqual(flow.flow_name, "AA")
         self.assertEqual(flow.full_flow, "TPR001AA")
-        self.assertTrue(flow.barcode.startswith("F"))
+        self.assertFalse(hasattr(flow, "barcode"))
 
         # Test invalid flow name
         flow_bad = ExpFlow(flow_name="A", exp=exp)
@@ -117,7 +119,7 @@ class ModelTests(TestCase):
         
         self.assertEqual(step1.step_number, "00")
         self.assertEqual(step1.full_step, "TPR001AA-ST00")
-        self.assertTrue(step1.barcode.startswith("S"))
+        self.assertFalse(hasattr(step1, "barcode"))
         
         # Second step with same name
         step2 = ExpStep(
@@ -158,6 +160,18 @@ class ModelTests(TestCase):
         step4 = ExpStep.objects.create(step_name="DD", flow=flow, parent=step_other)
         self.assertEqual(step4.step_num, "00")
 
+    def test_step_parent_cycle_is_rejected(self):
+        exp = Exp.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        flow = ExpFlow.objects.create(flow_name="AA", exp=exp)
+
+        step1 = ExpStep.objects.create(step_name="AA", flow=flow)
+        step2 = ExpStep.objects.create(step_name="BB", flow=flow, parent=step1)
+        step3 = ExpStep.objects.create(step_name="CC", flow=flow, parent=step2)
+
+        step1.parent = step3
+        with self.assertRaises(ValidationError):
+            step1.save()
+
     def test_update_flow_identifiers_signal(self):
         """Test that changing experiment name updates flow and step identifiers"""
         exp = Exp.objects.create(exp_name="OLD001", project=self.project, owner=self.user)
@@ -177,3 +191,49 @@ class ModelTests(TestCase):
         
         self.assertEqual(flow.full_flow, "NEW001AA")
         self.assertEqual(step.full_step, "NEW001AA-BB00")
+
+    def test_raw_material_creation_and_unique_batch(self):
+        material = RawMaterial.objects.create(
+            material_code="rm001",
+            received_date=date(2026, 6, 19),
+            material_type="Powder",
+            owner=self.user
+        )
+
+        self.assertEqual(material.material_code, "RM001")
+        self.assertEqual(material.batch_number, "RM001-061926")
+        self.assertIsNone(material.material_name)
+        self.assertEqual(material.owner, self.user)
+
+        duplicate = RawMaterial(
+            material_code="RM001",
+            received_date=date(2026, 6, 19),
+            owner=self.user
+        )
+        with self.assertRaises(ValidationError):
+            duplicate.full_clean()
+
+    def test_step_raw_material_usage_unique_per_step(self):
+        exp = Exp.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        flow = ExpFlow.objects.create(flow_name="AA", exp=exp)
+        step = ExpStep.objects.create(step_name="AA", flow=flow)
+        material = RawMaterial.objects.create(
+            material_code="RM002",
+            received_date=date(2026, 6, 20),
+            material_name="Binder",
+            owner=self.user
+        )
+
+        usage = StepRawMaterialUsage.objects.create(
+            step=step,
+            raw_material=material,
+            quantity="1.5000",
+            unit="g"
+        )
+
+        self.assertEqual(usage.raw_material, material)
+        self.assertEqual(usage.unit, "g")
+
+        duplicate = StepRawMaterialUsage(step=step, raw_material=material, quantity="2.0000", unit="g")
+        with self.assertRaises(ValidationError):
+            duplicate.full_clean()

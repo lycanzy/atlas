@@ -1,0 +1,171 @@
+{% extends "experiment_flow/base_no_sidebar.html" %}
+{% load static %}
+
+{% block title %}{{ raw_material.material_code }} / {{ raw_material.batch_number }} - 原材料详情{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>{{ raw_material.material_name|default:raw_material.material_code }}</h2>
+                    <p class="text-muted mb-0">
+                        <code>{{ raw_material.material_code }}</code> / <code>{{ raw_material.batch_number }}</code>
+                        {% if raw_material.owner %}
+                            | <i class="bi bi-person"></i> {{ raw_material.owner.get_full_name|default:raw_material.owner.username }}
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    {% if raw_material.is_active %}
+                        <span class="badge bg-success me-2">启用</span>
+                    {% else %}
+                        <span class="badge bg-danger me-2">停用</span>
+                    {% endif %}
+                    <a href="{% url 'edit_raw_material' raw_material.id %}" class="btn btn-warning btn-sm">
+                        <i class="bi bi-pencil"></i> 编辑
+                    </a>
+                    <a href="{% url 'raw_material_list' %}" class="btn btn-secondary btn-sm">
+                        <i class="bi bi-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h5 class="text-primary mb-3">
+                            <i class="bi bi-info-circle"></i> 基本信息
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">原材料代号：</label>
+                                <p><code>{{ raw_material.material_code }}</code></p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">批次：</label>
+                                <p><code>{{ raw_material.batch_number }}</code></p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">接收时间：</label>
+                                <p>{{ raw_material.received_date|date:"Y-m-d"|default:"未填写" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">名称：</label>
+                                <p>{{ raw_material.material_name|default:"未填写" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">种类：</label>
+                                <p>{{ raw_material.material_type|default:"未填写" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">负责人：</label>
+                                <p>
+                                    {% if raw_material.owner %}
+                                        {{ raw_material.owner.get_full_name|default:raw_material.owner.username }}
+                                    {% else %}
+                                        未分配
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">状态：</label>
+                                <p>
+                                    {% if raw_material.is_active %}
+                                        <span class="badge bg-success">启用</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">停用</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="fw-bold">描述：</label>
+                                <p>{{ raw_material.description|default:"暂无描述" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-4">
+                        <h5 class="text-primary mb-3">
+                            <i class="bi bi-box-seam"></i> 存储与供应商
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">供应商：</label>
+                                <p>{{ raw_material.supplier|default:"未填写" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">存放位置：</label>
+                                <p>{{ raw_material.location|default:"未填写" }}</p>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="fw-bold">备注：</label>
+                                <p>{{ raw_material.notes|default:"暂无备注" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-2">
+                        <h5 class="text-primary mb-3">
+                            <i class="bi bi-clock-history"></i> 时间记录
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">创建时间：</label>
+                                <p>{{ raw_material.created_on|date:"Y-m-d H:i" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="fw-bold">最近更新：</label>
+                                <p>{{ raw_material.updated_on|date:"Y-m-d H:i" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">使用记录</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>步骤</th>
+                                    <th>实验</th>
+                                    <th>用量</th>
+                                    <th>备注</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for usage in usages %}
+                                <tr>
+                                    <td>{{ usage.step.full_step }}</td>
+                                    <td>{{ usage.step.flow.full_flow }}</td>
+                                    <td>
+                                        {% if usage.quantity %}
+                                            {{ usage.quantity }} {{ usage.unit|default:"" }}
+                                        {% else %}
+                                            <span class="text-muted">未填写</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ usage.notes|default:"—" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">暂无使用记录</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

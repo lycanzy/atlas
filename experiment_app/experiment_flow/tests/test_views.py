@@ -1,8 +1,10 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth.models import User
+from datetime import date
 from experiment_flow.models import (
-    ResearchGroup, UserProfile, Project, Exp, ExpFlow, ExpStep, StepNameTemplate
+    ResearchGroup, UserProfile, Project, Exp, ExpFlow, ExpStep, StepNameTemplate,
+    RawMaterial, StepRawMaterialUsage
 )
 import json
 
@@ -33,6 +35,15 @@ class ViewTests(TestCase):
 
         # Setup templates
         StepNameTemplate.objects.create(step_code="AA", step_label="Step A")
+        self.raw_material = RawMaterial.objects.create(
+            material_code="RM001",
+            received_date=date(2026, 6, 19),
+            material_type="Powder",
+            material_name="Test Powder",
+            owner=self.user1,
+            supplier="Vendor A",
+            location="Shelf 1"
+        )
 
     def test_index_view_permissions(self):
         # User 1 should see Exp 1 but not Exp 2
@@ -116,10 +127,21 @@ class ViewTests(TestCase):
         response = self.client.post(reverse('add_step', args=[self.exp1.id, self.flow1.id]), {
             'step_name': 'AA',
             'step_description': 'Test Step',
-            'status': 'Planned'
+            'status': 'Planned',
+            'raw_material_usages': json.dumps([
+                {
+                    'raw_material_id': self.raw_material.id,
+                    'quantity': '2.5',
+                    'unit': 'g',
+                    'notes': 'first batch'
+                }
+            ])
         })
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(ExpStep.objects.filter(full_step="PRA001AA-AA00").exists())
+        step = ExpStep.objects.get(full_step="PRA001AA-AA00")
+        usage = StepRawMaterialUsage.objects.get(step=step)
+        self.assertEqual(usage.raw_material, self.raw_material)
+        self.assertEqual(usage.unit, 'g')
 
     def test_ajax_update_status(self):
         self.client.login(username="user1", password="password")
@@ -141,6 +163,12 @@ class ViewTests(TestCase):
         
         # Create source step
         step1 = ExpStep.objects.create(step_name="AA", flow=self.flow1, step_description="Source")
+        StepRawMaterialUsage.objects.create(
+            step=step1,
+            raw_material=self.raw_material,
+            quantity="3.0000",
+            unit="ml"
+        )
         
         # Create target flow
         flow2 = ExpFlow.objects.create(flow_name="BB", exp=self.exp1)
@@ -156,7 +184,50 @@ class ViewTests(TestCase):
         self.assertEqual(response.json()['success'], True)
         
         # Verify copy
-        self.assertTrue(ExpStep.objects.filter(flow=flow2, step_name="AA", step_description="Source").exists())
+        copied_step = ExpStep.objects.get(flow=flow2, step_name="AA", step_description="Source")
+        copied_usage = StepRawMaterialUsage.objects.get(step=copied_step)
+        self.assertEqual(copied_usage.raw_material, self.raw_material)
+        self.assertEqual(copied_usage.unit, "ml")
+
+    def test_raw_material_views_and_search(self):
+        self.client.login(username="user1", password="password")
+
+        list_response = self.client.get(reverse('raw_material_list'), {'search': 'Vendor A'})
+        self.assertEqual(list_response.status_code, 200)
+        self.assertContains(list_response, "RM001")
+        self.assertContains(list_response, "Test Powder")
+
+        detail_response = self.client.get(reverse('raw_material_detail', args=[self.raw_material.id]))
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, "RM001-061926")
+
+        add_response = self.client.post(reverse('add_raw_material'), {
+            'material_code': 'RM002',
+            'received_date': '2026-06-20',
+            'material_type': 'Liquid',
+            'material_name': '',
+            'owner': self.user1.id,
+            'supplier': 'Vendor B',
+            'location': 'Cabinet 2',
+            'is_active': 'on'
+        })
+        self.assertEqual(add_response.status_code, 302)
+        self.assertTrue(RawMaterial.objects.filter(material_code="RM002", batch_number="RM002-062026", material_name__isnull=True).exists())
+
+        edit_response = self.client.post(reverse('edit_raw_material', args=[self.raw_material.id]), {
+            'material_code': 'RM001',
+            'received_date': '2026-06-21',
+            'material_type': 'Powder',
+            'material_name': '',
+            'owner': self.user1.id,
+            'supplier': 'Vendor A',
+            'location': 'Shelf 2',
+            'is_active': 'on'
+        })
+        self.assertEqual(edit_response.status_code, 302)
+        self.raw_material.refresh_from_db()
+        self.assertEqual(self.raw_material.batch_number, "RM001-062126")
+        self.assertIsNone(self.raw_material.material_name)
 
     def test_copy_step_preserves_external_parent(self):
         self.client.login(username="user1", password="password")
@@ -202,3 +273,34 @@ class ViewTests(TestCase):
         copied_parent = ExpStep.objects.get(flow=flow2, step_name="MX")
         copied_child = ExpStep.objects.get(flow=flow2, step_name="CA")
         self.assertEqual(copied_child.parent, copied_parent)
+
+    def test_step_genealogy_view_shows_lineage_descendants_and_materials(self):
+        self.client.login(username="user1", password="password")
+
+        root = ExpStep.objects.create(step_name="AA", flow=self.flow1, step_description="Root step")
+        current = ExpStep.objects.create(step_name="BB", flow=self.flow1, parent=root, recipe="R1")
+        child = ExpStep.objects.create(step_name="CC", flow=self.flow1, parent=current)
+        StepRawMaterialUsage.objects.create(
+            step=current,
+            raw_material=self.raw_material,
+            quantity="2.0000",
+            unit="g"
+        )
+
+        response = self.client.get(reverse('step_genealogy', args=[current.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, root.full_step)
+        self.assertContains(response, current.full_step)
+        self.assertContains(response, child.full_step)
+        self.assertContains(response, self.raw_material.batch_number)
+        self.assertContains(response, "R1")
+
+    def test_step_genealogy_view_respects_group_access(self):
+        self.client.login(username="user1", password="password")
+        flow2 = ExpFlow.objects.create(flow_name="AA", exp=self.exp2)
+        other_step = ExpStep.objects.create(step_name="AA", flow=flow2)
+
+        response = self.client.get(reverse('step_genealogy', args=[other_step.id]))
+
+        self.assertEqual(response.status_code, 302)

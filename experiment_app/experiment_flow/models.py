@@ -99,7 +99,6 @@ class ExpFlow(models.Model):
     exp = models.ForeignKey(Exp, on_delete = models.CASCADE, related_name = 'flow', null = True)
     created_on = models.DateTimeField(auto_now_add=True, null = True)
     full_flow = models.CharField(max_length=35, editable=False, db_index=True, null = True)  # Adding index for faster queries
-    barcode = models.CharField(max_length=100, blank=True, unique=True, null=True, help_text="Unique barcode identifier for this flow")
 
     class Meta:
         verbose_name = "Experiment"
@@ -152,7 +151,6 @@ class ExpStep(models.Model):
     completed_on = models.DateTimeField(blank=True, null=True)
     tool = models.ForeignKey('Equipment', on_delete=models.SET_NULL, blank=True, null=True, related_name='steps', help_text="Equipment/tool used for this step")
     recipe = models.CharField(max_length=20, blank=True, null=True)
-    components = models.JSONField(default=list, blank=True, help_text="List of components/materials used in this step")
 
     @property
     def full_step_name(self):
@@ -169,7 +167,21 @@ class ExpStep(models.Model):
 
     flow = models.ForeignKey(ExpFlow, on_delete = models.CASCADE, related_name = 'step', null = True)
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, related_name='child', null=True, blank=True)
-    barcode = models.CharField(max_length=100, blank=True, unique=True, null=True, help_text="Unique barcode identifier for this step")
+
+    def clean(self):
+        super().clean()
+        if not self.parent:
+            return
+        if self.pk and self.parent_id == self.pk:
+            raise ValidationError({'parent': '步骤不能将自己设为前置步骤。'})
+
+        seen_ids = {self.pk} if self.pk else set()
+        current = self.parent
+        while current:
+            if current.pk in seen_ids:
+                raise ValidationError({'parent': '前置步骤不能形成循环谱系。'})
+            seen_ids.add(current.pk)
+            current = current.parent
 
     @property
     def step_num(self):
@@ -213,6 +225,7 @@ class ExpStep(models.Model):
         if len(self.step_name) != 2 or not self.step_name.isalpha():
             raise ValidationError('步骤名称必须是 2 个英文字母（例如 AA）。')
 
+        self.clean()
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -295,6 +308,77 @@ class Equipment(models.Model):
     def __str__(self):
         return self.equipment_name
 
+class RawMaterial(models.Model):
+    """Raw material database for tracking material batches used in steps"""
+
+    material_code = models.CharField(max_length=50, help_text="Raw material code")
+    batch_number = models.CharField(max_length=80, blank=True, help_text="Raw material batch number generated from material code and received date")
+    received_date = models.DateField(blank=True, null=True, help_text="Date this raw material batch was received")
+    material_type = models.CharField(max_length=100, blank=True, null=True, help_text="Raw material type/category")
+    material_name = models.CharField(max_length=100, blank=True, null=True, help_text="Raw material name")
+    description = models.TextField(blank=True, null=True, help_text="Detailed description of the raw material")
+    owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='raw_materials', help_text="Raw material owner/responsible person")
+    supplier = models.CharField(max_length=200, blank=True, null=True, help_text="Supplier/vendor")
+    location = models.CharField(max_length=200, blank=True, null=True, help_text="Storage location")
+    notes = models.TextField(blank=True, null=True, help_text="Additional notes")
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True, help_text="Whether the raw material is currently active/available")
+
+    class Meta:
+        ordering = ['material_code', 'batch_number']
+        verbose_name = "Raw Material"
+        verbose_name_plural = "Raw Materials"
+        constraints = [
+            models.UniqueConstraint(fields=['material_code', 'batch_number'], name='unique_raw_material_code_batch')
+        ]
+
+    def clean(self):
+        if self.material_code:
+            self.material_code = self.material_code.strip().upper()
+        if self.material_code and self.received_date:
+            self.batch_number = f"{self.material_code}-{self.received_date.strftime('%m%d%y')}"
+        elif self.batch_number:
+            self.batch_number = self.batch_number.strip().upper()
+        if not self.material_name:
+            self.material_name = None
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def display_label(self):
+        type_label = f" ({self.material_type})" if self.material_type else ""
+        name_label = f" - {self.material_name}" if self.material_name else ""
+        return f"{self.material_code} - {self.batch_number}{name_label}{type_label}"
+
+    def __str__(self):
+        return self.display_label
+
+class StepRawMaterialUsage(models.Model):
+    """Raw material usage record for a specific experiment step"""
+
+    step = models.ForeignKey(ExpStep, on_delete=models.CASCADE, related_name='raw_material_usages')
+    raw_material = models.ForeignKey(RawMaterial, on_delete=models.PROTECT, related_name='step_usages')
+    quantity = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
+    unit = models.CharField(max_length=50, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['raw_material__material_code', 'raw_material__batch_number']
+        verbose_name = "Step Raw Material Usage"
+        verbose_name_plural = "Step Raw Material Usages"
+        constraints = [
+            models.UniqueConstraint(fields=['step', 'raw_material'], name='unique_step_raw_material_usage')
+        ]
+
+    def __str__(self):
+        amount = f" - {self.quantity:g} {self.unit or ''}".strip() if self.quantity is not None else ""
+        return f"{self.step} uses {self.raw_material}{amount}"
+
 # Signal to update all flow identifiers when experiment changes
 @receiver(post_save, sender=Exp)
 def update_flow_identifiers(sender, instance, **kwargs):
@@ -314,21 +398,3 @@ def update_step_identifiers(sender, instance, **kwargs):
     for step in instance.step.all():
         step.full_step = f"{instance.full_flow}-{step.full_step_name}"
         step.save(update_fields=['full_step'])
-
-# Signal to generate barcode for ExpFlow
-@receiver(post_save, sender=ExpFlow)
-def generate_flow_barcode(sender, instance, created, **kwargs):
-    if created and not instance.barcode:
-        # Generate a unique barcode ID using flow ID
-        barcode_id = f"F{instance.id:06d}"
-        instance.barcode = barcode_id
-        ExpFlow.objects.filter(pk=instance.pk).update(barcode=barcode_id)
-
-# Signal to generate barcode for ExpStep
-@receiver(post_save, sender=ExpStep)
-def generate_step_barcode(sender, instance, created, **kwargs):
-    if created and not instance.barcode:
-        # Generate a unique barcode ID using step ID
-        barcode_id = f"S{instance.id:06d}"
-        instance.barcode = barcode_id
-        ExpStep.objects.filter(pk=instance.pk).update(barcode=barcode_id)

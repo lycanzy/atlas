@@ -1,5 +1,5 @@
 from django.test import TestCase
-from experiment_flow.forms import ExpStepForm, ExpFlowForm
+from experiment_flow.forms import ExpStepForm, ExpFlowForm, RawMaterialForm
 from experiment_flow.models import StepNameTemplate, ExpStep, ExpFlow, Exp, Project, ResearchGroup, User
 
 class FormTests(TestCase):
@@ -63,3 +63,16 @@ class FormTests(TestCase):
         # Let's check if is_valid captures model validation errors.
         # Django ModelForm runs model.clean() during validation.
         self.assertFalse(form.is_valid()) 
+
+    def test_raw_material_form_valid(self):
+        form = RawMaterialForm(data={
+            'material_code': 'RM001',
+            'received_date': '2026-06-19',
+            'material_type': 'Powder',
+            'material_name': '',
+            'owner': self.user.id,
+            'supplier': 'Vendor A',
+            'location': 'Shelf 1',
+            'is_active': 'on'
+        })
+        self.assertTrue(form.is_valid())

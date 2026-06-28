@@ -114,16 +114,17 @@
     grid-column: span 3;
 }
 
-#components-table {
+#raw-materials-table {
     font-size: 0.75rem;
 }
 
-#components-table th,
-#components-table td {
+#raw-materials-table th,
+#raw-materials-table td {
     padding: 0.25rem 0.4rem;
 }
 
-#components-table input {
+#raw-materials-table input,
+#raw-materials-table select {
     font-size: 0.75rem;
     padding: 0.2rem 0.3rem;
 }
@@ -272,24 +273,25 @@
     </div>
   </div>
   
-  <!-- Components Section -->
+  <!-- Raw Materials Section -->
   <div class="form-section">
-    <div class="section-title">组分 / 原材料</div>
-    <table class="table table-sm table-bordered" id="components-table">
+    <div class="section-title">原材料使用</div>
+    <table class="table table-sm table-bordered" id="raw-materials-table">
       <thead class="table-light">
         <tr>
-          <th style="width: 45%;">材料名称</th>
-          <th style="width: 20%;">用量</th>
-          <th style="width: 20%;">单位</th>
-          <th style="width: 15%; text-align: center;">
-            <button type="button" class="btn btn-xs btn-success" id="add-component-btn" style="font-size: 0.7rem; padding: 0.1rem 0.3rem;">
+          <th style="width: 42%;">原材料</th>
+          <th style="width: 16%;">用量</th>
+          <th style="width: 14%;">单位</th>
+          <th style="width: 18%;">备注</th>
+          <th style="width: 10%; text-align: center;">
+            <button type="button" class="btn btn-xs btn-success" id="add-raw-material-btn" style="font-size: 0.7rem; padding: 0.1rem 0.3rem;">
               <i class="bi bi-plus-circle"></i>
             </button>
           </th>
         </tr>
       </thead>
-      <tbody id="components-container">
-        <!-- Component rows will be added here -->
+      <tbody id="raw-materials-container">
+        <!-- Raw material rows will be added here -->
       </tbody>
     </table>
   </div>

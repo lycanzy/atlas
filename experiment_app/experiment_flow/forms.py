@@ -1,5 +1,5 @@
 from django import forms
-from .models import ExpStep, ExpFlow, StepNameTemplate, Equipment
+from .models import ExpStep, ExpFlow, StepNameTemplate, Equipment, RawMaterial
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordChangeForm
 import re
@@ -143,6 +143,14 @@ class ExpStepForm(forms.ModelForm):
         # Additional validation: prevent setting self as parent (in case queryset filtering fails)
         if parent and self.instance and parent.id == self.instance.id:
             raise forms.ValidationError('步骤不能将自己设为前置步骤。')
+        if parent and self.instance and self.instance.pk:
+            seen_ids = {self.instance.pk}
+            current = parent
+            while current:
+                if current.pk in seen_ids:
+                    raise forms.ValidationError('前置步骤不能形成循环谱系。')
+                seen_ids.add(current.pk)
+                current = current.parent
         return parent
 class EquipmentForm(forms.ModelForm):
     # Override owner to use a searchable select
@@ -186,6 +194,45 @@ class EquipmentForm(forms.ModelForm):
         # Populate owner choices with all users, ordered by first name then last name
         self.fields['owner'].queryset = User.objects.all().order_by('first_name', 'last_name', 'username')
         self.fields['owner'].label_from_instance = lambda obj: obj.get_full_name() if obj.get_full_name() else obj.username
+
+class RawMaterialForm(forms.ModelForm):
+    owner = forms.ModelChoiceField(
+        label='负责人',
+        queryset=User.objects.none(),
+        required=True,
+        widget=forms.Select(attrs={
+            'class': 'form-select searchable-select',
+            'id': 'id_owner',
+            'data-placeholder': '搜索负责人...'
+        }),
+        help_text='选择原材料负责人'
+    )
+
+    class Meta:
+        model = RawMaterial
+        fields = [
+            'material_code', 'received_date', 'material_type', 'material_name',
+            'description', 'owner', 'supplier', 'location', 'is_active', 'notes'
+        ]
+        widgets = {
+            'material_code': forms.TextInput(attrs={'class': 'form-control'}),
+            'received_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
+            'material_type': forms.TextInput(attrs={'class': 'form-control'}),
+            'material_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'supplier': forms.TextInput(attrs={'class': 'form-control'}),
+            'location': forms.TextInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['owner'].queryset = User.objects.all().order_by('first_name', 'last_name', 'username')
+        self.fields['owner'].label_from_instance = lambda obj: obj.get_full_name() if obj.get_full_name() else obj.username
+        self.fields['received_date'].required = True
+        self.fields['received_date'].input_formats = ['%Y-%m-%d']
+        self.fields['material_name'].required = False
 
 
 class CustomPasswordChangeForm(PasswordChangeForm):
