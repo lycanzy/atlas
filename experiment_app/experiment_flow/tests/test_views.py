@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.contrib.auth.models import User
 from datetime import date
 from experiment_flow.models import (
-    ResearchGroup, UserProfile, Project, Exp, ExpFlow, ExpStep, StepNameTemplate,
+    ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, StepNameTemplate,
     RawMaterial, StepRawMaterialUsage
 )
 import json
@@ -25,13 +25,13 @@ class ViewTests(TestCase):
         self.staff_user = User.objects.create_user(username="staff", password="password", is_staff=True)
         
         # Setup data for Group 1
-        self.project1 = Project.objects.create(project_name="P1", project_code="PRA", group=self.group1)
-        self.exp1 = Exp.objects.create(exp_name="PRA001", project=self.project1, owner=self.user1)
-        self.flow1 = ExpFlow.objects.create(flow_name="AA", exp=self.exp1)
+        self.project1 = ProjectCategory.objects.create(project_name="P1", project_code="PRA", group=self.group1)
+        self.exp1 = Project.objects.create(exp_name="PRA001", project=self.project1, owner=self.user1)
+        self.flow1 = Experiment.objects.create(flow_name="AA", exp=self.exp1)
         
         # Setup data for Group 2
-        self.project2 = Project.objects.create(project_name="P2", project_code="PRB", group=self.group2)
-        self.exp2 = Exp.objects.create(exp_name="PRB001", project=self.project2, owner=self.user2)
+        self.project2 = ProjectCategory.objects.create(project_name="P2", project_code="PRB", group=self.group2)
+        self.exp2 = Project.objects.create(exp_name="PRB001", project=self.project2, owner=self.user2)
 
         # Setup templates
         StepNameTemplate.objects.create(step_code="AA", step_label="Step A")
@@ -46,14 +46,14 @@ class ViewTests(TestCase):
         )
 
     def test_index_view_permissions(self):
-        # User 1 should see Exp 1 but not Exp 2
+        # User 1 should see Project 1 but not Project 2
         self.client.login(username="user1", password="password")
         response = self.client.get(reverse('index'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "PRA001")
         self.assertNotContains(response, "PRB001")
         
-        # User 2 should see Exp 2 but not Exp 1
+        # User 2 should see Project 2 but not Project 1
         self.client.login(username="user2", password="password")
         response = self.client.get(reverse('index'))
         self.assertContains(response, "PRB001")
@@ -66,16 +66,16 @@ class ViewTests(TestCase):
         self.assertContains(response, "PRB001")
 
     def test_experiment_detail_permissions(self):
-        # User 1 accessing Exp 1 -> OK
+        # User 1 accessing Project 1 -> OK
         self.client.login(username="user1", password="password")
         response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
         self.assertEqual(response.status_code, 200)
         
-        # User 1 accessing Exp 2 -> Redirect/Error
+        # User 1 accessing Project 2 -> Redirect/Error
         response = self.client.get(reverse('experiment_detail', args=[self.exp2.id]))
         self.assertEqual(response.status_code, 302) # Redirects to index
         
-        # Staff accessing Exp 2 -> OK
+        # Staff accessing Project 2 -> OK
         self.client.login(username="staff", password="password")
         response = self.client.get(reverse('experiment_detail', args=[self.exp2.id]))
         self.assertEqual(response.status_code, 200)
@@ -86,17 +86,17 @@ class ViewTests(TestCase):
         # Post valid data
         response = self.client.post(reverse('add_experiment'), {
             'team': self.group1.id,
-            'exp_description': 'New Exp'
+            'exp_description': 'New Project'
         })
         self.assertEqual(response.status_code, 302) # Redirects to index
         
         # Check created
-        self.assertTrue(Exp.objects.filter(exp_name="PRA002").exists())
+        self.assertTrue(Project.objects.filter(exp_name="PRA002").exists())
         
         # Try to add to team 2 (not in group)
         response = self.client.post(reverse('add_experiment'), {
             'team': self.group2.id,
-            'exp_description': 'Hacked Exp'
+            'exp_description': 'Hacked Project'
         })
         # Should fail (likely 404 or validation error caught in view)
         # The view catches ResearchGroup.DoesNotExist if filtered by group
@@ -106,19 +106,19 @@ class ViewTests(TestCase):
     def test_add_flow(self):
         self.client.login(username="user1", password="password")
         
-        # Add flow to Exp 1
+        # Add flow to Project 1
         response = self.client.post(reverse('add_flow', args=[self.exp1.id]), {
             'flow_name': 'BB'
         })
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(ExpFlow.objects.filter(full_flow="PRA001BB").exists())
+        self.assertTrue(Experiment.objects.filter(full_flow="PRA001BB").exists())
         
-        # Try to add flow to Exp 2
+        # Try to add flow to Project 2
         response = self.client.post(reverse('add_flow', args=[self.exp2.id]), {
             'flow_name': 'BB'
         })
         self.assertEqual(response.status_code, 302) # Redirects to index due to permission
-        self.assertFalse(ExpFlow.objects.filter(full_flow="PRB001BB").exists())
+        self.assertFalse(Experiment.objects.filter(full_flow="PRB001BB").exists())
 
     def test_add_step(self):
         self.client.login(username="user1", password="password")
@@ -138,14 +138,14 @@ class ViewTests(TestCase):
             ])
         })
         self.assertEqual(response.status_code, 302)
-        step = ExpStep.objects.get(full_step="PRA001AA-AA00")
+        step = ExperimentStep.objects.get(full_step="PRA001AA-AA00")
         usage = StepRawMaterialUsage.objects.get(step=step)
         self.assertEqual(usage.raw_material, self.raw_material)
         self.assertEqual(usage.unit, 'g')
 
     def test_ajax_update_status(self):
         self.client.login(username="user1", password="password")
-        step = ExpStep.objects.create(step_name="AA", flow=self.flow1)
+        step = ExperimentStep.objects.create(step_name="AA", flow=self.flow1)
         
         url = reverse('update_step_status', args=[step.id])
         data = {'status': 'Completed'}
@@ -162,7 +162,7 @@ class ViewTests(TestCase):
         self.client.login(username="user1", password="password")
         
         # Create source step
-        step1 = ExpStep.objects.create(step_name="AA", flow=self.flow1, step_description="Source")
+        step1 = ExperimentStep.objects.create(step_name="AA", flow=self.flow1, step_description="Source")
         StepRawMaterialUsage.objects.create(
             step=step1,
             raw_material=self.raw_material,
@@ -171,7 +171,7 @@ class ViewTests(TestCase):
         )
         
         # Create target flow
-        flow2 = ExpFlow.objects.create(flow_name="BB", exp=self.exp1)
+        flow2 = Experiment.objects.create(flow_name="BB", exp=self.exp1)
         
         url = reverse('copy_steps', args=[self.exp1.id])
         data = {
@@ -184,7 +184,7 @@ class ViewTests(TestCase):
         self.assertEqual(response.json()['success'], True)
         
         # Verify copy
-        copied_step = ExpStep.objects.get(flow=flow2, step_name="AA", step_description="Source")
+        copied_step = ExperimentStep.objects.get(flow=flow2, step_name="AA", step_description="Source")
         copied_usage = StepRawMaterialUsage.objects.get(step=copied_step)
         self.assertEqual(copied_usage.raw_material, self.raw_material)
         self.assertEqual(copied_usage.unit, "ml")
@@ -232,9 +232,9 @@ class ViewTests(TestCase):
     def test_copy_step_preserves_external_parent(self):
         self.client.login(username="user1", password="password")
 
-        parent = ExpStep.objects.create(step_name="MX", flow=self.flow1)
-        child = ExpStep.objects.create(step_name="CA", flow=self.flow1, parent=parent)
-        flow2 = ExpFlow.objects.create(flow_name="BB", exp=self.exp1)
+        parent = ExperimentStep.objects.create(step_name="MX", flow=self.flow1)
+        child = ExperimentStep.objects.create(step_name="CA", flow=self.flow1, parent=parent)
+        flow2 = Experiment.objects.create(flow_name="BB", exp=self.exp1)
 
         response = self.client.post(
             reverse('copy_steps', args=[self.exp1.id]),
@@ -248,15 +248,15 @@ class ViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['success'], True)
 
-        copied_child = ExpStep.objects.get(flow=flow2, step_name="CA")
+        copied_child = ExperimentStep.objects.get(flow=flow2, step_name="CA")
         self.assertEqual(copied_child.parent, parent)
 
     def test_copy_steps_remaps_parent_when_parent_is_copied(self):
         self.client.login(username="user1", password="password")
 
-        parent = ExpStep.objects.create(step_name="MX", flow=self.flow1)
-        child = ExpStep.objects.create(step_name="CA", flow=self.flow1, parent=parent)
-        flow2 = ExpFlow.objects.create(flow_name="BB", exp=self.exp1)
+        parent = ExperimentStep.objects.create(step_name="MX", flow=self.flow1)
+        child = ExperimentStep.objects.create(step_name="CA", flow=self.flow1, parent=parent)
+        flow2 = Experiment.objects.create(flow_name="BB", exp=self.exp1)
 
         response = self.client.post(
             reverse('copy_steps', args=[self.exp1.id]),
@@ -270,16 +270,16 @@ class ViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['success'], True)
 
-        copied_parent = ExpStep.objects.get(flow=flow2, step_name="MX")
-        copied_child = ExpStep.objects.get(flow=flow2, step_name="CA")
+        copied_parent = ExperimentStep.objects.get(flow=flow2, step_name="MX")
+        copied_child = ExperimentStep.objects.get(flow=flow2, step_name="CA")
         self.assertEqual(copied_child.parent, copied_parent)
 
     def test_step_genealogy_view_shows_lineage_descendants_and_materials(self):
         self.client.login(username="user1", password="password")
 
-        root = ExpStep.objects.create(step_name="AA", flow=self.flow1, step_description="Root step")
-        current = ExpStep.objects.create(step_name="BB", flow=self.flow1, parent=root, recipe="R1")
-        child = ExpStep.objects.create(step_name="CC", flow=self.flow1, parent=current)
+        root = ExperimentStep.objects.create(step_name="AA", flow=self.flow1, step_description="Root step")
+        current = ExperimentStep.objects.create(step_name="BB", flow=self.flow1, parent=root, recipe="R1")
+        child = ExperimentStep.objects.create(step_name="CC", flow=self.flow1, parent=current)
         StepRawMaterialUsage.objects.create(
             step=current,
             raw_material=self.raw_material,
@@ -298,8 +298,8 @@ class ViewTests(TestCase):
 
     def test_step_genealogy_view_respects_group_access(self):
         self.client.login(username="user1", password="password")
-        flow2 = ExpFlow.objects.create(flow_name="AA", exp=self.exp2)
-        other_step = ExpStep.objects.create(step_name="AA", flow=flow2)
+        flow2 = Experiment.objects.create(flow_name="AA", exp=self.exp2)
+        other_step = ExperimentStep.objects.create(step_name="AA", flow=flow2)
 
         response = self.client.get(reverse('step_genealogy', args=[other_step.id]))
 

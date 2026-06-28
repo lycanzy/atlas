@@ -10,15 +10,15 @@
 
 Atlas is a Django web application for research teams to manage **research groups, projects, experiments, process steps, equipment, and raw material batches**. It focuses on traceability: each step can carry equipment, recipe, status, material usage, and upstream/downstream genealogy links.
 
-The current UI uses a compact Atlas dashboard style with a left project sidebar, modal-first editing flows, and a Cytoscape.js genealogy visualizer.
+The current UI uses a compact Atlas dashboard style with a left project sidebar, modal-first editing workflows, and a Cytoscape.js genealogy visualizer.
 
 ### Core Data Model
 
-- **Research Group / Team**: Access boundary for normal users. Staff and superusers can see all data.
-- **Project**: A named research program under a team, with a team code such as `AFE`, `GNY`, or `PCA`.
-- **Project record (`Exp`)**: Auto-numbered project code such as `AFE001`.
-- **Experiment flow (`ExpFlow`)**: Two-letter suffix under a project, such as `AA`; full experiment ID is `AFE001AA`.
-- **Step (`ExpStep`)**: Process step inside an experiment, such as `AFE001AA-MX00`.
+- **Team (`ResearchGroup`)**: Research group and access boundary. Each team owns a 3-letter team code such as `AFE`, `GNY`, or `PCA`.
+- **Project Category (`ProjectCategory`)**: Optional program/category metadata used by the UI, such as `Anode-free Engineering`.
+- **Project (`Project`)**: Auto-numbered team project code such as `AFE001`.
+- **Experiment (`Experiment`)**: Two-letter experiment suffix under a project, such as `AA`; full experiment ID is `AFE001AA`. There is no separate business concept called "flow".
+- **Experiment Step (`ExperimentStep`)**: Process step inside an experiment, such as `AFE001AA-MX00`.
 - **Raw material batch**: Batch-level material record that can be attached to process steps with quantity and unit.
 
 ### Features
@@ -43,10 +43,10 @@ The current UI uses a compact Atlas dashboard style with a left project sidebar,
   - Modal-based project creation from the sidebar.
 
 - **Experiment and step management**
-  - Create/delete experiment flows under a project.
+  - Create/delete experiments under a project.
   - Create/edit/delete steps in a modal workflow.
   - Status support: `Planned`, `Completed`, `Canceled`.
-  - Inline flow and step description editing.
+  - Inline experiment and step description editing.
   - Bulk status updates, multi-select delete, and copy steps to another accessible experiment.
 
 - **Step genealogy**
@@ -115,6 +115,7 @@ python manage.py runserver 8000
 
 - No barcode module is currently active in the app.
 - No JavaScript build step is required.
+- The database table names still use the original legacy names for compatibility, but the Django model classes now use the current business names.
 - A sample uWSGI config is available at `experiment_app/uwsgi.ini`.
 
 ---
@@ -125,15 +126,15 @@ python manage.py runserver 8000
 
 Atlas 是一个基于 Django 的实验追踪应用，用于研究团队管理 **研究组、项目、实验、工艺步骤、设备和原材料批次**。它的重点是可追溯性：每个步骤都可以记录设备、配方、状态、原材料用量，以及上下游谱系关系。
 
-当前 UI 使用紧凑的 Atlas dashboard 风格：左侧项目列表、弹窗式编辑流程，以及基于 Cytoscape.js 的步骤谱系 visualizer。
+当前 UI 使用紧凑的 Atlas dashboard 风格：左侧项目列表、弹窗式编辑工作流，以及基于 Cytoscape.js 的步骤谱系 visualizer。
 
 ### 核心数据模型
 
-- **研究组 / Team**：普通用户的数据访问边界；管理员可以查看全部数据。
-- **项目 / Project**：团队下的研究方向，带有团队代码，例如 `AFE`、`GNY`、`PCA`。
-- **项目记录 (`Exp`)**：自动编号的项目代码，例如 `AFE001`。
-- **实验流程 (`ExpFlow`)**：项目下的两位字母实验后缀，例如 `AA`；完整实验编号为 `AFE001AA`。
-- **步骤 (`ExpStep`)**：实验流程中的工艺步骤，例如 `AFE001AA-MX00`。
+- **研究组 / Team (`ResearchGroup`)**：普通用户的数据访问边界；每个 Team 自带 3 位 team code，例如 `AFE`、`GNY`、`PCA`。
+- **项目分类 (`ProjectCategory`)**：UI 中用于展示研究方向/分类的辅助信息，例如 `Anode-free Engineering`。
+- **项目 (`Project`)**：Team code 后加三位数字形成的项目编号，例如 `AFE001`。
+- **实验 (`Experiment`)**：项目编号后加两位字母形成的实验编号，例如 `AFE001AA`。当前业务概念里已经没有单独的 “flow”。
+- **实验步骤 (`ExperimentStep`)**：实验中的工艺步骤，例如 `AFE001AA-MX00`。
 - **原材料批次**：可按批次记录，并关联到具体步骤，包含用量和单位。
 
 ### 功能
@@ -158,7 +159,7 @@ Atlas 是一个基于 Django 的实验追踪应用，用于研究团队管理 **
   - 侧边栏可通过弹窗创建新项目。
 
 - **实验与步骤管理**
-  - 在项目下创建 / 删除实验流程。
+  - 在项目下创建 / 删除实验。
   - 通过弹窗新增、编辑、删除步骤。
   - 支持 `Planned`、`Completed`、`Canceled` 状态。
   - 支持 inline 编辑实验和步骤描述。
@@ -230,6 +231,7 @@ python manage.py runserver 8000
 
 - 当前版本不启用 barcode 模块。
 - 不需要 JavaScript build step。
+- 数据库表名仍保留原 legacy 名称以兼容现有数据，但 Django model class 已改为当前业务命名。
 - 示例 uWSGI 配置位于 `experiment_app/uwsgi.ini`。
 
 ---

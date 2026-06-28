@@ -7,8 +7,8 @@ from django.db.models import Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Equipment, RawMaterial, StepRawMaterialUsage
-from .forms import ExpStepForm, ExpFlowForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm
+from .models import Project, Experiment, ExperimentStep, ProjectCategory, ResearchGroup, Equipment, RawMaterial, StepRawMaterialUsage
+from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm
 import json
 import string
 from datetime import timedelta
@@ -67,7 +67,7 @@ def save_raw_material_usages(step, usages_json):
 
 # Helpe r to return experiments visible to the current user (by research group)
 def get_experiments_for_user(user, search_query='', my_experiments=''):
-    """Return a queryset of Exp filtered to the user's research group.
+    """Return a queryset of Project filtered to the user's research group.
 
     Staff and superusers can see all experiments.
     Regular users see only experiments in their research group.
@@ -75,7 +75,7 @@ def get_experiments_for_user(user, search_query='', my_experiments=''):
     """
     # Staff and superusers can access all experiments
     if user.is_staff or user.is_superuser:
-        qs = Exp.objects.all().order_by('-created_on')
+        qs = Project.objects.all().order_by('-created_on')
     else:
         # Regular users: filter by research group
         rg = None
@@ -84,9 +84,9 @@ def get_experiments_for_user(user, search_query='', my_experiments=''):
             rg = getattr(profile, 'research_group', None)
 
         if not rg:
-            return Exp.objects.none()
+            return Project.objects.none()
 
-        qs = Exp.objects.filter(project__group=rg).order_by('-created_on')
+        qs = Project.objects.filter(project__group=rg).order_by('-created_on')
 
     # Filter by owner if requested
     if my_experiments == '1':
@@ -231,7 +231,7 @@ def change_password(request):
 def get_available_flow_codes(experiment):
     """Generate list of available 2-letter codes not used in this experiment"""
     # Get all existing flow names for this experiment
-    existing_flows = ExpFlow.objects.filter(exp=experiment).values_list('flow_name', flat=True)
+    existing_flows = Experiment.objects.filter(exp=experiment).values_list('flow_name', flat=True)
     existing_flows_set = set(existing_flows)
     
     # Generate all possible 2-letter combinations (AA-ZZ)
@@ -425,7 +425,7 @@ def index(request):
     latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
     overview_stats = get_experiment_overview_stats(latest_exp)
     visible_flows = (
-        ExpFlow.objects
+        Experiment.objects
         .filter(exp__in=latest_exp)
         .select_related('exp__owner', 'exp__project__group')
         .order_by('-created_on')
@@ -449,13 +449,13 @@ def index(request):
 @login_required
 def experiment_detail(request, exp_id):
     
-    experiment = Exp.objects.get(id=exp_id)
+    experiment = Project.objects.get(id=exp_id)
     # Security: ensure the current user is in the same research group as the experiment's project
     # Staff and superusers can access all experiments
     if not user_can_access_experiment(request.user, experiment):
         messages.error(request, '你没有权限查看该实验。')
         return redirect('index')
-    flows = ExpFlow.objects.filter(exp=experiment).order_by('created_on')
+    flows = Experiment.objects.filter(exp=experiment).order_by('created_on')
     available_flow_codes = get_available_flow_codes(experiment)
     
     search_query = request.GET.get('search', '')
@@ -478,8 +478,8 @@ def experiment_detail(request, exp_id):
 @login_required
 def delete_flow(request, exp_id, flow_id):
 
-    experiment = Exp.objects.get(id=exp_id)
-    flow = ExpFlow.objects.get(id=flow_id)
+    experiment = Project.objects.get(id=exp_id)
+    flow = Experiment.objects.get(id=flow_id)
     flow.delete()
 
     return redirect('experiment_detail', exp_id=exp_id)
@@ -487,14 +487,14 @@ def delete_flow(request, exp_id, flow_id):
 @login_required
 def delete_step(request, exp_id, flow_id, step_id):
 
-    step = ExpStep.objects.get(id=step_id)
+    step = ExperimentStep.objects.get(id=step_id)
     step.delete()
 
     return redirect(f'/experiment/{exp_id}/?expanded_flow={flow_id}')
 
 @login_required
 def add_experiment(request):
-    # Show Teams directly. The Project row is now an internal backing record
+    # Show Teams directly. The ProjectCategory row is now an internal backing record
     # used to keep existing experiment relationships intact.
     if request.user.is_staff or request.user.is_superuser:
         teams = ResearchGroup.objects.exclude(team_code__isnull=True).exclude(team_code="").order_by('group_name')
@@ -545,9 +545,9 @@ def add_experiment(request):
                 if not team.team_code:
                     raise ValidationError('请先在后台为该 Team 设置 3 位 Team Code。')
 
-                project = Project.objects.filter(group=team).order_by("id").first()
+                project = ProjectCategory.objects.filter(group=team).order_by("id").first()
                 if not project:
-                    project = Project.objects.create(
+                    project = ProjectCategory.objects.create(
                         group=team,
                         project_code=team.team_code,
                         project_name=team.group_name,
@@ -558,7 +558,7 @@ def add_experiment(request):
                 
                 exp_name = project.generate_experiment_name()
                 exp_description = request.POST.get('exp_description')
-                new_exp = Exp(
+                new_exp = Project(
                     exp_name=exp_name,
                     project=project,
                     exp_description=exp_description,
@@ -584,7 +584,7 @@ def add_experiment(request):
 @login_required
 def add_flow(request, exp_id):
     try:
-        experiment = get_object_or_404(Exp, id=exp_id)
+        experiment = get_object_or_404(Project, id=exp_id)
         # Security: ensure the user is in the same research group as the experiment
         # Staff and superusers can access all experiments
         if not (request.user.is_staff or request.user.is_superuser):
@@ -598,7 +598,7 @@ def add_flow(request, exp_id):
             flow_name = request.POST.get('flow_name')
             if flow_name:
                 try:
-                    new_flow = ExpFlow(flow_name=flow_name, exp=experiment)
+                    new_flow = Experiment(flow_name=flow_name, exp=experiment)
                     new_flow.save()
                     
                     # Return JSON for AJAX requests
@@ -648,17 +648,17 @@ def add_flow(request, exp_id):
             'page_obj': page_obj,
             'search_query': search_query
         })
-    except Exp.DoesNotExist:
+    except Project.DoesNotExist:
         return HttpResponse('未找到实验', status=404)
 
 @login_required
 def add_step(request, exp_id, flow_id):
     
-    experiment = Exp.objects.get(id=exp_id)
-    flow = ExpFlow.objects.get(id=flow_id)
+    experiment = Project.objects.get(id=exp_id)
+    flow = Experiment.objects.get(id=flow_id)
     
     if request.method == 'POST':
-        form = ExpStepForm(request.POST, flow=flow)
+        form = ExperimentStepForm(request.POST, flow=flow)
         if form.is_valid():
             step = form.save(commit=False)
             step.flow = flow
@@ -681,7 +681,7 @@ def add_step(request, exp_id, flow_id):
                     'errors': form.errors
                 })
     else:
-        form = ExpStepForm(flow=flow)
+        form = ExperimentStepForm(flow=flow)
     
     # Render the form (for both GET and non-AJAX POST with errors)
     return render(request, 'experiment_flow/add_step.html', {
@@ -694,11 +694,11 @@ def add_step(request, exp_id, flow_id):
 
 @login_required
 def edit_step(request, exp_id, flow_id, step_id):
-    step = get_object_or_404(ExpStep, id=step_id, flow_id=flow_id)
-    flow = get_object_or_404(ExpFlow, id=flow_id)
+    step = get_object_or_404(ExperimentStep, id=step_id, flow_id=flow_id)
+    flow = get_object_or_404(Experiment, id=flow_id)
     
     if request.method == 'POST':
-        form = ExpStepForm(request.POST, instance=step, flow=flow)
+        form = ExperimentStepForm(request.POST, instance=step, flow=flow)
         if form.is_valid():
             step = form.save(commit=False)
             # Ensure the step is associated with the correct flow
@@ -722,7 +722,7 @@ def edit_step(request, exp_id, flow_id, step_id):
                 })
             # If not AJAX, re-render the form with errors
     else:
-        form = ExpStepForm(instance=step, flow=flow)
+        form = ExperimentStepForm(instance=step, flow=flow)
     
     return render(
         request,
@@ -738,7 +738,7 @@ def edit_step(request, exp_id, flow_id, step_id):
 @login_required
 def step_genealogy(request, step_id):
     step = get_object_or_404(
-        ExpStep.objects
+        ExperimentStep.objects
         .select_related('flow__exp__project__group', 'parent', 'tool')
         .prefetch_related('raw_material_usages__raw_material'),
         id=step_id
@@ -751,7 +751,7 @@ def step_genealogy(request, step_id):
     ancestor_chain = build_step_ancestor_chain(step)
     ancestor_ids = [ancestor.id for ancestor in ancestor_chain]
     ancestors_qs = (
-        ExpStep.objects
+        ExperimentStep.objects
         .filter(id__in=ancestor_ids)
         .select_related('flow__exp', 'tool')
         .prefetch_related('raw_material_usages__raw_material')
@@ -788,11 +788,11 @@ def update_flow_desc(request, flow_id):
         data = json.loads(request.body)
         desc = data.get('description', '')
         try:
-            flow = ExpFlow.objects.get(id=flow_id)
+            flow = Experiment.objects.get(id=flow_id)
             flow.flow_description = desc
             flow.save()
             return JsonResponse({'success': True})
-        except ExpFlow.DoesNotExist:
+        except Experiment.DoesNotExist:
             return JsonResponse({'success': False}, status=404)
     return JsonResponse({'success': False}, status=400)
 
@@ -801,11 +801,11 @@ def update_step_desc(request, step_id):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            step = ExpStep.objects.get(id=step_id)
+            step = ExperimentStep.objects.get(id=step_id)
             step.step_description = data.get('description', '')
             step.save()
             return JsonResponse({'success': True})
-        except ExpStep.DoesNotExist:
+        except ExperimentStep.DoesNotExist:
             return JsonResponse({'success': False, 'error': '未找到步骤'})
     return JsonResponse({'success': False, 'error': '无效请求'})
 
@@ -814,7 +814,7 @@ def update_step_status(request, step_id):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            step = ExpStep.objects.get(id=step_id)
+            step = ExperimentStep.objects.get(id=step_id)
             new_status = data.get('status', '')
             
             # Validate status
@@ -838,7 +838,7 @@ def update_step_status(request, step_id):
                 response_data['completed_on'] = step.completed_on.strftime('%Y-%m-%d %H:%M:%S')
             
             return JsonResponse(response_data)
-        except ExpStep.DoesNotExist:
+        except ExperimentStep.DoesNotExist:
             return JsonResponse({'success': False, 'error': '未找到步骤'})
     return JsonResponse({'success': False, 'error': '无效请求'})
 
@@ -860,7 +860,7 @@ def bulk_update_status(request, exp_id):
                 return JsonResponse({'success': False, 'error': '无效状态'})
             
             # Get all steps and verify they belong to this experiment
-            steps = ExpStep.objects.filter(
+            steps = ExperimentStep.objects.filter(
                 id__in=step_ids,
                 flow__exp_id=exp_id
             )
@@ -910,16 +910,16 @@ def copy_steps(request, exp_id):
             target_flow = None
             for exp in experiments:
                 try:
-                    target_flow = ExpFlow.objects.get(full_flow=target_flow_name, exp=exp)
+                    target_flow = Experiment.objects.get(full_flow=target_flow_name, exp=exp)
                     break
-                except ExpFlow.DoesNotExist:
+                except Experiment.DoesNotExist:
                     continue
             
             if not target_flow:
                 return JsonResponse({'success': False, 'error': f'实验 "{target_flow_name}" 不存在，或你没有访问权限'})
             
             # Get the selected steps
-            steps_to_copy = ExpStep.objects.filter(id__in=step_ids).order_by('step_number')
+            steps_to_copy = ExperimentStep.objects.filter(id__in=step_ids).order_by('step_number')
             
             if not steps_to_copy:
                 return JsonResponse({'success': False, 'error': '未找到所选步骤'})
@@ -936,7 +936,7 @@ def copy_steps(request, exp_id):
                 step_name = original_step.step_name
                 
                 # Find existing steps with the same name in target flow
-                existing_steps = ExpStep.objects.filter(
+                existing_steps = ExperimentStep.objects.filter(
                     flow=target_flow,
                     step_name=step_name
                 ).order_by('-step_number')
@@ -955,7 +955,7 @@ def copy_steps(request, exp_id):
                     new_step_number = "00"
                 
                 # Create the copied step (always set status to "Planned" for copied steps)
-                new_step = ExpStep(
+                new_step = ExperimentStep(
                     step_name=step_name,  # Just the 2-letter code (e.g., "MX")
                     step_number=new_step_number,  # The number part (e.g., "01")
                     step_description=original_step.step_description,
@@ -1015,7 +1015,7 @@ def delete_steps(request, exp_id):
                 return JsonResponse({'success': False, 'error': '未选择步骤'})
             
             # Get the steps to delete
-            steps_to_delete = ExpStep.objects.filter(id__in=step_ids)
+            steps_to_delete = ExperimentStep.objects.filter(id__in=step_ids)
             
             if not steps_to_delete:
                 return JsonResponse({'success': False, 'error': '未找到所选步骤'})
@@ -1197,7 +1197,7 @@ def get_all_steps(request):
     """API endpoint to get all steps for the current user's research group"""
     # Staff and superusers can see all steps
     if request.user.is_staff or request.user.is_superuser:
-        steps = ExpStep.objects.all().select_related('flow', 'flow__exp').order_by('-started_on')
+        steps = ExperimentStep.objects.all().select_related('flow', 'flow__exp').order_by('-started_on')
     else:
         # Get user's research group
         profile = getattr(request.user, 'profile', None)
@@ -1209,7 +1209,7 @@ def get_all_steps(request):
             return JsonResponse({'steps': []})
         
         # Get all steps from experiments in the user's research group
-        steps = ExpStep.objects.filter(
+        steps = ExperimentStep.objects.filter(
             flow__exp__project__group=rg
         ).select_related('flow', 'flow__exp').order_by('-started_on')
     
@@ -1269,18 +1269,18 @@ def global_search(request):
     
     # First, try to find a flow by full_flow code
     try:
-        flow = ExpFlow.objects.get(full_flow=query)
+        flow = Experiment.objects.get(full_flow=query)
         # Redirect to the experiment with the flow expanded
         return redirect(f'/experiment/{flow.exp.id}/?expanded_flow={flow.id}')
-    except ExpFlow.DoesNotExist:
+    except Experiment.DoesNotExist:
         pass
     
     # Next, try to find a step by full_step code
     try:
-        step = ExpStep.objects.get(full_step=query)
+        step = ExperimentStep.objects.get(full_step=query)
         # Redirect to the experiment with the flow expanded
         return redirect(f'/experiment/{step.flow.exp.id}/?expanded_flow={step.flow.id}&highlight_step={step.id}')
-    except ExpStep.DoesNotExist:
+    except ExperimentStep.DoesNotExist:
         pass
     
     # If nothing found, show error and redirect back

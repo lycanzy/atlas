@@ -1,15 +1,15 @@
 from django import forms
-from .models import ExpStep, ExpFlow, StepNameTemplate, Equipment, RawMaterial
+from .models import ExperimentStep, Experiment, StepNameTemplate, Equipment, RawMaterial
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordChangeForm
 import re
 
-class ExpFlowForm(forms.ModelForm):
+class ExperimentForm(forms.ModelForm):
     class Meta:
-        model = ExpFlow
+        model = Experiment
         fields = ['flow_name']
 
-class ExpStepForm(forms.ModelForm):
+class ExperimentStepForm(forms.ModelForm):
     # Override step_name to use a dropdown
     step_name = forms.ChoiceField(
         label='步骤名称',
@@ -24,7 +24,7 @@ class ExpStepForm(forms.ModelForm):
     # Override parent to use a searchable select for all steps across experiments
     parent = forms.ModelChoiceField(
         label='前置步骤',
-        queryset=ExpStep.objects.none(),  # Will be set in __init__
+        queryset=ExperimentStep.objects.none(),  # Will be set in __init__
         required=False,
         widget=forms.Select(attrs={
             'class': 'form-select searchable-select',
@@ -48,7 +48,7 @@ class ExpStepForm(forms.ModelForm):
     )
     
     class Meta:
-        model = ExpStep
+        model = ExperimentStep
         fields = ['step_name', 'parent', 'step_description', 'status', 'completed_on', 'tool', 'recipe', 'notes']
         widgets = {
             'parent': forms.Select(attrs={
@@ -112,12 +112,12 @@ class ExpStepForm(forms.ModelForm):
         # Allow parent to be any step from any experiment, except itself
         if self.instance and self.instance.pk:
             # Exclude the step itself when editing
-            self.fields['parent'].queryset = ExpStep.objects.all().exclude(id=self.instance.id).select_related(
+            self.fields['parent'].queryset = ExperimentStep.objects.all().exclude(id=self.instance.id).select_related(
                 'flow__exp'
             ).order_by('flow__exp__exp_name', 'flow__flow_name', 'step_name', 'step_number')
         else:
             # When adding a new step, show all existing steps
-            self.fields['parent'].queryset = ExpStep.objects.all().select_related(
+            self.fields['parent'].queryset = ExperimentStep.objects.all().select_related(
                 'flow__exp'
             ).order_by('flow__exp__exp_name', 'flow__flow_name', 'step_name', 'step_number')
         

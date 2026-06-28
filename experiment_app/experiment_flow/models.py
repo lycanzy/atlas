@@ -41,7 +41,8 @@ class UserProfile(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.research_group.group_name if self.research_group else '无研究组'}"
 
-class Project(models.Model):
+class ProjectCategory(models.Model):
+    """Project category/program metadata used to group generated project records."""
     
     project_name = models.CharField(max_length = 50)
     project_code = models.CharField(max_length = 3, null = True, blank = True)
@@ -49,8 +50,9 @@ class Project(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = "Team Code"
-        verbose_name_plural = "Team Codes"
+        db_table = "experiment_flow_project"
+        verbose_name = "Project Category"
+        verbose_name_plural = "Project Categories"
 
     def generate_experiment_name(self):
         # Business naming: team code (e.g. PCA) + sequence => project code (e.g. PCA001).
@@ -77,30 +79,34 @@ class Project(models.Model):
             return str(self.project_name)
         return "未命名项目"
 
-class Exp(models.Model):
+class Project(models.Model):
+    """Generated project record, such as AFE001."""
 
     exp_name = models.CharField(max_length = 30)
     exp_description = models.TextField(blank = True, null = True)
     created_on = models.DateTimeField(auto_now_add=True)
-    project = models.ForeignKey(Project, on_delete = models.CASCADE, related_name = 'experiment', null = True)
+    project = models.ForeignKey(ProjectCategory, on_delete = models.CASCADE, related_name = 'experiment', null = True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='experiments')
 
     class Meta:
+        db_table = "experiment_flow_exp"
         verbose_name = "Project"
         verbose_name_plural = "Projects"
 
     def __str__(self):
-        return str(self.exp_name) if self.exp_name else "未命名实验"
+        return str(self.exp_name) if self.exp_name else "未命名项目"
     
-class ExpFlow(models.Model):
+class Experiment(models.Model):
+    """Experiment under a project, such as AFE001AA."""
 
     flow_name = models.CharField(max_length = 2)
     flow_description = models.TextField(blank = True, null = True)
-    exp = models.ForeignKey(Exp, on_delete = models.CASCADE, related_name = 'flow', null = True)
+    exp = models.ForeignKey(Project, on_delete = models.CASCADE, related_name = 'flow', null = True)
     created_on = models.DateTimeField(auto_now_add=True, null = True)
     full_flow = models.CharField(max_length=35, editable=False, db_index=True, null = True)  # Adding index for faster queries
 
     class Meta:
+        db_table = "experiment_flow_expflow"
         verbose_name = "Experiment"
         verbose_name_plural = "Experiments"
 
@@ -108,7 +114,7 @@ class ExpFlow(models.Model):
         if self.flow_name:
             # Check if the input contains exactly 2 alphabetic characters
             if not (len(self.flow_name) == 2 and self.flow_name.isalpha()):
-                raise ValidationError('流程代码必须是 2 个英文字母。')
+                raise ValidationError('实验代码必须是 2 个英文字母。')
             # Convert to uppercase
             self.flow_name = self.flow_name.upper()
 
@@ -126,7 +132,7 @@ class ExpFlow(models.Model):
             return str(self.full_flow)
         if self.flow_name:
             return str(self.flow_name)
-        return "未命名流程"
+        return "未命名实验"
     
     @property
     def flow(self):
@@ -135,7 +141,8 @@ class ExpFlow(models.Model):
             return f"{self.exp.exp_name}{self.flow_name}"
         return self.flow_name
     
-class ExpStep(models.Model):
+class ExperimentStep(models.Model):
+    """Process step inside an experiment, such as AFE001AA-MX00."""
 
     STATUS_CHOICES = [
         ("Planned", "Planned"),
@@ -165,8 +172,13 @@ class ExpStep(models.Model):
         default="Planned"
     )
 
-    flow = models.ForeignKey(ExpFlow, on_delete = models.CASCADE, related_name = 'step', null = True)
+    flow = models.ForeignKey(Experiment, on_delete = models.CASCADE, related_name = 'step', null = True)
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, related_name='child', null=True, blank=True)
+
+    class Meta:
+        db_table = "experiment_flow_expstep"
+        verbose_name = "Experiment Step"
+        verbose_name_plural = "Experiment Steps"
 
     def clean(self):
         super().clean()
@@ -199,7 +211,7 @@ class ExpStep(models.Model):
     def save(self, *args, **kwargs):
         if not self.step_number:  # Only set number if it's not already set
             # Get the highest number for this step name in this flow
-            existing_steps = ExpStep.objects.filter(
+            existing_steps = ExperimentStep.objects.filter(
                 flow=self.flow,
                 step_name=self.step_name
             ).exclude(pk=self.pk)  # Exclude self if updating
@@ -268,7 +280,7 @@ class Sample(models.Model):
 
     sample_name = models.CharField(max_length = 50)
     created_on = models.DateTimeField(auto_now_add=True)
-    flow = models.ForeignKey(ExpStep, on_delete = models.CASCADE, related_name = 'sample', null = True)
+    flow = models.ForeignKey(ExperimentStep, on_delete = models.CASCADE, related_name = 'sample', null = True)
 
     def __str__(self):
         return str(self.sample_name) if self.sample_name else "未命名样品"
@@ -359,7 +371,7 @@ class RawMaterial(models.Model):
 class StepRawMaterialUsage(models.Model):
     """Raw material usage record for a specific experiment step"""
 
-    step = models.ForeignKey(ExpStep, on_delete=models.CASCADE, related_name='raw_material_usages')
+    step = models.ForeignKey(ExperimentStep, on_delete=models.CASCADE, related_name='raw_material_usages')
     raw_material = models.ForeignKey(RawMaterial, on_delete=models.PROTECT, related_name='step_usages')
     quantity = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
     unit = models.CharField(max_length=50, blank=True, null=True)
@@ -380,7 +392,7 @@ class StepRawMaterialUsage(models.Model):
         return f"{self.step} uses {self.raw_material}{amount}"
 
 # Signal to update all flow identifiers when experiment changes
-@receiver(post_save, sender=Exp)
+@receiver(post_save, sender=Project)
 def update_flow_identifiers(sender, instance, **kwargs):
     # Update all related flows
     for flow in instance.flow.all():
@@ -391,8 +403,8 @@ def update_flow_identifiers(sender, instance, **kwargs):
             step.full_step = f"{flow.full_flow}-{step.full_step_name}"
             step.save(update_fields=['full_step'])
 
-# Signal to update ExpStep.full_step when flow changes
-@receiver(post_save, sender=ExpFlow)
+# Signal to update ExperimentStep.full_step when flow changes
+@receiver(post_save, sender=Experiment)
 def update_step_identifiers(sender, instance, **kwargs):
     # Update all related steps
     for step in instance.step.all():
