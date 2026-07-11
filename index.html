@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atlas Experiment Tracking Demo</title>
+    <meta
+      name="description"
+      content="A live preview for research teams evaluating Atlas experiment tracking workflows."
+    />
+    <style>
+      :root {
+        --background: #f5f7f4;
+        --foreground: #17201b;
+        --muted: #66746d;
+        --line: #dce4dd;
+        --panel: #ffffff;
+        --panel-alt: #eef4f1;
+        --accent: #1f7a5b;
+        --accent-strong: #0f5a43;
+        --blue: #2f628f;
+        --ink: #102019;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--foreground);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      a { color: inherit; text-decoration: none; }
+      .hero {
+        min-height: 92vh;
+        padding: 24px clamp(18px, 4vw, 56px) 56px;
+        background:
+          linear-gradient(135deg, rgba(31, 122, 91, 0.12), transparent 36%),
+          linear-gradient(180deg, #ffffff 0%, #eef4f1 100%);
+        border-bottom: 1px solid var(--line);
+      }
+      .nav {
+        align-items: center;
+        display: flex;
+        justify-content: space-between;
+        margin: 0 auto 48px;
+        max-width: 1240px;
+      }
+      .brand, .nav-links, .hero-actions, .metric-row, .dashboard-header, .chart-head, .step-row {
+        align-items: center;
+        display: flex;
+      }
+      .brand { color: var(--ink); font-weight: 800; gap: 10px; }
+      .brand-mark {
+        align-items: center;
+        background: var(--accent);
+        border-radius: 8px;
+        color: white;
+        display: inline-flex;
+        height: 34px;
+        justify-content: center;
+        width: 34px;
+      }
+      .nav-links { color: var(--muted); font-size: 14px; gap: 22px; }
+      .hero-grid {
+        align-items: center;
+        display: grid;
+        gap: clamp(28px, 5vw, 72px);
+        grid-template-columns: minmax(0, 0.9fr) minmax(520px, 1.1fr);
+        margin: 0 auto;
+        max-width: 1240px;
+      }
+      .hero-copy { max-width: 620px; }
+      .eyebrow {
+        color: var(--accent-strong);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        margin: 0 0 12px;
+        text-transform: uppercase;
+      }
+      h1, h2, h3, p { margin-top: 0; }
+      h1 {
+        color: var(--ink);
+        font-size: clamp(44px, 6vw, 76px);
+        line-height: 0.96;
+        margin-bottom: 24px;
+      }
+      h2 {
+        color: var(--ink);
+        font-size: clamp(30px, 4vw, 48px);
+        line-height: 1.02;
+        margin-bottom: 16px;
+      }
+      h3 { color: var(--ink); font-size: 20px; margin-bottom: 10px; }
+      .lede, .trace-copy p, .trial p, .workflow-card p {
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.65;
+      }
+      .hero-actions { flex-wrap: wrap; gap: 12px; margin: 30px 0; }
+      .button {
+        border-radius: 8px;
+        display: inline-flex;
+        font-weight: 800;
+        min-height: 46px;
+        padding: 13px 18px;
+      }
+      .button.primary { background: var(--accent); color: white; }
+      .button.secondary { background: white; border: 1px solid var(--line); color: var(--ink); }
+      .metric-row { border-top: 1px solid var(--line); gap: 28px; padding-top: 22px; }
+      .metric-row strong { color: var(--ink); display: block; font-size: 28px; }
+      .metric-row span { color: var(--muted); display: block; font-size: 13px; }
+      .product-frame {
+        background: linear-gradient(145deg, #1f7a5b, #2f628f);
+        border-radius: 8px;
+        box-shadow: 0 28px 70px rgba(18, 43, 34, 0.22);
+        padding: 12px;
+      }
+      .app-shell {
+        background: #f7faf8;
+        border-radius: 6px;
+        display: grid;
+        grid-template-columns: 235px 1fr;
+        min-height: 560px;
+        overflow: hidden;
+      }
+      .sidebar { background: #16221c; color: white; padding: 22px; }
+      .sidebar-title { font-size: 13px; font-weight: 800; margin-bottom: 18px; text-transform: uppercase; }
+      .search { display: grid; gap: 7px; margin-bottom: 18px; }
+      .search span { color: #b8c6be; font-size: 12px; }
+      .search input {
+        background: #24352c;
+        border: 1px solid #3a5145;
+        border-radius: 7px;
+        color: white;
+        min-height: 38px;
+        padding: 8px 10px;
+        width: 100%;
+      }
+      .project-list { display: grid; gap: 10px; }
+      .project-card {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        padding: 12px;
+      }
+      .project-card:first-child { background: rgba(31, 122, 91, 0.45); }
+      .project-card span, .step-row span, .project-card small { display: block; }
+      .project-card span { color: #cbd8d1; font-size: 12px; line-height: 1.35; margin-top: 4px; }
+      .project-card small { color: #9fbaaf; font-weight: 800; }
+      .dashboard { padding: 28px; }
+      .dashboard-header { justify-content: space-between; margin-bottom: 22px; }
+      .crumb { color: var(--accent-strong); display: block; font-size: 12px; font-weight: 800; margin-bottom: 5px; }
+      .dashboard h2 { font-size: 28px; margin: 0; }
+      .status-pill {
+        background: #e6f4ed;
+        border-radius: 999px;
+        color: var(--accent-strong);
+        font-size: 12px;
+        font-weight: 800;
+        padding: 8px 12px;
+      }
+      .chart-card, .trial-panel, .workflow-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .chart-card { margin-bottom: 18px; padding: 18px; }
+      .chart-head { justify-content: space-between; margin-bottom: 18px; }
+      .chart-head span { color: var(--muted); }
+      .chart-head strong { color: var(--accent-strong); }
+      .bars {
+        align-items: end;
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(6, 1fr);
+        height: 150px;
+      }
+      .bars span {
+        background: linear-gradient(180deg, #2f628f, #1f7a5b);
+        border-radius: 6px 6px 0 0;
+        min-height: 30px;
+      }
+      .step-list { display: grid; gap: 10px; }
+      .step-row {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        gap: 12px;
+        padding: 13px 14px;
+      }
+      .node { background: var(--accent); border-radius: 50%; height: 12px; width: 12px; }
+      .step-row div { flex: 1; }
+      .step-row strong { display: block; font-size: 13px; }
+      .step-row span { color: var(--muted); font-size: 13px; margin-top: 2px; }
+      .step-row small { color: var(--blue); font-weight: 800; }
+      .section, .trace-section, .trial {
+        margin: 0 auto;
+        max-width: 1240px;
+        padding: 78px clamp(18px, 4vw, 56px);
+      }
+      .section-heading { max-width: 760px; }
+      .workflow-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(4, 1fr);
+        margin-top: 30px;
+      }
+      .workflow-card { padding: 22px; }
+      .workflow-card > span {
+        align-items: center;
+        background: var(--panel-alt);
+        border-radius: 8px;
+        color: var(--accent-strong);
+        display: inline-flex;
+        font-weight: 900;
+        height: 38px;
+        justify-content: center;
+        margin-bottom: 28px;
+        width: 38px;
+      }
+      .workflow-card p { font-size: 15px; margin-bottom: 0; }
+      .trace-section {
+        align-items: center;
+        display: grid;
+        gap: clamp(28px, 5vw, 72px);
+        grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+      }
+      .trace-copy ul {
+        color: var(--ink);
+        display: grid;
+        gap: 12px;
+        line-height: 1.45;
+        list-style: none;
+        margin: 28px 0 0;
+        padding: 0;
+      }
+      .trace-copy li { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 13px 14px; }
+      .genealogy {
+        background:
+          linear-gradient(90deg, rgba(23, 32, 27, 0.05) 1px, transparent 1px),
+          linear-gradient(0deg, rgba(23, 32, 27, 0.05) 1px, transparent 1px),
+          #ffffff;
+        background-size: 34px 34px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 430px;
+        position: relative;
+      }
+      .graph-node {
+        align-items: center;
+        border-radius: 8px;
+        box-shadow: 0 14px 34px rgba(18, 43, 34, 0.15);
+        display: flex;
+        font-weight: 900;
+        justify-content: center;
+        min-height: 56px;
+        padding: 12px 16px;
+        position: absolute;
+        text-align: center;
+        z-index: 2;
+      }
+      .graph-node.material { background: #fff5df; color: #88580f; left: 7%; top: 42%; }
+      .graph-node.step { background: #e6f4ed; color: var(--accent-strong); }
+      .graph-node.a { left: 31%; top: 22%; }
+      .graph-node.b { left: 52%; top: 42%; }
+      .graph-node.c { left: 31%; top: 64%; }
+      .graph-node.final { background: #e8f0f8; color: #1e4f78; right: 7%; top: 42%; }
+      .edge {
+        background: #9eb1a8;
+        display: block;
+        height: 3px;
+        position: absolute;
+        transform-origin: left center;
+        z-index: 1;
+      }
+      .edge-one { left: 22%; top: 50%; transform: rotate(-29deg); width: 130px; }
+      .edge-two { left: 42%; top: 33%; transform: rotate(33deg); width: 138px; }
+      .edge-three { left: 42%; top: 72%; transform: rotate(-31deg); width: 135px; }
+      .edge-four { left: 65%; top: 50%; width: 118px; }
+      .trial {
+        align-items: stretch;
+        display: grid;
+        gap: 28px;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.65fr);
+        padding-bottom: 96px;
+      }
+      .trial-panel { padding: 24px; }
+      .trial-panel strong { color: var(--ink); display: block; font-size: 18px; margin-bottom: 14px; }
+      .trial-panel ol { color: var(--muted); line-height: 1.55; margin: 0; padding-left: 20px; }
+      .trial-panel li + li { margin-top: 10px; }
+      @media (max-width: 980px) {
+        .hero-grid, .trace-section, .trial { grid-template-columns: 1fr; }
+        .product-frame { overflow-x: auto; }
+        .app-shell { min-width: 720px; }
+        .workflow-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 680px) {
+        .hero { min-height: auto; }
+        .nav { align-items: flex-start; gap: 18px; }
+        .nav, .nav-links, .metric-row { flex-direction: column; }
+        .nav-links, .metric-row { align-items: flex-start; }
+        h1 { font-size: 42px; }
+        .workflow-grid { grid-template-columns: 1fr; }
+        .genealogy { min-height: 360px; }
+        .graph-node { font-size: 12px; min-height: 46px; padding: 10px 12px; }
+        .edge { opacity: 0.7; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <nav class="nav" aria-label="Atlas preview navigation">
+          <div class="brand"><span class="brand-mark" aria-hidden="true">A</span><span>Atlas</span></div>
+          <div class="nav-links">
+            <a href="#workflow">Workflow</a>
+            <a href="#traceability">Traceability</a>
+            <a href="#trial">Team trial</a>
+          </div>
+        </nav>
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">Experiment Tracking App</p>
+            <h1>One place for research projects, process steps, and sample genealogy.</h1>
+            <p class="lede">
+              Atlas helps battery and materials teams track experiments from project creation through
+              equipment use, raw material batches, step status, and cross-experiment lineage.
+            </p>
+            <div class="hero-actions" aria-label="Primary information">
+              <a class="button primary" href="#trial">Try the workflow</a>
+              <a class="button secondary" href="#traceability">See traceability</a>
+            </div>
+            <div class="metric-row" aria-label="Demo metrics">
+              <div><strong>36</strong><span>active experiments</span></div>
+              <div><strong>128</strong><span>tracked steps</span></div>
+              <div><strong>3</strong><span>research groups</span></div>
+            </div>
+          </div>
+          <div class="product-frame" aria-label="Atlas dashboard preview">
+            <div class="app-shell">
+              <aside class="sidebar">
+                <div class="sidebar-title">Projects</div>
+                <label class="search"><span>Search</span><input value="AFE001" readonly aria-label="Search preview" /></label>
+                <div class="project-list">
+                  <article class="project-card"><div><strong>AFE001</strong><span>Anode-free Engineering</span></div><small>AFE</small></article>
+                  <article class="project-card"><div><strong>GNY004</strong><span>Gel electrolyte validation</span></div><small>GNY</small></article>
+                  <article class="project-card"><div><strong>PCA002</strong><span>Pouch cell assembly controls</span></div><small>PCA</small></article>
+                </div>
+              </aside>
+              <section class="dashboard">
+                <header class="dashboard-header">
+                  <div><span class="crumb">AFE001 / AA</span><h2>Electrolyte wetting run</h2></div>
+                  <span class="status-pill">In progress</span>
+                </header>
+                <div class="chart-card">
+                  <div class="chart-head"><span>Cumulative experiments</span><strong>+18% this month</strong></div>
+                  <div class="bars" aria-hidden="true">
+                    <span style="height:34%"></span><span style="height:48%"></span><span style="height:42%"></span>
+                    <span style="height:65%"></span><span style="height:74%"></span><span style="height:88%"></span>
+                  </div>
+                </div>
+                <div class="step-list">
+                  <div class="step-row"><span class="node" aria-hidden="true"></span><div><strong>AFE001AA-MX00</strong><span>Mix slurry</span></div><small>Completed</small></div>
+                  <div class="step-row"><span class="node" aria-hidden="true"></span><div><strong>AFE001AA-CT01</strong><span>Coat collector</span></div><small>Completed</small></div>
+                  <div class="step-row"><span class="node" aria-hidden="true"></span><div><strong>AFE001AA-DR02</strong><span>Dry electrode</span></div><small>Planned</small></div>
+                  <div class="step-row"><span class="node" aria-hidden="true"></span><div><strong>AFE001AA-AS03</strong><span>Assemble cell</span></div><small>Planned</small></div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="section" id="workflow">
+        <div class="section-heading">
+          <p class="eyebrow">Workflow</p>
+          <h2>Designed around how lab teams actually record work.</h2>
+        </div>
+        <div class="workflow-grid">
+          <article class="workflow-card"><span>1</span><h3>Create a project</h3><p>Assign a research group, owner, description, and project code.</p></article>
+          <article class="workflow-card"><span>2</span><h3>Add experiments</h3><p>Generate IDs under the project and keep descriptions editable inline.</p></article>
+          <article class="workflow-card"><span>3</span><h3>Record process steps</h3><p>Capture equipment, status, recipe, notes, and material usage.</p></article>
+          <article class="workflow-card"><span>4</span><h3>Link genealogy</h3><p>Connect parent steps and raw material batches for downstream traceability.</p></article>
+        </div>
+      </section>
+      <section class="trace-section" id="traceability">
+        <div class="trace-copy">
+          <p class="eyebrow">Traceability</p>
+          <h2>From raw batch to finished cell, the lineage stays visible.</h2>
+          <p>The genealogy view shows step nodes, material nodes, and directed links without forcing the team to leave the experiment detail page.</p>
+          <ul>
+            <li>Team-scoped access so each research group sees only its projects</li>
+            <li>Auto-numbered project and experiment IDs such as AFE001AA</li>
+            <li>Process steps with equipment, recipe, status, notes, and material usage</li>
+            <li>Step genealogy that links upstream and downstream samples across experiments</li>
+            <li>Equipment and raw material batch databases for traceable lab records</li>
+            <li>Search across projects, experiments, steps, materials, and teams</li>
+          </ul>
+        </div>
+        <div class="genealogy" aria-label="Sample genealogy preview">
+          <div class="graph-node material">LiFSI-24A</div>
+          <div class="graph-node step a">MX00</div>
+          <div class="graph-node step b">CT01</div>
+          <div class="graph-node step c">DR02</div>
+          <div class="graph-node final">Cell AFE001AA</div>
+          <span class="edge edge-one"></span><span class="edge edge-two"></span><span class="edge edge-three"></span><span class="edge edge-four"></span>
+        </div>
+      </section>
+      <section class="trial" id="trial">
+        <div>
+          <p class="eyebrow">Team trial</p>
+          <h2>Use this live site as the shared preview for Atlas.</h2>
+          <p>
+            This deployment is a team-friendly demo page for evaluating the workflow, terminology,
+            and interface direction. The full app remains the Django project in the workspace for
+            local database-backed testing.
+          </p>
+        </div>
+        <div class="trial-panel">
+          <strong>Recommended trial path</strong>
+          <ol>
+            <li>Review project and experiment naming with the team.</li>
+            <li>Confirm required fields for process steps and materials.</li>
+            <li>Validate genealogy terminology against current lab practice.</li>
+            <li>Use feedback to prioritize the next Django app iteration.</li>
+          </ol>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
