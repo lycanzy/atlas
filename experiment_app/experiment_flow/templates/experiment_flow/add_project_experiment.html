@@ -7,11 +7,11 @@
     {{ error }}
 </div>
 {% endif %}
-<form method="post" action="{% url 'add_flow' experiment.id %}">
+<form method="post" action="{% url 'add_project_experiment' experiment.id %}">
     {% csrf_token %}
     <div style="margin-bottom: 1rem;">
         <label for="name" style="display:block; margin-bottom:0.5rem;">实验代码（仅 2 个英文字母）：</label>
-        <input type="text" name="flow_name" required maxlength="2" pattern="[A-Za-z]{2}" 
+        <input type="text" name="experiment_code" required maxlength="2" pattern="[A-Za-z]{2}"
                style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;"
                title="请输入 2 个英文字母">
     </div>

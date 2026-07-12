@@ -1,14 +1,14 @@
 from django.test import TestCase
-from experiment_flow.forms import ExpStepForm, ExpFlowForm, RawMaterialForm
-from experiment_flow.models import StepNameTemplate, ExpStep, ExpFlow, Exp, Project, ResearchGroup, User
+from experiment_flow.forms import ExperimentStepForm, ExperimentForm, RawMaterialForm
+from experiment_flow.models import StepNameTemplate, ExperimentStep, Experiment, Project, ProjectCategory, ResearchGroup, User, Equipment
 
 class FormTests(TestCase):
     def setUp(self):
         self.group = ResearchGroup.objects.create(group_name="Test Group")
         self.user = User.objects.create_user(username="testuser", password="password")
-        self.project = Project.objects.create(project_name="Test Project", project_code="TPR", group=self.group)
-        self.exp = Exp.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
-        self.flow = ExpFlow.objects.create(flow_name="AA", exp=self.exp)
+        self.project = ProjectCategory.objects.create(project_name="Test ProjectCategory", project_code="TPR", group=self.group)
+        self.exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        self.experiment = Experiment.objects.create(experiment_code="AA", project=self.exp)
         
         # Create templates
         StepNameTemplate.objects.create(step_code="AA", step_label="Step A")
@@ -20,7 +20,7 @@ class FormTests(TestCase):
             'step_description': 'Test Description',
             'status': 'Planned'
         }
-        form = ExpStepForm(data=form_data, flow=self.flow)
+        form = ExperimentStepForm(data=form_data, experiment=self.experiment)
         self.assertTrue(form.is_valid())
 
     def test_step_form_invalid_name(self):
@@ -30,34 +30,45 @@ class FormTests(TestCase):
             'step_name': 'CC', 
             'status': 'Planned'
         }
-        form = ExpStepForm(data=form_data, flow=self.flow)
+        form = ExperimentStepForm(data=form_data, experiment=self.experiment)
         self.assertFalse(form.is_valid())
         self.assertIn('step_name', form.errors)
 
     def test_step_form_parent_queryset(self):
         # Create some steps
-        step1 = ExpStep.objects.create(step_name="AA", flow=self.flow)
-        step2 = ExpStep.objects.create(step_name="BB", flow=self.flow)
+        step1 = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment)
+        step2 = ExperimentStep.objects.create(step_name="BB", experiment=self.experiment)
         
         # Initialize form for a new step
-        form = ExpStepForm(flow=self.flow)
+        form = ExperimentStepForm(experiment=self.experiment)
         # Parent queryset should include existing steps
-        self.assertIn(step1, form.fields['parent'].queryset)
-        self.assertIn(step2, form.fields['parent'].queryset)
+        self.assertIn(step1, form.fields['parents'].queryset)
+        self.assertIn(step2, form.fields['parents'].queryset)
         
         # Initialize form for editing step1
-        form_edit = ExpStepForm(instance=step1, flow=self.flow)
+        form_edit = ExperimentStepForm(instance=step1, experiment=self.experiment)
         # Parent queryset should NOT include step1 (cannot be own parent)
-        self.assertNotIn(step1, form_edit.fields['parent'].queryset)
-        self.assertIn(step2, form_edit.fields['parent'].queryset)
+        self.assertNotIn(step1, form_edit.fields['parents'].queryset)
+        self.assertIn(step2, form_edit.fields['parents'].queryset)
+
+    def test_step_form_equipment_choices_use_equipment_id(self):
+        equipment = Equipment.objects.create(
+            equipment_name="Vacuum Oven",
+            equipment_id="EQ-OVEN-001",
+            owner=self.user,
+        )
+
+        form = ExperimentStepForm(experiment=self.experiment)
+
+        self.assertEqual(form.fields['tool'].label_from_instance(equipment), "EQ-OVEN-001")
 
     def test_flow_form(self):
-        form_data = {'flow_name': 'AA'}
-        form = ExpFlowForm(data=form_data)
+        form_data = {'experiment_code': 'AA'}
+        form = ExperimentForm(data=form_data)
         self.assertTrue(form.is_valid())
         
-        form_data_invalid = {'flow_name': 'A'} # Too short
-        form = ExpFlowForm(data=form_data_invalid)
+        form_data_invalid = {'experiment_code': 'A'} # Too short
+        form = ExperimentForm(data=form_data_invalid)
         # Validation happens at model level, but ModelForm calls model.clean()
         # Wait, ModelForm validation usually checks max_length but custom clean() might need explicit call or is handled by is_valid() running full_clean()
         # Let's check if is_valid captures model validation errors.

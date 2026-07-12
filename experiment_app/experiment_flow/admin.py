@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Exp, ExpFlow, ExpStep, Project, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, StepRawMaterialUsage
+from .models import Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, StepRawMaterialUsage
 
 # Base admin class with custom CSS
 class BaseModelAdmin(admin.ModelAdmin):
@@ -46,8 +46,8 @@ admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 
 
-@admin.register(Exp)
-class ExpAdmin(BaseModelAdmin):
+@admin.register(Project)
+class ProjectAdmin(BaseModelAdmin):
     readonly_fields = ("created_on",)
     list_display = ("exp_name", "get_team_code", "exp_description", "owner", "created_on")
     search_fields = ("exp_name", "exp_description", "project__project_code", "project__project_name")
@@ -59,14 +59,21 @@ class ExpAdmin(BaseModelAdmin):
         return obj.project.project_code if obj.project else "-"
     get_team_code.short_description = "Team"
 
-@admin.register(ExpFlow)
-class ExpFlowAdmin(BaseModelAdmin):
-    list_display = ("full_flow", "flow_name", "exp", "flow_description", "created_on")
-    search_fields = ("full_flow", "flow_name", "flow_description", "exp__exp_name")
+@admin.register(Experiment)
+class ExperimentAdmin(BaseModelAdmin):
+    list_display = ("full_experiment_code", "experiment_code", "project", "experiment_description", "created_on")
+    search_fields = ("full_experiment_code", "experiment_code", "experiment_description", "project__exp_name")
 
-@admin.register(ExpStep)
-class ExpStepAdmin(BaseModelAdmin):
-    list_display = ("step_name", "flow", "status", "started_on")
+@admin.register(ExperimentStep)
+class ExperimentStepAdmin(BaseModelAdmin):
+    list_display = ("step_name", "experiment", "status", "started_on")
+
+
+@admin.register(ExperimentStepLink)
+class ExperimentStepLinkAdmin(BaseModelAdmin):
+    list_display = ("parent_step", "child_step", "created_on")
+    search_fields = ("parent_step__full_step", "child_step__full_step")
+    readonly_fields = ("created_on",)
 
 @admin.register(ResearchGroup)
 class ResearchGroupAdmin(BaseModelAdmin):
@@ -89,7 +96,7 @@ class ResearchGroupAdmin(BaseModelAdmin):
 
 @admin.register(Sample)
 class SampleAdmin(BaseModelAdmin):
-    list_display = ("sample_name", "flow", "created_on")
+    list_display = ("sample_name", "step", "created_on")
     readonly_fields = ("created_on",)
 
 @admin.register(StepNameTemplate)

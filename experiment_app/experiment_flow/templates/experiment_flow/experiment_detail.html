@@ -32,7 +32,7 @@
     transform: scale(1.2);
 }
 
-/* Compact table headers for both flow and step tables */
+/* Compact table headers for both project_experiment and step tables */
 .table thead th {
     font-size: 0.85rem !important;
     padding: 0.3rem 0.5rem !important;
@@ -46,14 +46,14 @@
     --bs-table-bg: rgba(0, 0, 0, 0.02) !important;
 }
 
-/* Adjust cell padding for more compact look - Flow table rows */
+/* Adjust cell padding for more compact look - Experiment table rows */
 .table td {
     padding: 0.3rem 0.5rem !important;
     vertical-align: middle;
     font-size: 0.85rem;
 }
 
-/* Make flow table cells smaller */
+/* Make experiment table cells smaller */
 .table tbody td {
     font-size: 0.85rem;
 }
@@ -89,7 +89,7 @@
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-/* Compact table headers for both flow and step tables */
+/* Compact table headers for both project_experiment and step tables */
 .table thead th {
     font-size: 0.85rem;
     padding: 0.5rem;
@@ -110,11 +110,11 @@
 }
 
 /* Make nested table more compact */
-#steps-{{ flow.id }} .table {
+#steps-{{ project_experiment.id }} .table {
     margin-bottom: 0;
 }
 
-#steps-{{ flow.id }} .table thead th {
+#steps-{{ project_experiment.id }} .table thead th {
     font-size: 0.8rem;
     padding: 0.4rem 0.5rem;
 }
@@ -154,13 +154,13 @@
     font-size: 1rem;
 }
 
-/* Add Flow Dropdown Styles */
-.add-flow-dropdown {
+/* Add Experiment Dropdown Styles */
+.add-experiment-dropdown {
     position: relative;
     display: inline-block;
 }
 
-.add-flow-btn {
+.add-experiment-btn {
     background: none !important;
     border: none !important;
     padding: 0.25rem 0.5rem;
@@ -170,11 +170,11 @@
     text-decoration: none;
 }
 
-.add-flow-btn:hover {
+.add-experiment-btn:hover {
     color: #0056b3;
 }
 
-.flow-dropdown-menu {
+.experiment-dropdown-menu {
     display: none;
     position: absolute;
     right: 0;
@@ -189,26 +189,26 @@
     overflow-y: auto;
 }
 
-.flow-dropdown-menu.show {
+.experiment-dropdown-menu.show {
     display: block;
 }
 
-.flow-dropdown-item {
+.experiment-dropdown-item {
     padding: 0.5rem 1rem;
     cursor: pointer;
     transition: background 0.2s;
     border-bottom: 1px solid #f0f0f0;
 }
 
-.flow-dropdown-item:last-child {
+.experiment-dropdown-item:last-child {
     border-bottom: none;
 }
 
-.flow-dropdown-item:hover {
+.experiment-dropdown-item:hover {
     background: #f8f9fa;
 }
 
-.flow-dropdown-search {
+.experiment-dropdown-search {
     padding: 0.5rem;
     border-bottom: 1px solid #ddd;
     position: sticky;
@@ -216,7 +216,7 @@
     background: white;
 }
 
-.flow-dropdown-search input {
+.experiment-dropdown-search input {
     width: 100%;
     padding: 0.4rem;
     border: 1px solid #ddd;
@@ -274,8 +274,8 @@
     color: #721c24;
 }
 
-/* Prevent text wrapping in flow descriptions */
-.flow-desc {
+/* Prevent text wrapping in experiment descriptions */
+.experiment-desc {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -343,18 +343,18 @@
                 <th style="width:150px;">实验</th>
                 <th style="width:auto;">描述</th>
                 <th style="width:100px; text-align:center;">
-                    <div class="add-flow-dropdown">
-                        <button class="add-flow-btn" id="addFlowBtn" title="新增实验" data-add-flow-url="{% url 'add_flow' experiment.id %}">
+                    <div class="add-experiment-dropdown">
+                        <button class="add-experiment-btn" id="addExperimentBtn" title="新增实验" data-add-experiment-url="{% url 'add_project_experiment' experiment.id %}">
                             <i class="bi bi-plus-lg"></i>
                         </button>
-                        <div class="flow-dropdown-menu" id="flowDropdownMenu">
-                            <div class="flow-dropdown-search">
-                                <input type="text" id="flowCodeSearch" placeholder="搜索实验代码...">
+                        <div class="experiment-dropdown-menu" id="experimentDropdownMenu">
+                            <div class="experiment-dropdown-search">
+                                <input type="text" id="experimentCodeSearch" placeholder="搜索实验代码...">
                             </div>
-                            {% if available_flow_codes %}
-                                <div id="flowCodeList">
-                                    {% for code in available_flow_codes %}
-                                        <div class="flow-dropdown-item" data-code="{{ code }}">{{ code }}</div>
+                            {% if available_experiment_codes %}
+                                <div id="experimentCodeList">
+                                    {% for code in available_experiment_codes %}
+                                        <div class="experiment-dropdown-item" data-code="{{ code }}">{{ code }}</div>
                                     {% endfor %}
                                 </div>
                             {% else %}
@@ -366,28 +366,28 @@
             </tr>
         </thead>
         <tbody>
-            {% for flow in flows %}
-            <!-- Flow row -->
+            {% for project_experiment in project_experiments %}
+            <!-- Experiment row -->
             <tr>
                 <!-- Expand/collapse button -->
                 <td class="text-center">
-                    <button type="button" class="btn-no-style expand-btn" data-flow-id="{{ flow.id }}">
+                    <button type="button" class="btn-no-style expand-btn" data-experiment-id="{{ project_experiment.id }}">
                         <i class="bi bi-chevron-right"></i>
                     </button>
                 </td>
-                <td>{{ flow.full_flow }}</td>
+                <td>{{ project_experiment.full_experiment_code }}</td>
                 <td>
-                    <span class="flow-desc" data-flow-id="{{ flow.id }}">{{ flow.flow_description | default:"无" }}</span>
+                    <span class="experiment-desc" data-experiment-id="{{ project_experiment.id }}">{{ project_experiment.experiment_description | default:"无" }}</span>
                 </td>
                 <td class="text-center">
                     <div class="table-action-group">
-                        <button type="button" class="btn-no-style add-step-btn" 
-                                data-exp-id="{{ experiment.id }}" 
-                                data-flow-id="{{ flow.id }}" 
+                        <button type="button" class="btn-no-style add-step-btn"
+                                data-exp-id="{{ experiment.id }}"
+                                data-experiment-id="{{ project_experiment.id }}"
                                 title="新增步骤">
                             <i class="bi bi-plus-lg"></i>
                         </button>
-                        <a href="{% url 'delete_flow' experiment.id flow.id %}" class="btn-no-style" title="删除实验">
+                        <a href="{% url 'delete_project_experiment' experiment.id project_experiment.id %}" class="btn-no-style" title="删除实验">
                             <i class="bi bi-trash"></i>
                         </a>
                     </div>
@@ -395,25 +395,26 @@
             </tr>
 
             <!-- Collapsible row for steps -->
-            <tr id="steps-{{ flow.id }}" class="bg-light steps-row" style="display:none;">
+            <tr id="steps-{{ project_experiment.id }}" class="bg-light steps-row" style="display:none;">
                 <td colspan="4" class="p-0">
-                    <div class="d-flex justify-content-end align-items-center p-2 bg-white border-bottom">
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-sm btn-primary copy-steps-btn" data-flow-id="{{ flow.id }}" style="display:none;">
-                                <i class="bi bi-clipboard"></i> 复制步骤
+                    <div class="step-selection-bar" data-experiment-id="{{ project_experiment.id }}" hidden>
+                        <span class="step-selection-count" id="selected-count-{{ project_experiment.id }}">已选 0</span>
+                        <div class="step-selection-actions">
+                            <button class="btn btn-sm btn-outline-primary copy-steps-btn" data-experiment-id="{{ project_experiment.id }}" style="display:none;">
+                                <i class="bi bi-clipboard"></i> 复制
                             </button>
-                            <div class="btn-group" role="group" style="display:none;" id="bulk-status-group-{{ flow.id }}">
-                                <button type="button" class="btn btn-sm btn-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="bi bi-check-circle"></i> 更新状态
+                            <div class="btn-group" role="group" style="display:none;" id="bulk-status-group-{{ project_experiment.id }}">
+                                <button type="button" class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-check-circle"></i> 状态
                                 </button>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item bulk-status-update" href="#" data-flow-id="{{ flow.id }}" data-status="Planned">标记为计划中</a></li>
-                                    <li><a class="dropdown-item bulk-status-update" href="#" data-flow-id="{{ flow.id }}" data-status="Completed">标记为已完成</a></li>
-                                    <li><a class="dropdown-item bulk-status-update" href="#" data-flow-id="{{ flow.id }}" data-status="Canceled">标记为已取消</a></li>
+                                    <li><a class="dropdown-item bulk-status-update" href="#" data-experiment-id="{{ project_experiment.id }}" data-status="Planned">标记为计划中</a></li>
+                                    <li><a class="dropdown-item bulk-status-update" href="#" data-experiment-id="{{ project_experiment.id }}" data-status="Completed">标记为已完成</a></li>
+                                    <li><a class="dropdown-item bulk-status-update" href="#" data-experiment-id="{{ project_experiment.id }}" data-status="Canceled">标记为已取消</a></li>
                                 </ul>
                             </div>
-                            <button class="btn btn-sm btn-danger delete-steps-btn" data-flow-id="{{ flow.id }}" style="display:none;">
-                                <i class="bi bi-trash"></i> 删除步骤
+                            <button class="btn btn-sm btn-outline-danger delete-steps-btn" data-experiment-id="{{ project_experiment.id }}" style="display:none;">
+                                <i class="bi bi-trash"></i> 删除
                             </button>
                         </div>
                     </div>
@@ -421,7 +422,7 @@
                         <thead class="table-secondary">
                             <tr>
                                 <th style="width:40px;">
-                                    <input type="checkbox" class="form-check-input select-all-steps" data-flow-id="{{ flow.id }}" title="全选步骤">
+                                    <input type="checkbox" class="form-check-input select-all-steps" data-experiment-id="{{ project_experiment.id }}" title="全选步骤">
                                 </th>
                                 <th style="width:200px;">步骤编号</th>
                                 <th style="width:80px;">序号</th>
@@ -431,9 +432,9 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for step in flow.step.all|dictsort:"step_num" %}
+                            {% for step in project_experiment.steps.all|dictsort:"step_num" %}
                             <tr>
-                                <td><input type="checkbox" class="form-check-input step-checkbox" data-step-id="{{ step.id }}" data-flow-id="{{ flow.id }}"></td>
+                                <td><input type="checkbox" class="form-check-input step-checkbox" data-step-id="{{ step.id }}" data-experiment-id="{{ project_experiment.id }}"></td>
                                 <td>{{ step.full_step }}</td>
                                 <td>{{ step.step_num }}</td>
                                 <td>
@@ -448,11 +449,11 @@
                                 </td>
                                 <td class="text-center">
                                     <div class="table-action-group">
-                                        <button type="button" class="btn-no-style edit-step-btn" 
-                                                data-step-id="{{ step.id }}" data-flow-id="{{ flow.id }}" data-exp-id="{{ experiment.id }}">
+                                        <button type="button" class="btn-no-style edit-step-btn"
+                                                data-step-id="{{ step.id }}" data-experiment-id="{{ project_experiment.id }}" data-exp-id="{{ experiment.id }}">
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <a href="{% url 'delete_step' experiment.id flow.id step.id %}" class="btn-no-style">
+                                        <a href="{% url 'delete_step' experiment.id project_experiment.id step.id %}" class="btn-no-style">
                                             <i class="bi bi-trash"></i>
                                         </a>
                                         <button type="button"
@@ -539,14 +540,14 @@
             </div>
             <div class="modal-body">
 	                <p class="mb-3">将复制 <strong><span id="copyStepsCount">0</span> 个步骤</strong></p>
-                
+
                 <div class="mb-3">
-	                    <label for="targetFlowId" class="form-label">目标实验编号</label>
-                    <input type="text" class="form-control" id="targetFlowId" 
+	                    <label for="targetExperimentId" class="form-label">目标实验编号</label>
+                    <input type="text" class="form-control" id="targetExperimentId"
 	                           placeholder="例如 {{ experiment.exp_name }}AA、{{ experiment.exp_name }}MX，或其他项目中的实验">
 	                    <div class="form-text">请输入完整实验编号（例如 MLO001AA）</div>
                 </div>
-                
+
                 <div id="copyStepsError" class="alert alert-danger d-none"></div>
             </div>
             <div class="modal-footer">
@@ -599,44 +600,44 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// Add Flow dropdown is initialized early so unrelated page scripts cannot break it.
-(function initAddFlowDropdown() {
-    const addFlowBtn = document.getElementById('addFlowBtn');
-    const flowDropdownMenu = document.getElementById('flowDropdownMenu');
-    const flowCodeSearch = document.getElementById('flowCodeSearch');
-    const flowCodeList = document.getElementById('flowCodeList');
+// Add Experiment dropdown is initialized early so unrelated page scripts cannot break it.
+(function initAddExperimentDropdown() {
+    const addExperimentBtn = document.getElementById('addExperimentBtn');
+    const experimentDropdownMenu = document.getElementById('experimentDropdownMenu');
+    const experimentCodeSearch = document.getElementById('experimentCodeSearch');
+    const experimentCodeList = document.getElementById('experimentCodeList');
 
-    if (!addFlowBtn || !flowDropdownMenu) {
+    if (!addExperimentBtn || !experimentDropdownMenu) {
         return;
     }
 
     function positionDropdown() {
-        const rect = addFlowBtn.getBoundingClientRect();
-        flowDropdownMenu.style.position = 'fixed';
-        flowDropdownMenu.style.top = `${rect.bottom + 6}px`;
-        flowDropdownMenu.style.right = 'auto';
-        flowDropdownMenu.style.left = `${Math.max(12, rect.right - flowDropdownMenu.offsetWidth)}px`;
-        flowDropdownMenu.style.zIndex = '2000';
+        const rect = addExperimentBtn.getBoundingClientRect();
+        experimentDropdownMenu.style.position = 'fixed';
+        experimentDropdownMenu.style.top = `${rect.bottom + 6}px`;
+        experimentDropdownMenu.style.right = 'auto';
+        experimentDropdownMenu.style.left = `${Math.max(12, rect.right - experimentDropdownMenu.offsetWidth)}px`;
+        experimentDropdownMenu.style.zIndex = '2000';
     }
 
     function closeDropdown() {
-        flowDropdownMenu.classList.remove('show');
+        experimentDropdownMenu.classList.remove('show');
     }
 
-    addFlowBtn.addEventListener('click', function(e) {
+    addExperimentBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        flowDropdownMenu.classList.toggle('show');
-        if (flowDropdownMenu.classList.contains('show')) {
+        experimentDropdownMenu.classList.toggle('show');
+        if (experimentDropdownMenu.classList.contains('show')) {
             positionDropdown();
-            if (flowCodeSearch) {
-                flowCodeSearch.focus();
+            if (experimentCodeSearch) {
+                experimentCodeSearch.focus();
             }
         }
     });
 
     document.addEventListener('click', function(e) {
-        if (!flowDropdownMenu.contains(e.target) && !addFlowBtn.contains(e.target)) {
+        if (!experimentDropdownMenu.contains(e.target) && !addExperimentBtn.contains(e.target)) {
             closeDropdown();
         }
     });
@@ -644,31 +645,31 @@ function getCookie(name) {
     window.addEventListener('resize', closeDropdown);
     window.addEventListener('scroll', closeDropdown, true);
 
-    if (flowCodeSearch && flowCodeList) {
-        flowCodeSearch.addEventListener('input', function() {
+    if (experimentCodeSearch && experimentCodeList) {
+        experimentCodeSearch.addEventListener('input', function() {
             const searchTerm = this.value.toLowerCase();
-            flowCodeList.querySelectorAll('.flow-dropdown-item').forEach(function(item) {
+            experimentCodeList.querySelectorAll('.experiment-dropdown-item').forEach(function(item) {
                 const code = item.getAttribute('data-code').toLowerCase();
                 item.style.display = code.includes(searchTerm) ? 'block' : 'none';
             });
         });
     }
 
-    if (flowCodeList) {
-        flowCodeList.addEventListener('click', function(e) {
-            const item = e.target.closest('.flow-dropdown-item');
+    if (experimentCodeList) {
+        experimentCodeList.addEventListener('click', function(e) {
+            const item = e.target.closest('.experiment-dropdown-item');
             if (!item) {
                 return;
             }
-            const flowCode = item.getAttribute('data-code');
-            fetch(addFlowBtn.dataset.addFlowUrl, {
+            const experimentCode = item.getAttribute('data-code');
+            fetch(addExperimentBtn.dataset.addExperimentUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRFToken': getCookie('csrftoken')
                 },
-                body: new URLSearchParams({ flow_name: flowCode }).toString()
+                body: new URLSearchParams({ experiment_code: experimentCode }).toString()
             })
                 .then(res => res.json())
                 .then(data => {
@@ -688,13 +689,13 @@ function getCookie(name) {
     }
 })();
 
-// Expand/collapse flows
+// Expand/collapse experiments
 document.querySelectorAll('.expand-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
-        const flowId = btn.getAttribute('data-flow-id');
-        const row = document.getElementById('steps-' + flowId);
+        const experimentId = btn.getAttribute('data-experiment-id');
+        const row = document.getElementById('steps-' + experimentId);
         const icon = btn.querySelector('i');
-        
+
         if (row.style.display === 'none') {
             row.style.display = '';
             icon.className = 'bi bi-chevron-down';
@@ -705,30 +706,30 @@ document.querySelectorAll('.expand-btn').forEach(function(btn) {
     });
 });
 
-// Auto-expand flow if expanded_flow parameter is present in URL
+// Auto-expand experiment if expanded_experiment parameter is present in URL
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
-    const expandedFlowId = urlParams.get('expanded_flow');
+    const expandedExperimentId = urlParams.get('expanded_experiment');
     const highlightStepId = urlParams.get('highlight_step');
-    
-    if (expandedFlowId) {
-        const row = document.getElementById('steps-' + expandedFlowId);
-        const btn = document.querySelector(`.expand-btn[data-flow-id="${expandedFlowId}"]`);
-        
+
+    if (expandedExperimentId) {
+        const row = document.getElementById('steps-' + expandedExperimentId);
+        const btn = document.querySelector(`.expand-btn[data-experiment-id="${expandedExperimentId}"]`);
+
         if (row && btn) {
             row.style.display = '';
             const icon = btn.querySelector('i');
             if (icon) {
                 icon.className = 'bi bi-chevron-down';
             }
-            
-            // Scroll to the flow
+
+            // Scroll to the experiment
             setTimeout(() => {
                 btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 100);
         }
     }
-    
+
     // Highlight the specific step if highlight_step parameter is present
     if (highlightStepId) {
         setTimeout(() => {
@@ -738,10 +739,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Add highlight class
                 stepRow.style.backgroundColor = '#fff3cd';
                 stepRow.style.transition = 'background-color 0.3s ease';
-                
+
                 // Scroll to the step
                 stepRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
+
                 // Remove highlight after 3 seconds
                 setTimeout(() => {
                     stepRow.style.backgroundColor = '';
@@ -758,23 +759,23 @@ function attachInlineHandler(selector, urlPrefix, dataAttr) {
             const id = span.getAttribute(dataAttr);
             const currentText = span.textContent;
             const originalClassName = span.className;
-            
+
             // Create container for input and button
             const container = document.createElement('div');
             container.className = 'inline-edit-container';
-            
+
             // Create input
             const input = document.createElement('input');
             input.type = 'text';
             input.value = currentText;
             input.className = 'form-control form-control-sm inline-edit-input';
-            
+
             // Create save button
             const saveBtn = document.createElement('button');
             saveBtn.className = 'inline-save-btn';
             saveBtn.innerHTML = '<i class="bi bi-check-lg"></i>';
             saveBtn.title = '保存';
-            
+
             container.appendChild(input);
             container.appendChild(saveBtn);
             span.replaceWith(container);
@@ -824,7 +825,7 @@ function attachInlineHandler(selector, urlPrefix, dataAttr) {
     });
 }
 
-attachInlineHandler('.flow-desc', '/update_flow_desc/', 'data-flow-id');
+attachInlineHandler('.experiment-desc', '/update_experiment_desc/', 'data-experiment-id');
 attachInlineHandler('.step-desc', '/update_step_desc/', 'data-step-id');
 
 function buildGenealogyPartialUrl(url) {
@@ -904,15 +905,15 @@ document.getElementById('genealogyModal').addEventListener('hidden.bs.modal', fu
 document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
         const expId = btn.getAttribute('data-exp-id');
-        const flowId = btn.getAttribute('data-flow-id');
+        const experimentId = btn.getAttribute('data-experiment-id');
         const stepId = btn.getAttribute('data-step-id');
-        fetch(`/experiment/${expId}/flow/${flowId}/edit_step/${stepId}/`)
+        fetch(`/experiment/${expId}/project_experiment/${experimentId}/edit_step/${stepId}/`)
             .then(response => response.text())
             .then(html => {
                 document.getElementById('editStepModalBody').innerHTML = html;
                 const modal = new bootstrap.Modal(document.getElementById('editStepModal'));
                 modal.show();
-                
+
                 // Initialize Select2 on the tool field after modal content loads
                 setTimeout(async function() {
                     if ($('#id_tool').length) {
@@ -924,109 +925,17 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
                             allowClear: true
                         });
                     }
-                    
-                    // Setup parent step dropdown
-                    try {
-                        console.log('Setting up parent step dropdown for edit...');
-                        const response = await fetch('/api/steps/');
-                        const data = await response.json();
-                        const steps = data.steps || [];
-                        console.log('Fetched steps:', steps.length);
-                        
-                        const parentInput = document.getElementById('id_parent');
-                        const parentValue = document.getElementById('id_parent_value');
-                        const parentDropdown = document.getElementById('parent-steps-dropdown');
-                        
-                        console.log('Elements found:', { 
-                            parentInput: !!parentInput, 
-                            parentValue: !!parentValue, 
-                            parentDropdown: !!parentDropdown 
+                    if ($('#id_parents').length) {
+                        $('#id_parents').select2({
+                            theme: 'bootstrap-5',
+                            dropdownParent: $('#editStepModal'),
+                            dropdownCssClass: 'lineage-parent-dropdown',
+                            width: '100%',
+                            placeholder: '搜索前置步骤...',
+                            allowClear: true,
+                            closeOnSelect: false
                         });
-                        
-                        if (!parentInput || !parentDropdown || !parentValue) {
-                            console.error('Parent dropdown elements not found!');
-                            return;
-                        }
-                        
-                        function updateParentOptions(filteredSteps) {
-                            console.log('Updating parent options, filtered steps:', filteredSteps.length);
-                            if (filteredSteps.length === 0) {
-	                                parentDropdown.innerHTML = '<div class="dropdown-item-empty">未找到步骤</div>';
-                                return;
-                            }
-                            
-                            parentDropdown.innerHTML = '';
-                            
-                            // Add "No parent" option
-                            const noParentItem = document.createElement('div');
-                            noParentItem.className = 'dropdown-item-custom';
-	                            noParentItem.textContent = '无前置步骤（顶层步骤）';
-                            noParentItem.style.fontStyle = 'italic';
-                            noParentItem.style.color = '#6c757d';
-                            noParentItem.addEventListener('click', function() {
-                                parentInput.value = '';
-                                parentValue.value = '';
-                                parentDropdown.style.display = 'none';
-                            });
-                            parentDropdown.appendChild(noParentItem);
-                            
-                            // Add divider
-                            const divider = document.createElement('div');
-                            divider.style.borderTop = '1px solid #dee2e6';
-                            divider.style.margin = '0.25rem 0';
-                            parentDropdown.appendChild(divider);
-                            
-                            filteredSteps.forEach(step => {
-                                const item = document.createElement('div');
-                                item.className = 'dropdown-item-custom';
-                                item.textContent = `${step.full_step} (${step.experiment})`;
-                                item.dataset.stepId = step.id;
-                                item.addEventListener('click', function() {
-                                    parentInput.value = step.full_step;
-                                    parentValue.value = step.id;
-                                    parentDropdown.style.display = 'none';
-                                });
-                                parentDropdown.appendChild(item);
-                            });
-                        }
-                        
-                        // Initial population
-                        updateParentOptions(steps);
-                        
-                        // Show dropdown on focus
-                        parentInput.addEventListener('focus', function() {
-                            console.log('Parent input focused');
-                            updateParentOptions(steps);
-                            parentDropdown.style.display = 'block';
-                        });
-                        
-                        // Filter dropdown on input
-                        parentInput.addEventListener('input', function() {
-                            console.log('Parent input changed:', this.value);
-                            const searchTerm = this.value.toLowerCase();
-                            if (!searchTerm) {
-                                updateParentOptions(steps);
-                            } else {
-                                const filtered = steps.filter(step => 
-                                    step.full_step.toLowerCase().includes(searchTerm) ||
-                                    step.experiment.toLowerCase().includes(searchTerm)
-                                );
-                                updateParentOptions(filtered);
-                            }
-                            parentDropdown.style.display = 'block';
-                            console.log('Dropdown display set to block');
-                        });
-                        
-                        // Hide dropdown when clicking outside
-                        document.addEventListener('click', function(e) {
-                            if (!parentInput.contains(e.target) && !parentDropdown.contains(e.target)) {
-                                parentDropdown.style.display = 'none';
-                            }
-                        });
-                        
-                        console.log('Parent step dropdown setup complete');
-                    } catch (error) {
-                        console.error('Error setting up parent dropdown:', error);
+                        $('#id_parents').next('.select2-container').addClass('lineage-parent-select2');
                     }
                     initializeRawMaterialSelects($('#editStepModal'));
                 }, 100);
@@ -1041,6 +950,9 @@ document.getElementById('editStepModal').addEventListener('hidden.bs.modal', fun
         $('#id_tool').select2('destroy');
     }
     if (typeof $ !== 'undefined') {
+        if ($('#editStepModal #id_parents').length && $('#editStepModal #id_parents').hasClass('select2-hidden-accessible')) {
+            $('#editStepModal #id_parents').select2('destroy');
+        }
         $('#editStepModal .raw-material-select.select2-hidden-accessible').select2('destroy');
     }
     document.getElementById('editStepModalBody').innerHTML = '';
@@ -1050,10 +962,10 @@ document.getElementById('editStepModal').addEventListener('hidden.bs.modal', fun
 document.addEventListener('submit', function(e) {
     if (e.target && e.target.id === 'expstepEditForm') {
         e.preventDefault();
-        
+
         const formData = new FormData(e.target);
         formData.append('raw_material_usages', JSON.stringify(collectRawMaterialUsages(e.target)));
-        
+
         fetch(e.target.action || window.location.href, {
             method: "POST",
             body: formData,
@@ -1070,7 +982,7 @@ document.addEventListener('submit', function(e) {
                 var modal = bootstrap.Modal.getInstance(modalEl);
                 modal.hide();
 
-                // Redirect to the URL with expanded_flow parameter
+                // Redirect to the URL with expanded_experiment parameter
                 if (data.redirect_url) {
                     window.location.href = data.redirect_url;
                 } else {
@@ -1082,7 +994,7 @@ document.addEventListener('submit', function(e) {
                 for (let field in data.errors) {
                     if (field === '__all__') {
                         errorMessages.push(data.errors[field].join(', '));
-                    } else if (field === 'parent') {
+                    } else if (field === 'parents') {
 	                        errorMessages.push('前置步骤：' + data.errors[field].join(', '));
                     } else {
                         errorMessages.push(field + ': ' + data.errors[field].join(', '));
@@ -1102,14 +1014,14 @@ document.addEventListener('submit', function(e) {
 document.querySelectorAll('.add-step-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
         const expId = btn.getAttribute('data-exp-id');
-        const flowId = btn.getAttribute('data-flow-id');
-        fetch(`/experiment/${expId}/flow/${flowId}/add_step/`)
+        const experimentId = btn.getAttribute('data-experiment-id');
+        fetch(`/experiment/${expId}/project_experiment/${experimentId}/add_step/`)
             .then(response => response.text())
             .then(html => {
                 document.getElementById('addStepModalBody').innerHTML = html;
                 const modal = new bootstrap.Modal(document.getElementById('addStepModal'));
                 modal.show();
-                
+
                 // Initialize Select2 on the tool field after modal content loads
                 setTimeout(async function() {
                     if ($('#id_tool').length) {
@@ -1121,109 +1033,17 @@ document.querySelectorAll('.add-step-btn').forEach(function(btn) {
                             allowClear: true
                         });
                     }
-                    
-                    // Setup parent step dropdown
-                    try {
-                        console.log('Setting up parent step dropdown...');
-                        const response = await fetch('/api/steps/');
-                        const data = await response.json();
-                        const steps = data.steps || [];
-                        console.log('Fetched steps:', steps.length);
-                        
-                        const parentInput = document.getElementById('id_parent');
-                        const parentValue = document.getElementById('id_parent_value');
-                        const parentDropdown = document.getElementById('parent-steps-dropdown');
-                        
-                        console.log('Elements found:', { 
-                            parentInput: !!parentInput, 
-                            parentValue: !!parentValue, 
-                            parentDropdown: !!parentDropdown 
+                    if ($('#id_parents').length) {
+                        $('#id_parents').select2({
+                            theme: 'bootstrap-5',
+                            dropdownParent: $('#addStepModal'),
+                            dropdownCssClass: 'lineage-parent-dropdown',
+                            width: '100%',
+                            placeholder: '搜索前置步骤...',
+                            allowClear: true,
+                            closeOnSelect: false
                         });
-                        
-                        if (!parentInput || !parentDropdown || !parentValue) {
-                            console.error('Parent dropdown elements not found!');
-                            return;
-                        }
-                        
-                        function updateParentOptions(filteredSteps) {
-                            console.log('Updating parent options, filtered steps:', filteredSteps.length);
-                            if (filteredSteps.length === 0) {
-	                                parentDropdown.innerHTML = '<div class="dropdown-item-empty">未找到步骤</div>';
-                                return;
-                            }
-                            
-                            parentDropdown.innerHTML = '';
-                            
-                            // Add "No parent" option
-                            const noParentItem = document.createElement('div');
-                            noParentItem.className = 'dropdown-item-custom';
-	                            noParentItem.textContent = '无前置步骤（顶层步骤）';
-                            noParentItem.style.fontStyle = 'italic';
-                            noParentItem.style.color = '#6c757d';
-                            noParentItem.addEventListener('click', function() {
-                                parentInput.value = '';
-                                parentValue.value = '';
-                                parentDropdown.style.display = 'none';
-                            });
-                            parentDropdown.appendChild(noParentItem);
-                            
-                            // Add divider
-                            const divider = document.createElement('div');
-                            divider.style.borderTop = '1px solid #dee2e6';
-                            divider.style.margin = '0.25rem 0';
-                            parentDropdown.appendChild(divider);
-                            
-                            filteredSteps.forEach(step => {
-                                const item = document.createElement('div');
-                                item.className = 'dropdown-item-custom';
-                                item.textContent = `${step.full_step} (${step.experiment})`;
-                                item.dataset.stepId = step.id;
-                                item.addEventListener('click', function() {
-                                    parentInput.value = step.full_step;
-                                    parentValue.value = step.id;
-                                    parentDropdown.style.display = 'none';
-                                });
-                                parentDropdown.appendChild(item);
-                            });
-                        }
-                        
-                        // Initial population
-                        updateParentOptions(steps);
-                        
-                        // Show dropdown on focus
-                        parentInput.addEventListener('focus', function() {
-                            console.log('Parent input focused');
-                            updateParentOptions(steps);
-                            parentDropdown.style.display = 'block';
-                        });
-                        
-                        // Filter dropdown on input
-                        parentInput.addEventListener('input', function() {
-                            console.log('Parent input changed:', this.value);
-                            const searchTerm = this.value.toLowerCase();
-                            if (!searchTerm) {
-                                updateParentOptions(steps);
-                            } else {
-                                const filtered = steps.filter(step => 
-                                    step.full_step.toLowerCase().includes(searchTerm) ||
-                                    step.experiment.toLowerCase().includes(searchTerm)
-                                );
-                                updateParentOptions(filtered);
-                            }
-                            parentDropdown.style.display = 'block';
-                            console.log('Dropdown display set to block');
-                        });
-                        
-                        // Hide dropdown when clicking outside
-                        document.addEventListener('click', function(e) {
-                            if (!parentInput.contains(e.target) && !parentDropdown.contains(e.target)) {
-                                parentDropdown.style.display = 'none';
-                            }
-                        });
-                        
-                        console.log('Parent step dropdown setup complete');
-                    } catch (error) {
-                        console.error('Error setting up parent dropdown:', error);
+                        $('#id_parents').next('.select2-container').addClass('lineage-parent-select2');
                     }
                     initializeRawMaterialSelects($('#addStepModal'));
                 }, 100);
@@ -1238,6 +1058,9 @@ document.getElementById('addStepModal').addEventListener('hidden.bs.modal', func
         $('#id_tool').select2('destroy');
     }
     if (typeof $ !== 'undefined') {
+        if ($('#addStepModal #id_parents').length && $('#addStepModal #id_parents').hasClass('select2-hidden-accessible')) {
+            $('#addStepModal #id_parents').select2('destroy');
+        }
         $('#addStepModal .raw-material-select.select2-hidden-accessible').select2('destroy');
     }
     document.getElementById('addStepModalBody').innerHTML = '';
@@ -1247,10 +1070,10 @@ document.getElementById('addStepModal').addEventListener('hidden.bs.modal', func
 document.addEventListener('submit', function(e) {
     if (e.target && e.target.id === 'addStepForm') {
         e.preventDefault();
-        
+
         const formData = new FormData(e.target);
         formData.append('raw_material_usages', JSON.stringify(collectRawMaterialUsages(e.target)));
-        
+
         fetch(e.target.action || window.location.href, {
             method: "POST",
             body: formData,
@@ -1267,7 +1090,7 @@ document.addEventListener('submit', function(e) {
                 var modal = bootstrap.Modal.getInstance(modalEl);
                 modal.hide();
 
-                // Redirect to the URL with expanded_flow parameter
+                // Redirect to the URL with expanded_experiment parameter
                 if (data.redirect_url) {
                     window.location.href = data.redirect_url;
                 } else {
@@ -1279,7 +1102,7 @@ document.addEventListener('submit', function(e) {
                 for (let field in data.errors) {
                     if (field === '__all__') {
                         errorMessages.push(data.errors[field].join(', '));
-                    } else if (field === 'parent') {
+                    } else if (field === 'parents') {
 	                        errorMessages.push('前置步骤：' + data.errors[field].join(', '));
                     } else {
                         errorMessages.push(field + ': ' + data.errors[field].join(', '));
@@ -1302,12 +1125,12 @@ document.addEventListener('change', function(e) {
         const stepId = dropdown.getAttribute('data-step-id');
         const newStatus = dropdown.value;
         const oldStatus = dropdown.getAttribute('data-current-status');
-        
+
         // Don't process if status hasn't actually changed
         if (newStatus === oldStatus) {
             return;
         }
-        
+
         // Send AJAX request to update status
         fetch(`/update_step_status/${stepId}/`, {
             method: 'POST',
@@ -1344,109 +1167,118 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle select all checkboxes
     document.querySelectorAll('.select-all-steps').forEach(checkbox => {
         checkbox.addEventListener('change', function() {
-            const flowId = this.getAttribute('data-flow-id');
+            const experimentId = this.getAttribute('data-experiment-id');
             const isChecked = this.checked;
-            const stepCheckboxes = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]`);
-            
+            const stepCheckboxes = document.querySelectorAll(`.step-checkbox[data-experiment-id="${experimentId}"]`);
+
             stepCheckboxes.forEach(cb => {
                 cb.checked = isChecked;
             });
-            
+
             // Show/hide copy button
-            updateCopyButtonVisibility(flowId);
+            updateCopyButtonVisibility(experimentId);
         });
     });
-    
+
     // Handle individual step checkboxes
     document.querySelectorAll('.step-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', function() {
-            const flowId = this.getAttribute('data-flow-id');
-            updateCopyButtonVisibility(flowId);
-            
+            const experimentId = this.getAttribute('data-experiment-id');
+            updateCopyButtonVisibility(experimentId);
+
             // Update "select all" checkbox state
-            const allCheckboxes = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]`);
-            const checkedCheckboxes = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`);
-            const selectAllCheckbox = document.querySelector(`.select-all-steps[data-flow-id="${flowId}"]`);
-            
+            const allCheckboxes = document.querySelectorAll(`.step-checkbox[data-experiment-id="${experimentId}"]`);
+            const checkedCheckboxes = document.querySelectorAll(`.step-checkbox[data-experiment-id="${experimentId}"]:checked`);
+            const selectAllCheckbox = document.querySelector(`.select-all-steps[data-experiment-id="${experimentId}"]`);
+
             if (selectAllCheckbox) {
                 selectAllCheckbox.checked = allCheckboxes.length === checkedCheckboxes.length && allCheckboxes.length > 0;
             }
         });
     });
-    
-    function updateCopyButtonVisibility(flowId) {
-        const checkedCount = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`).length;
-        const copyBtn = document.querySelector(`.copy-steps-btn[data-flow-id="${flowId}"]`);
-        const deleteBtn = document.querySelector(`.delete-steps-btn[data-flow-id="${flowId}"]`);
-        const bulkStatusGroup = document.getElementById(`bulk-status-group-${flowId}`);
-        
+
+    function updateCopyButtonVisibility(experimentId) {
+        const checkedCount = document.querySelectorAll(`.step-checkbox[data-experiment-id="${experimentId}"]:checked`).length;
+        const selectionBar = document.querySelector(`.step-selection-bar[data-experiment-id="${experimentId}"]`);
+        const selectedCount = document.getElementById(`selected-count-${experimentId}`);
+        const copyBtn = document.querySelector(`.copy-steps-btn[data-experiment-id="${experimentId}"]`);
+        const deleteBtn = document.querySelector(`.delete-steps-btn[data-experiment-id="${experimentId}"]`);
+        const bulkStatusGroup = document.getElementById(`bulk-status-group-${experimentId}`);
+
+        if (selectionBar) {
+            selectionBar.hidden = checkedCount === 0;
+        }
+        if (selectedCount) {
+            selectedCount.textContent = `已选 ${checkedCount}`;
+        }
+
         if (copyBtn) {
-            copyBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+            copyBtn.style.display = checkedCount > 0 ? 'inline-flex' : 'none';
         }
         if (deleteBtn) {
-            deleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+            deleteBtn.style.display = checkedCount > 0 ? 'inline-flex' : 'none';
         }
         if (bulkStatusGroup) {
-            bulkStatusGroup.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+            bulkStatusGroup.style.display = checkedCount > 0 ? 'inline-flex' : 'none';
         }
     }
-    
+
     // Handle copy steps button click
     let selectedStepsForCopy = [];
-    let currentFlowIdForCopy = null;
-    
+    let currentExperimentIdForCopy = null;
+
     document.querySelectorAll('.copy-steps-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            const flowId = this.getAttribute('data-flow-id');
-            currentFlowIdForCopy = flowId;
-            const checkedSteps = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`);
-            
+            const experimentId = this.getAttribute('data-experiment-id');
+            currentExperimentIdForCopy = experimentId;
+            const checkedSteps = document.querySelectorAll(`.step-checkbox[data-experiment-id="${experimentId}"]:checked`);
+
             if (checkedSteps.length === 0) {
 	                alert('请至少选择一个要复制的步骤。');
                 return;
             }
-            
+
             // Store step IDs
             selectedStepsForCopy = Array.from(checkedSteps).map(cb => cb.getAttribute('data-step-id'));
-            
+
             // Update modal with count
             document.getElementById('copyStepsCount').textContent = selectedStepsForCopy.length;
-            
+
             // Clear previous input and errors
-            document.getElementById('targetFlowId').value = '';
+            document.getElementById('targetExperimentId').value = '';
             document.getElementById('copyStepsError').classList.add('d-none');
-            
+
             // Show modal
             const copyModal = new bootstrap.Modal(document.getElementById('copyStepsModal'));
             copyModal.show();
         });
     });
-    
+
     // Handle confirm copy button
     document.getElementById('confirmCopySteps').addEventListener('click', function() {
-        const targetFlowId = document.getElementById('targetFlowId').value.trim();
+        const targetExperimentId = document.getElementById('targetExperimentId').value.trim();
         const errorDiv = document.getElementById('copyStepsError');
-        
-        if (!targetFlowId) {
+
+        if (!targetExperimentId) {
 	            errorDiv.textContent = '请输入目标实验编号。';
             errorDiv.classList.remove('d-none');
             return;
         }
-        
+
         if (selectedStepsForCopy.length === 0) {
 	            errorDiv.textContent = '未选择步骤。';
             errorDiv.classList.remove('d-none');
             return;
         }
-        
+
         errorDiv.classList.add('d-none');
-        
+
         // Disable button during request
         this.disabled = true;
 	        this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>正在复制...';
-        
+
         const expId = {{ experiment.id }};
-        
+
         fetch(`/experiment/${expId}/copy_steps/`, {
             method: 'POST',
             headers: {
@@ -1455,7 +1287,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({
                 step_ids: selectedStepsForCopy,
-                target_flow_name: targetFlowId
+                target_experiment_code: targetExperimentId
             })
         })
         .then(res => res.json())
@@ -1464,10 +1296,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Close modal
                 const copyModal = bootstrap.Modal.getInstance(document.getElementById('copyStepsModal'));
                 copyModal.hide();
-                
+
                 // Show success message
                 alert(data.message);
-                
+
                 // Reload page to show copied steps
                 window.location.reload();
             } else {
@@ -1486,29 +1318,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    
+
     // Handle delete steps button click
     document.querySelectorAll('.delete-steps-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            const flowId = this.getAttribute('data-flow-id');
-            const checkedSteps = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`);
-            
+            const experimentId = this.getAttribute('data-experiment-id');
+            const checkedSteps = document.querySelectorAll(`.step-checkbox[data-experiment-id="${experimentId}"]:checked`);
+
             if (checkedSteps.length === 0) {
 	                alert('请至少选择一个要删除的步骤。');
                 return;
             }
-            
+
             // Get step IDs
             const stepIds = Array.from(checkedSteps).map(cb => cb.getAttribute('data-step-id'));
-            
+
             // Confirm deletion
 	            if (!confirm(`确定要删除 ${stepIds.length} 个步骤吗？\n\n此操作不可撤销。`)) {
                 return;
             }
-            
+
             // Send delete request
             const expId = {{ experiment.id }};
-            
+
             fetch(`/experiment/${expId}/delete_steps/`, {
                 method: 'POST',
                 headers: {
@@ -1535,26 +1367,26 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
-    
+
     // Handle bulk status update
     document.querySelectorAll('.bulk-status-update').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
-            const flowId = this.getAttribute('data-flow-id');
+            const experimentId = this.getAttribute('data-experiment-id');
             const newStatus = this.getAttribute('data-status');
-            const checkedSteps = document.querySelectorAll(`.step-checkbox[data-flow-id="${flowId}"]:checked`);
-            
+            const checkedSteps = document.querySelectorAll(`.step-checkbox[data-experiment-id="${experimentId}"]:checked`);
+
             if (checkedSteps.length === 0) {
 	                showToast('提示', '请至少选择一个要更新的步骤。', 'warning');
                 return;
             }
-            
+
             // Get step IDs
             const stepIds = Array.from(checkedSteps).map(cb => cb.getAttribute('data-step-id'));
-            
+
             // Send bulk update request
             const expId = {{ experiment.id }};
-            
+
             fetch(`/experiment/${expId}/bulk_update_status/`, {
                 method: 'POST',
                 headers: {
@@ -1581,7 +1413,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Uncheck all checkboxes
                     checkedSteps.forEach(cb => cb.checked = false);
                     // Update button visibility
-                    updateCopyButtonVisibility(flowId);
+                    updateCopyButtonVisibility(experimentId);
                 } else {
 	                showToast('错误', data.error || '状态更新失败', 'danger');
                 }
@@ -1606,7 +1438,7 @@ document.addEventListener('click', function(e) {
         rawMaterialCounter++;
         const tbody = document.getElementById('raw-materials-container');
         if (!tbody) return;
-        
+
         const newRow = document.createElement('tr');
         newRow.className = 'raw-material-row';
         newRow.setAttribute('data-raw-material-row-id', 'new-' + rawMaterialCounter);
@@ -1634,7 +1466,7 @@ document.addEventListener('click', function(e) {
         tbody.appendChild(newRow);
         initializeRawMaterialSelects($(newRow).closest('.modal'));
     }
-    
+
     if (e.target.closest('.remove-raw-material-btn')) {
         const row = e.target.closest('.raw-material-row');
         if (row && typeof $ !== 'undefined') {

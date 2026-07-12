@@ -1,0 +1,53 @@
+{% extends 'experiment_flow/base_no_sidebar.html' %}
+{% block title %}管理中心 · Atlas{% endblock %}
+{% block content %}
+<style>
+  .management-shell{max-width:1280px;margin:0 auto}.management-tabs{border-bottom:1px solid #dbe3ef;gap:4px}.management-tabs .nav-link{color:#526173;border:0;border-bottom:3px solid transparent;padding:10px 18px;font-weight:600}.management-tabs .nav-link.active{color:#315ed6;border-bottom-color:#315ed6;background:transparent}
+  .panel-card{background:#fff;border:1px solid #e1e7ef;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(15,23,42,.04)}.table-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.toolbar-actions{display:flex;gap:8px}.search-box{width:260px}
+  .management-table{margin:0}.management-table thead th{font-size:.8rem;padding:.4rem .55rem;font-weight:600;white-space:nowrap;background:#f8fafc;color:#526173}.management-table tbody td{font-size:.84rem;padding:.38rem .55rem;vertical-align:middle}.management-table tbody tr:hover{background:#f8fbff}.management-table .description-cell{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.management-table .actions{white-space:nowrap;text-align:right;width:1%}.management-table .btn-sm{padding:.15rem .4rem;font-size:.78rem}
+  .modal .form-label{font-size:.82rem;color:#526173;margin-bottom:4px}.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.modal-grid .full{grid-column:1/-1}.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;background:#94a3b8}.status-dot.active{background:#22c55e}.empty-row{text-align:center;color:#718096;padding:24px!important}
+  @media(max-width:700px){.table-toolbar{align-items:stretch;flex-direction:column}.toolbar-actions,.search-box{width:100%}.modal-grid{grid-template-columns:1fr}.modal-grid .full{grid-column:auto}.panel-card{padding:10px}.management-tabs .nav-link{padding:9px 10px}}
+</style>
+<div class="management-shell">
+  <div class="mb-3"><h1 class="h3 mb-1">管理中心</h1><div class="text-muted">Team、项目、成员和步骤模板的集中管理</div></div>
+  {% if messages %}{% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-{{ message.tags|default:'info' }}{% endif %} py-2">{{ message }}</div>{% endfor %}{% endif %}
+  <ul class="nav nav-tabs management-tabs mb-3" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#teams" type="button">Team</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#projects" type="button">Projects</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#members" type="button">成员</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#steps" type="button">步骤模板</button></li>
+  </ul>
+  <div class="tab-content">
+    <section class="tab-pane fade show active" id="teams"><div class="panel-card">
+      <div class="table-toolbar"><h2 class="h6 mb-0">Team 列表</h2><div class="toolbar-actions"><input class="form-control form-control-sm search-box record-search" data-target="team-record" placeholder="搜索 Team"><button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addTeamModal"><i class="bi bi-plus-lg"></i> 新增</button></div></div>
+      <div class="table-responsive"><table class="table management-table"><thead><tr><th>代码</th><th>Team 名称</th><th>成员</th><th>项目分类</th><th>创建日期</th><th class="text-end">操作</th></tr></thead><tbody>
+      {% for team in teams %}<tr class="team-record" data-search="{{ team.group_name }} {{ team.team_code }}"><td><strong>{{ team.team_code }}</strong></td><td>{{ team.group_name }}</td><td>{{ team.members.count }}</td><td>{{ team.project.count }}</td><td>{{ team.created_on|date:'Y-m-d' }}</td><td class="actions"><button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editTeam{{ team.id }}">修改</button> <form method="post" action="{% url 'delete_team' team.id %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-danger btn-sm" onclick="return confirm('删除 Team 会同时删除其项目和实验数据，确定继续吗？')">删除</button></form></td></tr>
+      {% empty %}<tr><td colspan="6" class="empty-row">尚无 Team</td></tr>{% endfor %}</tbody></table></div>
+    </div></section>
+    <section class="tab-pane fade" id="projects"><div class="panel-card">
+      <div class="table-toolbar"><h2 class="h6 mb-0">Project 列表</h2><div class="toolbar-actions"><input class="form-control form-control-sm search-box record-search" data-target="project-record" placeholder="搜索项目"><button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addProjectModal"><i class="bi bi-plus-lg"></i> 新增</button></div></div>
+      <div class="table-responsive"><table class="table management-table"><thead><tr><th>Project</th><th>Team</th><th>负责人</th><th>描述</th><th>创建日期</th><th class="text-end">操作</th></tr></thead><tbody>
+      {% for project in managed_projects %}<tr class="project-record" data-search="{{ project.exp_name }} {{ project.project.group }} {{ project.owner.username }} {{ project.exp_description }}"><td><strong>{{ project.exp_name }}</strong></td><td>{{ project.project.group|default:'-' }}</td><td>{{ project.owner.username }}</td><td class="description-cell" title="{{ project.exp_description|default:'' }}">{{ project.exp_description|default:'-' }}</td><td>{{ project.created_on|date:'Y-m-d' }}</td><td class="actions"><button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editProject{{ project.id }}">修改</button> <form method="post" action="{% url 'delete_managed_project' project.id %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-danger btn-sm" onclick="return confirm('删除 Project 会同时删除其中的实验和步骤，确定继续吗？')">删除</button></form></td></tr>
+      {% empty %}<tr><td colspan="6" class="empty-row">尚无 Project</td></tr>{% endfor %}</tbody></table></div>
+    </div></section>
+    <section class="tab-pane fade" id="members"><div class="panel-card">
+      <div class="table-toolbar"><h2 class="h6 mb-0">成员列表</h2><div class="toolbar-actions"><input class="form-control form-control-sm search-box record-search" data-target="member-record" placeholder="搜索成员"><button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addMemberModal"><i class="bi bi-plus-lg"></i> 新增</button></div></div>
+      <div class="table-responsive"><table class="table management-table"><thead><tr><th>用户名</th><th>姓名</th><th>邮箱</th><th>Team</th><th>状态</th><th>权限</th><th class="text-end">操作</th></tr></thead><tbody>
+      {% for member in managed_users %}<tr class="member-record" data-search="{{ member.username }} {{ member.get_full_name }} {{ member.email }} {{ member.profile.research_group }}"><td><strong>{{ member.username }}</strong></td><td>{{ member.get_full_name|default:'-' }}</td><td>{{ member.email|default:'-' }}</td><td>{{ member.profile.research_group|default:'未分配' }}</td><td><span class="status-dot {% if member.is_active %}active{% endif %}"></span>{% if member.is_active %}启用{% else %}停用{% endif %}</td><td>{% if member.is_superuser %}超级管理员{% elif member.is_staff %}管理员{% else %}成员{% endif %}</td><td class="actions"><button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editMember{{ member.id }}">修改</button> <form method="post" action="{% url 'delete_managed_user' member.id %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-danger btn-sm" onclick="return confirm('确定删除成员 {{ member.username }} 吗？其拥有的项目也会被删除。')">删除</button></form></td></tr>{% endfor %}
+      </tbody></table></div>
+    </div></section>
+    <section class="tab-pane fade" id="steps"><div class="panel-card">
+      <div class="table-toolbar"><div><h2 class="h6 mb-0">步骤模板列表</h2><small class="text-muted">仅影响新增步骤时的可选模板</small></div><div class="toolbar-actions"><input class="form-control form-control-sm search-box record-search" data-target="step-record" placeholder="搜索代码、名称或分类"><button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStepModal"><i class="bi bi-plus-lg"></i> 新增</button></div></div>
+      <div class="table-responsive"><table class="table management-table"><thead><tr><th>代码</th><th>步骤名称</th><th>分类</th><th>默认描述</th><th>状态</th><th class="text-end">操作</th></tr></thead><tbody>
+      {% for template in step_templates %}<tr class="step-record" data-search="{{ template.step_code }} {{ template.step_label }} {{ template.category }}"><td><strong>{{ template.step_code }}</strong></td><td>{{ template.step_label }}</td><td>{{ template.category|default:'-' }}</td><td class="description-cell" title="{{ template.default_description|default:'' }}">{{ template.default_description|default:'-' }}</td><td><span class="status-dot {% if template.is_active %}active{% endif %}"></span>{% if template.is_active %}启用{% else %}停用{% endif %}</td><td class="actions"><button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editStep{{ template.id }}">修改</button> <form method="post" action="{% url 'delete_step_template' template.id %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-danger btn-sm" onclick="return confirm('确定删除步骤模板 {{ template.step_code }} 吗？')">删除</button></form></td></tr>
+      {% empty %}<tr><td colspan="6" class="empty-row">尚无步骤模板</td></tr>{% endfor %}</tbody></table></div>
+    </div></section>
+  </div>
+</div>
+
+{% include 'experiment_flow/_management_modals.html' %}
+{% endblock %}
+{% block extra_js %}<script>
+document.querySelectorAll('.record-search').forEach(input=>input.addEventListener('input',()=>{const q=input.value.trim().toLowerCase();document.querySelectorAll('.'+input.dataset.target).forEach(row=>row.hidden=!(row.dataset.search||'').toLowerCase().includes(q))}));
+function activateHashTab(){const trigger=document.querySelector(`[data-bs-target="${location.hash||'#teams'}"]`);if(trigger)bootstrap.Tab.getOrCreateInstance(trigger).show()}activateHashTab();document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab=>tab.addEventListener('shown.bs.tab',e=>history.replaceState(null,'',e.target.dataset.bsTarget)));
+</script>{% endblock %}

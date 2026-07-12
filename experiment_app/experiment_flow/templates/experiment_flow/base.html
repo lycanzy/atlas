@@ -276,12 +276,12 @@
     <!-- Select2 for searchable dropdowns -->
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2.min.css' %}" />
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2-bootstrap-5-theme.min.css' %}" />
-    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=10" />
+    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=13" />
     <script src="{% static 'vendor/jquery/jquery-3.7.0.min.js' %}?v=2"></script>
     <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'vendor/select2/js/select2.min.js' %}"></script>
     <script src="{% static 'vendor/cytoscape/cytoscape.min.js' %}"></script>
-    <script src="{% static 'app/js/genealogy_graph.js' %}"></script>
+    <script src="{% static 'app/js/genealogy_graph.js' %}?v=2"></script>
 </head>
 <body>
     <!-- Toast container for notifications -->
@@ -313,6 +313,12 @@
                     class="btn btn-primary btn-sm"
                     data-url="{% url 'raw_material_list' %}"
                     onclick="window.location.href=this.dataset.url;">原材料</button>
+            {% if user.is_staff or user.is_superuser %}
+                <button type="button"
+                    class="btn btn-primary btn-sm"
+                    data-url="{% url 'management_dashboard' %}"
+                    onclick="window.location.href=this.dataset.url;">管理</button>
+            {% endif %}
             {% if user.is_authenticated %}
                 <div class="dropdown user-menu">
                     <button class="btn btn-outline-light btn-sm dropdown-toggle user-menu-toggle"
@@ -485,13 +491,13 @@
                 const searchInput = document.getElementById('searchInput');
                 const searchForm = document.getElementById('searchForm');
                 
-                // Function to check if input looks like a flow/step code
-                function looksLikeFlowOrStepCode(value) {
-                    // Flow pattern: 3 letters + 3+ digits + 2 letters (e.g., MLO001AB)
-                    // Step pattern: flow code + dash + 2 letters + 2 digits (e.g., MLO001AB-MX00)
-                    const flowPattern = /^[A-Z]{3}\d{3,}[A-Z]{2}$/i;
+                // Function to check if input looks like a experiment/step code
+                function looksLikeExperimentOrStepCode(value) {
+                    // Experiment pattern: 3 letters + 3+ digits + 2 letters (e.g., MLO001AB)
+                    // Step pattern: experiment code + dash + 2 letters + 2 digits (e.g., MLO001AB-MX00)
+                    const experimentPattern = /^[A-Z]{3}\d{3,}[A-Z]{2}$/i;
                     const stepPattern = /^[A-Z]{3}\d{3,}[A-Z]{2}-[A-Z]{2}\d{2}$/i;
-                    return flowPattern.test(value) || stepPattern.test(value);
+                    return experimentPattern.test(value) || stepPattern.test(value);
                 }
                 
                 // Function to handle search submission
@@ -507,8 +513,8 @@
                         return;
                     }
                     
-                    // Check if it looks like a flow or step code
-                    if (looksLikeFlowOrStepCode(searchValue)) {
+                    // Check if it looks like an experiment or step code
+                    if (looksLikeExperimentOrStepCode(searchValue)) {
                         // Redirect to global search
                         window.location.href = `/search/?q=${encodeURIComponent(searchValue)}`;
                     } else {

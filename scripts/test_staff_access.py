@@ -22,7 +22,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'experiment_app.settings')
 django.setup()
 
 from django.contrib.auth.models import User
-from experiment_flow.models import Exp, Project, ResearchGroup, UserProfile
+from experiment_flow.models import Project, ResearchGroup, UserProfile
 from experiment_flow.views import get_experiments_for_user
 
 
@@ -34,7 +34,7 @@ def test_access_control():
     print("=" * 60)
     
     # Get all experiments
-    all_experiments = Exp.objects.all()
+    all_experiments = Project.objects.all()
     total_count = all_experiments.count()
     print(f"\nTotal experiments in database: {total_count}")
     
@@ -76,7 +76,7 @@ def test_access_control():
         else:
             # Regular user should only see their group's experiments
             if user_group:
-                group_exp_count = Exp.objects.filter(project__group=user_group).count()
+                group_exp_count = Project.objects.filter(project__group=user_group).count()
                 if visible_count == group_exp_count:
                     print(f"  ✅ PASS: Regular user sees only their group's {visible_count} experiments")
                 else:
@@ -94,7 +94,7 @@ def test_access_control():
     
     groups = ResearchGroup.objects.all()
     for group in groups:
-        count = Exp.objects.filter(project__group=group).count()
+        count = Project.objects.filter(project__group=group).count()
         print(f"  {group.group_name}: {count} experiments")
     
     print("\n" + "=" * 60)

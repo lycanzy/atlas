@@ -154,8 +154,8 @@
         }
 
         requestAnimationFrame(function () {
-            focusCurrent();
-            window.setTimeout(focusCurrent, 250);
+            fit();
+            window.setTimeout(fit, 250);
         });
 
         return cyInstance;
