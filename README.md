@@ -69,7 +69,7 @@ The current UI uses a compact Atlas dashboard style with a left project sidebar,
   - Search full experiment IDs or step IDs and redirect to the matching page.
   - `GET /api/steps/`
   - `GET /api/raw_materials/`
-  - `GET /api/experiments_with_flows/`
+  - `GET /api/experiments_with_items/`
 
 ### Tech Stack
 
@@ -133,7 +133,7 @@ Atlas 是一个基于 Django 的实验追踪应用，用于研究团队管理 **
 - **研究组 / Team (`ResearchGroup`)**：普通用户的数据访问边界；每个 Team 自带 3 位 team code，例如 `AFE`、`GNY`、`PCA`。
 - **项目分类 (`ProjectCategory`)**：UI 中用于展示研究方向/分类的辅助信息，例如 `Anode-free Engineering`。
 - **项目 (`Project`)**：Team code 后加三位数字形成的项目编号，例如 `AFE001`。
-- **实验 (`Experiment`)**：项目编号后加两位字母形成的实验编号，例如 `AFE001AA`。当前业务概念里已经没有单独的 “flow”。
+- **实验 (`Experiment`)**：项目编号后加两位字母形成的实验编号，例如 `AFE001AA`。当前业务概念里已经没有单独的 “flow / 流程”。
 - **实验步骤 (`ExperimentStep`)**：实验中的工艺步骤，例如 `AFE001AA-MX00`。
 - **原材料批次**：可按批次记录，并关联到具体步骤，包含用量和单位。
 
@@ -185,7 +185,7 @@ Atlas 是一个基于 Django 的实验追踪应用，用于研究团队管理 **
   - 可搜索完整实验编号或步骤编号，并跳转到对应页面。
   - `GET /api/steps/`
   - `GET /api/raw_materials/`
-  - `GET /api/experiments_with_flows/`
+  - `GET /api/experiments_with_items/`
 
 ### 技术栈
 

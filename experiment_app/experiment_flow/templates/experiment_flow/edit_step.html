@@ -217,9 +217,141 @@
     border-color: #ced4da;
     font-size: 0.75rem;
 }
+
+.lineage-parent-select2 .select2-selection--multiple {
+    align-items: center;
+    background: #fff !important;
+    border: 1px solid #cfd7e2 !important;
+    border-radius: 0.35rem !important;
+    box-shadow: none !important;
+    display: flex !important;
+    min-height: 32px !important;
+    padding: 0.2rem 2rem 0.2rem 0.35rem !important;
+    position: relative;
+}
+
+.lineage-parent-select2.select2-container--focus .select2-selection--multiple,
+.lineage-parent-select2.select2-container--open .select2-selection--multiple {
+    background: #ffffff !important;
+    border-color: #2f66d0 !important;
+    box-shadow: 0 0 0 0.14rem rgba(47, 102, 208, 0.12) !important;
+}
+
+.lineage-parent-select2 .select2-selection--multiple::after {
+    color: #6b7785;
+    content: "⌕";
+    font-size: 0.85rem;
+    line-height: 1;
+    position: absolute;
+    right: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.lineage-parent-select2 .select2-selection__rendered {
+    align-items: center;
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.lineage-parent-select2 .select2-selection__choice {
+    align-items: center;
+    background: #eef4ff !important;
+    border: 1px solid #c9dafc !important;
+    border-radius: 0.3rem !important;
+    color: #24364f !important;
+    display: inline-flex !important;
+    font-size: 0.72rem !important;
+    font-weight: 600;
+    gap: 0.2rem;
+    line-height: 1.15 !important;
+    margin: 0 !important;
+    max-width: 220px;
+    padding: 0.18rem 0.42rem 0.18rem 0.25rem !important;
+}
+
+.lineage-parent-select2 .select2-selection__choice__display {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lineage-parent-select2 .select2-selection__choice__remove {
+    border: 0 !important;
+    color: #5f6b7a !important;
+    font-size: 0.9rem !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 0.1rem !important;
+}
+
+.lineage-parent-select2 .select2-search--inline {
+    display: inline-flex;
+    flex: 1 0 130px;
+    min-width: 130px;
+}
+
+.lineage-parent-select2 .select2-search__field {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: #1f2933 !important;
+    font-size: 0.75rem !important;
+    height: 22px !important;
+    margin: 0 !important;
+    min-width: 130px !important;
+    outline: 0 !important;
+    padding: 0 !important;
+}
+
+.lineage-parent-dropdown {
+    border-color: #cfd7e2 !important;
+    border-radius: 0.35rem !important;
+    box-shadow: 0 12px 26px rgba(31, 41, 51, 0.13);
+    overflow: hidden;
+}
+
+.lineage-parent-dropdown .select2-search--dropdown {
+    padding: 0.45rem;
+}
+
+.lineage-parent-dropdown .select2-search__field {
+    border: 1px solid #cfd7e2 !important;
+    border-radius: 0.3rem !important;
+    font-size: 0.78rem;
+    outline: 0;
+    padding: 0.36rem 0.45rem !important;
+}
+
+.lineage-parent-dropdown .select2-results__option {
+    color: #24364f;
+    font-size: 0.76rem;
+    padding: 0.42rem 0.55rem !important;
+}
+
+.lineage-parent-dropdown .select2-results__option--highlighted {
+    background: #edf4ff !important;
+    color: #1f4f9f !important;
+}
+
+.lineage-parent-dropdown .select2-results__option--selected,
+.lineage-parent-dropdown .select2-results__option[aria-selected="true"] {
+    background: #eef4ff !important;
+    color: #24364f !important;
+    font-weight: 650;
+}
+
+.lineage-parent-dropdown .select2-results__option--highlighted[aria-selected="true"] {
+    background: #dceaff !important;
+    color: #1f4f9f !important;
+}
 </style>
 
-<form method="post" id="expstepEditForm" action="{% url 'edit_step' step.flow.exp.id step.flow.id step.id %}" class="edit-step-form">
+<form method="post" id="expstepEditForm" action="{% url 'edit_step' step.experiment.project.id step.experiment.id step.id %}" class="edit-step-form">
   {% csrf_token %}
   
   <!-- Main Form Section -->
@@ -241,22 +373,10 @@
         {% endif %}
       </div>
       <div class="form-group col-span-2">
-        <label for="id_parent">前置步骤</label>
-        <div style="position: relative;">
-          <input type="text" 
-                 class="form-control form-control-sm" 
-                 id="id_parent" 
-                 name="parent_search"
-                 placeholder="搜索前置步骤..."
-                 autocomplete="off"
-                 value="{% if step.parent %}{{ step.parent.full_step }}{% endif %}">
-          <input type="hidden" id="id_parent_value" name="parent" value="{% if step.parent %}{{ step.parent.id }}{% endif %}">
-          <div class="steps-dropdown" id="parent-steps-dropdown" style="display: none;">
-            <div class="dropdown-loading">正在加载步骤...</div>
-          </div>
-        </div>
-        {% if form.parent.errors %}
-          <div class="error-message">{{ form.parent.errors.0 }}</div>
+        <label for="id_parents">前置步骤</label>
+        {{ form.parents }}
+        {% if form.parents.errors %}
+          <div class="error-message">{{ form.parents.errors.0 }}</div>
         {% endif %}
       </div>
       <div class="form-group">

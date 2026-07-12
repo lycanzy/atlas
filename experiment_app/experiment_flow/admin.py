@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Project, Experiment, ExperimentStep, ProjectCategory, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, StepRawMaterialUsage
+from .models import Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, StepRawMaterialUsage
 
 # Base admin class with custom CSS
 class BaseModelAdmin(admin.ModelAdmin):
@@ -61,12 +61,19 @@ class ProjectAdmin(BaseModelAdmin):
 
 @admin.register(Experiment)
 class ExperimentAdmin(BaseModelAdmin):
-    list_display = ("full_flow", "flow_name", "exp", "flow_description", "created_on")
-    search_fields = ("full_flow", "flow_name", "flow_description", "exp__exp_name")
+    list_display = ("full_experiment_code", "experiment_code", "project", "experiment_description", "created_on")
+    search_fields = ("full_experiment_code", "experiment_code", "experiment_description", "project__exp_name")
 
 @admin.register(ExperimentStep)
 class ExperimentStepAdmin(BaseModelAdmin):
-    list_display = ("step_name", "flow", "status", "started_on")
+    list_display = ("step_name", "experiment", "status", "started_on")
+
+
+@admin.register(ExperimentStepLink)
+class ExperimentStepLinkAdmin(BaseModelAdmin):
+    list_display = ("parent_step", "child_step", "created_on")
+    search_fields = ("parent_step__full_step", "child_step__full_step")
+    readonly_fields = ("created_on",)
 
 @admin.register(ResearchGroup)
 class ResearchGroupAdmin(BaseModelAdmin):
@@ -89,7 +96,7 @@ class ResearchGroupAdmin(BaseModelAdmin):
 
 @admin.register(Sample)
 class SampleAdmin(BaseModelAdmin):
-    list_display = ("sample_name", "flow", "created_on")
+    list_display = ("sample_name", "step", "created_on")
     readonly_fields = ("created_on",)
 
 @admin.register(StepNameTemplate)

@@ -5,10 +5,10 @@
     <h2>{{ experiment.exp_name }}</h2>
     <h3>实验列表</h3>
     <ul style="list-style:none; padding:0;">
-        {% for flow in experiment.flow.all %}
+        {% for project_experiment in experiment.experiments.all %}
         <li style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:10px; padding:12px;">
-            <strong>{{ flow.name }}</strong><br>
-            <span>{{ flow.description }}</span>
+            <strong>{{ project_experiment.name }}</strong><br>
+            <span>{{ project_experiment.description }}</span>
         </li>
         {% empty %}
         <li>该项目暂无实验。</li>

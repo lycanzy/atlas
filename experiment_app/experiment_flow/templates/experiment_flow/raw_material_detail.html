@@ -145,7 +145,7 @@
                                 {% for usage in usages %}
                                 <tr>
                                     <td>{{ usage.step.full_step }}</td>
-                                    <td>{{ usage.step.flow.full_flow }}</td>
+                                    <td>{{ usage.step.experiment.full_experiment_code }}</td>
                                     <td>
                                         {% if usage.quantity %}
                                             {{ usage.quantity }} {{ usage.unit|default:"" }}

@@ -56,7 +56,7 @@ a {
 .navbar > div:first-child,
 .navbar .brand-link {
     color: var(--eta-text);
-    font-size: 1.05rem;
+    font-size: 2rem;
     font-weight: 750;
     letter-spacing: 0;
     padding-left: 0.15rem;
@@ -733,7 +733,7 @@ a {
 }
 
 .btn-no-style,
-.add-flow-btn {
+.add-experiment-btn {
     width: 28px;
     height: 28px;
     display: inline-flex !important;
@@ -745,7 +745,7 @@ a {
 }
 
 .btn-no-style:hover,
-.add-flow-btn:hover {
+.add-experiment-btn:hover {
     background: #eef2f4 !important;
     color: var(--eta-text) !important;
     transform: none !important;
@@ -806,19 +806,59 @@ a {
 
 .steps-row > td {
     background: #f8faf9 !important;
+    padding: 0.45rem 0.7rem 0.7rem !important;
 }
 
 .steps-row .border-bottom {
     border-color: var(--eta-border-soft) !important;
 }
 
-.steps-row .table {
+.step-selection-bar {
+    align-items: center;
+    background: #ffffff;
     border: 1px solid var(--eta-border-soft);
-    border-left: 0;
-    border-right: 0;
+    border-bottom: 0;
+    border-radius: 7px 7px 0 0;
+    display: flex;
+    justify-content: space-between;
+    min-height: 34px;
+    padding: 0.25rem 0.42rem 0.25rem 0.55rem;
 }
 
-.flow-desc,
+.step-selection-bar[hidden] {
+    display: none !important;
+}
+
+.step-selection-count {
+    color: var(--eta-text-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.step-selection-actions {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.35rem;
+}
+
+.step-selection-actions .btn {
+    align-items: center;
+    border-radius: 6px !important;
+    display: inline-flex;
+    font-size: 0.76rem !important;
+    font-weight: 700 !important;
+    gap: 0.25rem;
+    line-height: 1.1;
+    padding: 0.28rem 0.48rem !important;
+}
+
+.steps-row .table {
+    border: 1px solid var(--eta-border-soft);
+    border-radius: 0 0 7px 7px;
+    overflow: hidden;
+}
+
+.experiment-desc,
 .step-desc {
     color: var(--eta-text-muted);
 }
@@ -1025,19 +1065,19 @@ small.text-muted {
     color: var(--eta-text-subtle) !important;
 }
 
-.flow-dropdown-menu {
+.experiment-dropdown-menu {
     border-color: var(--eta-border-soft) !important;
     border-radius: var(--eta-radius) !important;
     box-shadow: var(--eta-shadow-md) !important;
     overflow: hidden;
 }
 
-.flow-dropdown-search {
+.experiment-dropdown-search {
     background: #f8faf9 !important;
     border-color: var(--eta-border-soft) !important;
 }
 
-.flow-dropdown-item:hover {
+.experiment-dropdown-item:hover {
     background: #f1f7f6 !important;
 }
 

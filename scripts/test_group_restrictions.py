@@ -4,7 +4,7 @@ from django.test import Client
 from django.urls import reverse
 import json
 
-from experiment_flow.models import Exp, Project, ResearchGroup, UserProfile
+from experiment_flow.models import Project, ProjectCategory, ResearchGroup, UserProfile
 
 User = get_user_model()
 
@@ -30,13 +30,13 @@ def run_test():
     print(f"Created users: {user_a.username} (in {profile_a.research_group.group_name}), {user_b.username} (in {profile_b.research_group.group_name})")
 
     # Create two projects, one for each group
-    proj_a, _ = Project.objects.get_or_create(project_name='ProjectA', defaults={'project_code': 'PRA', 'group': group_a})
-    proj_b, _ = Project.objects.get_or_create(project_name='ProjectB', defaults={'project_code': 'PRB', 'group': group_b})
+    proj_a, _ = ProjectCategory.objects.get_or_create(project_name='ProjectA', defaults={'project_code': 'PRA', 'group': group_a})
+    proj_b, _ = ProjectCategory.objects.get_or_create(project_name='ProjectB', defaults={'project_code': 'PRB', 'group': group_b})
     print(f"Created projects: {proj_a.project_name} (Group A), {proj_b.project_name} (Group B)")
 
     # Create two experiments
-    exp_a = Exp.objects.create(exp_name='ExpA', project=proj_a, owner=user_a)
-    exp_b = Exp.objects.create(exp_name='ExpB', project=proj_b, owner=user_b)
+    exp_a = Project.objects.create(exp_name='ExpA', project=proj_a, owner=user_a)
+    exp_b = Project.objects.create(exp_name='ExpB', project=proj_b, owner=user_b)
     print(f"Created experiments: {exp_a.exp_name} (Project A), {exp_b.exp_name} (Project B)")
 
     client = Client()

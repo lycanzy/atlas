@@ -27,7 +27,7 @@ class ViewTests(TestCase):
         # Setup data for Group 1
         self.project1 = ProjectCategory.objects.create(project_name="P1", project_code="PRA", group=self.group1)
         self.exp1 = Project.objects.create(exp_name="PRA001", project=self.project1, owner=self.user1)
-        self.flow1 = Experiment.objects.create(flow_name="AA", exp=self.exp1)
+        self.experiment1_item = Experiment.objects.create(experiment_code="AA", project=self.exp1)
         
         # Setup data for Group 2
         self.project2 = ProjectCategory.objects.create(project_name="P2", project_code="PRB", group=self.group2)
@@ -103,28 +103,28 @@ class ViewTests(TestCase):
         self.assertEqual(response.status_code, 200) # Renders form with error
         self.assertContains(response, "Selected team not found")
 
-    def test_add_flow(self):
+    def test_add_project_experiment(self):
         self.client.login(username="user1", password="password")
         
-        # Add flow to Project 1
-        response = self.client.post(reverse('add_flow', args=[self.exp1.id]), {
-            'flow_name': 'BB'
+        # Add project_experiment to Project 1
+        response = self.client.post(reverse('add_project_experiment', args=[self.exp1.id]), {
+            'experiment_code': 'BB'
         })
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(Experiment.objects.filter(full_flow="PRA001BB").exists())
+        self.assertTrue(Experiment.objects.filter(full_experiment_code="PRA001BB").exists())
         
-        # Try to add flow to Project 2
-        response = self.client.post(reverse('add_flow', args=[self.exp2.id]), {
-            'flow_name': 'BB'
+        # Try to add project_experiment to Project 2
+        response = self.client.post(reverse('add_project_experiment', args=[self.exp2.id]), {
+            'experiment_code': 'BB'
         })
         self.assertEqual(response.status_code, 302) # Redirects to index due to permission
-        self.assertFalse(Experiment.objects.filter(full_flow="PRB001BB").exists())
+        self.assertFalse(Experiment.objects.filter(full_experiment_code="PRB001BB").exists())
 
     def test_add_step(self):
         self.client.login(username="user1", password="password")
         
-        # Add step to Flow 1
-        response = self.client.post(reverse('add_step', args=[self.exp1.id, self.flow1.id]), {
+        # Add step to Experiment 1
+        response = self.client.post(reverse('add_step', args=[self.exp1.id, self.experiment1_item.id]), {
             'step_name': 'AA',
             'step_description': 'Test Step',
             'status': 'Planned',
@@ -143,9 +143,79 @@ class ViewTests(TestCase):
         self.assertEqual(usage.raw_material, self.raw_material)
         self.assertEqual(usage.unit, 'g')
 
+    def test_add_step_with_multiple_parents(self):
+        self.client.login(username="user1", password="password")
+
+        parent_a = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        parent_b = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+
+        response = self.client.post(reverse('add_step', args=[self.exp1.id, self.experiment1_item.id]), {
+            'step_name': 'AA',
+            'step_description': 'Combined slurry',
+            'status': 'Planned',
+            'parents': [str(parent_a.id), str(parent_b.id)],
+        })
+
+        self.assertEqual(response.status_code, 302)
+        step = ExperimentStep.objects.get(step_description="Combined slurry")
+        self.assertEqual(set(step.parents.all()), {parent_a, parent_b})
+        self.assertEqual(step.parent, parent_a)
+
+    def test_edit_step_replaces_parents(self):
+        self.client.login(username="user1", password="password")
+
+        parent_a = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        parent_b = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item, step_description="Before")
+        step.parents.set([parent_a])
+
+        response = self.client.post(reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, step.id]), {
+            'step_name': 'AA',
+            'step_description': 'After',
+            'status': 'Planned',
+            'parents': [str(parent_b.id)],
+        })
+
+        self.assertEqual(response.status_code, 302)
+        step.refresh_from_db()
+        self.assertEqual(step.step_description, "After")
+        self.assertEqual(list(step.parents.all()), [parent_b])
+        self.assertEqual(step.parent, parent_b)
+
+    def test_delete_step_blocks_step_with_downstream_link(self):
+        self.client.login(username="user1", password="password")
+
+        parent = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        child = ExperimentStep.objects.create(step_name="BB", experiment=self.experiment1_item)
+        child.parents.set([parent])
+
+        response = self.client.get(reverse('delete_step', args=[self.exp1.id, self.experiment1_item.id, parent.id]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(ExperimentStep.objects.filter(id=parent.id).exists())
+        self.assertTrue(ExperimentStep.objects.filter(id=child.id).exists())
+
+    def test_delete_steps_blocks_step_with_legacy_downstream_child(self):
+        self.client.login(username="user1", password="password")
+
+        parent = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        child = ExperimentStep.objects.create(step_name="BB", experiment=self.experiment1_item, parent=parent)
+
+        response = self.client.post(
+            reverse('delete_steps', args=[self.exp1.id]),
+            json.dumps({'step_ids': [parent.id]}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['success'], False)
+        self.assertIn(parent.full_step, response.json()['error'])
+        self.assertTrue(ExperimentStep.objects.filter(id=parent.id).exists())
+        self.assertTrue(ExperimentStep.objects.filter(id=child.id).exists())
+
     def test_ajax_update_status(self):
         self.client.login(username="user1", password="password")
-        step = ExperimentStep.objects.create(step_name="AA", flow=self.flow1)
+        step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
         
         url = reverse('update_step_status', args=[step.id])
         data = {'status': 'Completed'}
@@ -162,7 +232,7 @@ class ViewTests(TestCase):
         self.client.login(username="user1", password="password")
         
         # Create source step
-        step1 = ExperimentStep.objects.create(step_name="AA", flow=self.flow1, step_description="Source")
+        step1 = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item, step_description="Source")
         StepRawMaterialUsage.objects.create(
             step=step1,
             raw_material=self.raw_material,
@@ -170,13 +240,13 @@ class ViewTests(TestCase):
             unit="ml"
         )
         
-        # Create target flow
-        flow2 = Experiment.objects.create(flow_name="BB", exp=self.exp1)
+        # Create target project_experiment
+        experiment2 = Experiment.objects.create(experiment_code="BB", project=self.exp1)
         
         url = reverse('copy_steps', args=[self.exp1.id])
         data = {
             'step_ids': [step1.id],
-            'target_flow_name': flow2.full_flow
+            'target_experiment_code': experiment2.full_experiment_code
         }
         
         response = self.client.post(url, json.dumps(data), content_type='application/json')
@@ -184,7 +254,7 @@ class ViewTests(TestCase):
         self.assertEqual(response.json()['success'], True)
         
         # Verify copy
-        copied_step = ExperimentStep.objects.get(flow=flow2, step_name="AA", step_description="Source")
+        copied_step = ExperimentStep.objects.get(experiment=experiment2, step_name="AA", step_description="Source")
         copied_usage = StepRawMaterialUsage.objects.get(step=copied_step)
         self.assertEqual(copied_usage.raw_material, self.raw_material)
         self.assertEqual(copied_usage.unit, "ml")
@@ -229,18 +299,94 @@ class ViewTests(TestCase):
         self.assertEqual(self.raw_material.batch_number, "RM001-062126")
         self.assertIsNone(self.raw_material.material_name)
 
+    def test_management_dashboard_requires_staff(self):
+        self.client.login(username="user1", password="password")
+        response = self.client.get(reverse('management_dashboard'))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url.split('?')[0], reverse('index'))
+
+    def test_staff_can_create_team_and_assign_member(self):
+        self.client.login(username="staff", password="password")
+        response = self.client.post(reverse('add_team'), {
+            'group_name': 'New Team',
+            'team_code': 'NEW',
+        })
+        self.assertRedirects(response, reverse('management_dashboard') + '#teams')
+        team = ResearchGroup.objects.get(team_code='NEW')
+        self.assertTrue(ProjectCategory.objects.filter(group=team, project_code='NEW').exists())
+
+        response = self.client.post(reverse('assign_member_team', args=[self.user1.id]), {
+            'research_group': team.id,
+        })
+        self.assertRedirects(response, reverse('management_dashboard') + '#members')
+        self.user1.profile.refresh_from_db()
+        self.assertEqual(self.user1.profile.research_group, team)
+
+    def test_project_owner_must_belong_to_project_team(self):
+        self.client.login(username="staff", password="password")
+        response = self.client.post(reverse('edit_managed_project', args=[self.exp1.id]), {
+            'exp_description': 'Updated centrally',
+            'owner': self.user2.id,
+        })
+        self.assertRedirects(response, reverse('management_dashboard') + '#projects')
+        self.exp1.refresh_from_db()
+        self.assertEqual(self.exp1.owner, self.user1)
+
+        response = self.client.post(reverse('edit_managed_project', args=[self.exp1.id]), {
+            'exp_description': 'Updated centrally',
+            'owner': self.staff_user.id,
+        })
+        self.assertRedirects(response, reverse('management_dashboard') + '#projects')
+        self.exp1.refresh_from_db()
+        self.assertEqual(self.exp1.owner, self.staff_user)
+        self.assertEqual(self.exp1.exp_description, 'Updated centrally')
+
+    def test_management_crud_for_projects_members_and_step_templates(self):
+        self.client.login(username="staff", password="password")
+
+        response = self.client.post(reverse('add_managed_user'), {
+            'username': 'new_member', 'email': 'new@example.com',
+            'password': 'secure-pass-123', 'research_group': self.group1.id,
+            'is_active': 'on',
+        })
+        self.assertRedirects(response, reverse('management_dashboard') + '#members')
+        member = User.objects.get(username='new_member')
+        self.assertEqual(member.profile.research_group, self.group1)
+
+        response = self.client.post(reverse('add_managed_project'), {
+            'team': self.group1.id, 'owner': member.id, 'exp_description': 'Managed project',
+        })
+        self.assertRedirects(response, reverse('management_dashboard') + '#projects')
+        project = Project.objects.get(owner=member, exp_description='Managed project')
+        self.assertTrue(project.exp_name.startswith('PRA'))
+
+        response = self.client.post(reverse('add_step_template'), {
+            'step_code': 'ZZ', 'step_label': 'Managed Step',
+            'category': 'Test', 'default_description': 'Template description',
+            'is_active': 'on',
+        })
+        self.assertRedirects(response, reverse('management_dashboard') + '#steps')
+        template = StepNameTemplate.objects.get(step_code='ZZ')
+
+        self.client.post(reverse('delete_step_template', args=[template.id]))
+        self.assertFalse(StepNameTemplate.objects.filter(id=template.id).exists())
+        self.client.post(reverse('delete_managed_project', args=[project.id]))
+        self.assertFalse(Project.objects.filter(id=project.id).exists())
+        self.client.post(reverse('delete_managed_user', args=[member.id]))
+        self.assertFalse(User.objects.filter(id=member.id).exists())
+
     def test_copy_step_preserves_external_parent(self):
         self.client.login(username="user1", password="password")
 
-        parent = ExperimentStep.objects.create(step_name="MX", flow=self.flow1)
-        child = ExperimentStep.objects.create(step_name="CA", flow=self.flow1, parent=parent)
-        flow2 = Experiment.objects.create(flow_name="BB", exp=self.exp1)
+        parent = ExperimentStep.objects.create(step_name="MX", experiment=self.experiment1_item)
+        child = ExperimentStep.objects.create(step_name="CA", experiment=self.experiment1_item, parent=parent)
+        experiment2 = Experiment.objects.create(experiment_code="BB", project=self.exp1)
 
         response = self.client.post(
             reverse('copy_steps', args=[self.exp1.id]),
             json.dumps({
                 'step_ids': [child.id],
-                'target_flow_name': flow2.full_flow
+                'target_experiment_code': experiment2.full_experiment_code
             }),
             content_type='application/json'
         )
@@ -248,21 +394,22 @@ class ViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['success'], True)
 
-        copied_child = ExperimentStep.objects.get(flow=flow2, step_name="CA")
+        copied_child = ExperimentStep.objects.get(experiment=experiment2, step_name="CA")
         self.assertEqual(copied_child.parent, parent)
+        self.assertEqual(list(copied_child.parents.all()), [parent])
 
     def test_copy_steps_remaps_parent_when_parent_is_copied(self):
         self.client.login(username="user1", password="password")
 
-        parent = ExperimentStep.objects.create(step_name="MX", flow=self.flow1)
-        child = ExperimentStep.objects.create(step_name="CA", flow=self.flow1, parent=parent)
-        flow2 = Experiment.objects.create(flow_name="BB", exp=self.exp1)
+        parent = ExperimentStep.objects.create(step_name="MX", experiment=self.experiment1_item)
+        child = ExperimentStep.objects.create(step_name="CA", experiment=self.experiment1_item, parent=parent)
+        experiment2 = Experiment.objects.create(experiment_code="BB", project=self.exp1)
 
         response = self.client.post(
             reverse('copy_steps', args=[self.exp1.id]),
             json.dumps({
                 'step_ids': [parent.id, child.id],
-                'target_flow_name': flow2.full_flow
+                'target_experiment_code': experiment2.full_experiment_code
             }),
             content_type='application/json'
         )
@@ -270,16 +417,43 @@ class ViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['success'], True)
 
-        copied_parent = ExperimentStep.objects.get(flow=flow2, step_name="MX")
-        copied_child = ExperimentStep.objects.get(flow=flow2, step_name="CA")
+        copied_parent = ExperimentStep.objects.get(experiment=experiment2, step_name="MX")
+        copied_child = ExperimentStep.objects.get(experiment=experiment2, step_name="CA")
         self.assertEqual(copied_child.parent, copied_parent)
+        self.assertEqual(list(copied_child.parents.all()), [copied_parent])
+
+    def test_copy_step_preserves_multiple_parent_links(self):
+        self.client.login(username="user1", password="password")
+
+        parent_a = ExperimentStep.objects.create(step_name="MX", experiment=self.experiment1_item)
+        parent_b = ExperimentStep.objects.create(step_name="MY", experiment=self.experiment1_item)
+        child = ExperimentStep.objects.create(step_name="CA", experiment=self.experiment1_item)
+        child.parents.set([parent_a, parent_b])
+        experiment2 = Experiment.objects.create(experiment_code="BB", project=self.exp1)
+
+        response = self.client.post(
+            reverse('copy_steps', args=[self.exp1.id]),
+            json.dumps({
+                'step_ids': [child.id],
+                'target_experiment_code': experiment2.full_experiment_code
+            }),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['success'], True)
+
+        copied_child = ExperimentStep.objects.get(experiment=experiment2, step_name="CA")
+        self.assertEqual(set(copied_child.parents.all()), {parent_a, parent_b})
 
     def test_step_genealogy_view_shows_lineage_descendants_and_materials(self):
         self.client.login(username="user1", password="password")
 
-        root = ExperimentStep.objects.create(step_name="AA", flow=self.flow1, step_description="Root step")
-        current = ExperimentStep.objects.create(step_name="BB", flow=self.flow1, parent=root, recipe="R1")
-        child = ExperimentStep.objects.create(step_name="CC", flow=self.flow1, parent=current)
+        root = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item, step_description="Root step")
+        current = ExperimentStep.objects.create(step_name="BB", experiment=self.experiment1_item, recipe="R1")
+        current.parents.set([root])
+        child = ExperimentStep.objects.create(step_name="CC", experiment=self.experiment1_item)
+        child.parents.set([current])
         StepRawMaterialUsage.objects.create(
             step=current,
             raw_material=self.raw_material,
@@ -296,10 +470,25 @@ class ViewTests(TestCase):
         self.assertContains(response, self.raw_material.batch_number)
         self.assertContains(response, "R1")
 
+    def test_step_genealogy_view_shows_multiple_upstream_steps(self):
+        self.client.login(username="user1", password="password")
+
+        slurry_a = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        slurry_b = ExperimentStep.objects.create(step_name="BB", experiment=self.experiment1_item)
+        final_mix = ExperimentStep.objects.create(step_name="MX", experiment=self.experiment1_item)
+        final_mix.parents.set([slurry_a, slurry_b])
+
+        response = self.client.get(reverse('step_genealogy', args=[final_mix.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, slurry_a.full_step)
+        self.assertContains(response, slurry_b.full_step)
+        self.assertContains(response, final_mix.full_step)
+
     def test_step_genealogy_view_respects_group_access(self):
         self.client.login(username="user1", password="password")
-        flow2 = Experiment.objects.create(flow_name="AA", exp=self.exp2)
-        other_step = ExperimentStep.objects.create(step_name="AA", flow=flow2)
+        experiment2 = Experiment.objects.create(experiment_code="AA", project=self.exp2)
+        other_step = ExperimentStep.objects.create(step_name="AA", experiment=experiment2)
 
         response = self.client.get(reverse('step_genealogy', args=[other_step.id]))
 

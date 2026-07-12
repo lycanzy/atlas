@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.db.models.signals import post_save
+from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 import re
@@ -99,11 +99,11 @@ class Project(models.Model):
 class Experiment(models.Model):
     """Experiment under a project, such as AFE001AA."""
 
-    flow_name = models.CharField(max_length = 2)
-    flow_description = models.TextField(blank = True, null = True)
-    exp = models.ForeignKey(Project, on_delete = models.CASCADE, related_name = 'flow', null = True)
+    experiment_code = models.CharField(max_length = 2)
+    experiment_description = models.TextField(blank = True, null = True)
+    project = models.ForeignKey(Project, on_delete = models.CASCADE, related_name = 'experiments', null = True)
     created_on = models.DateTimeField(auto_now_add=True, null = True)
-    full_flow = models.CharField(max_length=35, editable=False, db_index=True, null = True)  # Adding index for faster queries
+    full_experiment_code = models.CharField(max_length=35, editable=False, db_index=True, null = True)  # Adding index for faster queries
 
     class Meta:
         db_table = "experiment_flow_expflow"
@@ -111,36 +111,29 @@ class Experiment(models.Model):
         verbose_name_plural = "Experiments"
 
     def clean(self):
-        if self.flow_name:
+        if self.experiment_code:
             # Check if the input contains exactly 2 alphabetic characters
-            if not (len(self.flow_name) == 2 and self.flow_name.isalpha()):
+            if not (len(self.experiment_code) == 2 and self.experiment_code.isalpha()):
                 raise ValidationError('实验代码必须是 2 个英文字母。')
             # Convert to uppercase
-            self.flow_name = self.flow_name.upper()
+            self.experiment_code = self.experiment_code.upper()
 
     def save(self, *args, **kwargs):
         self.full_clean()
         # Business naming: project code (e.g. PCA001) + experiment suffix (e.g. AA).
-        if self.exp:
-            self.full_flow = f"{self.exp.exp_name}{self.flow_name}"
+        if self.project:
+            self.full_experiment_code = f"{self.project.exp_name}{self.experiment_code}"
         else:
-            self.full_flow = self.flow_name
+            self.full_experiment_code = self.experiment_code
         super().save(*args, **kwargs)
 
     def __str__(self):
-        if self.full_flow:
-            return str(self.full_flow)
-        if self.flow_name:
-            return str(self.flow_name)
+        if self.full_experiment_code:
+            return str(self.full_experiment_code)
+        if self.experiment_code:
+            return str(self.experiment_code)
         return "未命名实验"
-    
-    @property
-    def flow(self):
-        """Returns the full flow identifier combining experiment name and flow name"""
-        if self.exp:
-            return f"{self.exp.exp_name}{self.flow_name}"
-        return self.flow_name
-    
+
 class ExperimentStep(models.Model):
     """Process step inside an experiment, such as AFE001AA-MX00."""
 
@@ -172,8 +165,16 @@ class ExperimentStep(models.Model):
         default="Planned"
     )
 
-    flow = models.ForeignKey(Experiment, on_delete = models.CASCADE, related_name = 'step', null = True)
+    experiment = models.ForeignKey(Experiment, on_delete = models.CASCADE, related_name = 'steps', null = True)
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, related_name='child', null=True, blank=True)
+    parents = models.ManyToManyField(
+        'self',
+        through='ExperimentStepLink',
+        through_fields=('child_step', 'parent_step'),
+        symmetrical=False,
+        related_name='children',
+        blank=True,
+    )
 
     class Meta:
         db_table = "experiment_flow_expstep"
@@ -197,22 +198,31 @@ class ExperimentStep(models.Model):
 
     @property
     def step_num(self):
-        """Count the number of previous steps within the current flow only"""
-        step_num = 0
-        current = self.parent
-        while current:
-            # Only count if the parent is in the same flow
-            if current.flow == self.flow:
-                step_num += 1
-            current = current.parent   # ✅ move up to the next parent
-        return f"{step_num:02d}"
+        """Count the number of previous steps within the current experiment only"""
+        def chain_length(step, seen_ids=None):
+            seen_ids = seen_ids or set()
+            if not step or step.id in seen_ids:
+                return 0
+            seen_ids.add(step.id)
+
+            parents = list(step.parents.all()) if step.pk else []
+            if not parents and step.parent:
+                parents = [step.parent]
+
+            lengths = []
+            for parent in parents:
+                if parent.experiment == self.experiment:
+                    lengths.append(1 + chain_length(parent, seen_ids.copy()))
+            return max(lengths, default=0)
+
+        return f"{chain_length(self):02d}"
 
 
     def save(self, *args, **kwargs):
         if not self.step_number:  # Only set number if it's not already set
-            # Get the highest number for this step name in this flow
+            # Get the highest number for this step name in this experiment
             existing_steps = ExperimentStep.objects.filter(
-                flow=self.flow,
+                experiment=self.experiment,
                 step_name=self.step_name
             ).exclude(pk=self.pk)  # Exclude self if updating
             
@@ -227,8 +237,8 @@ class ExperimentStep(models.Model):
             self.step_number = f"{next_number:02d}"
         
         # Update full_step
-        if self.flow and self.flow.exp and self.step_number:
-            self.full_step = f"{self.flow.full_flow}-{self.full_step_name}"
+        if self.experiment and self.experiment.project and self.step_number:
+            self.full_step = f"{self.experiment.full_experiment_code}-{self.full_step_name}"
         elif self.step_number:
             self.full_step = self.full_step_name
 
@@ -240,12 +250,120 @@ class ExperimentStep(models.Model):
         self.clean()
         super().save(*args, **kwargs)
 
+        if self.parent_id and not self.parents.filter(id=self.parent_id).exists():
+            ExperimentStepLink.objects.get_or_create(
+                parent_step_id=self.parent_id,
+                child_step_id=self.id,
+            )
+
     def __str__(self):
         if hasattr(self, 'full_step') and self.full_step:
             return str(self.full_step)
         if self.step_name:
             return f"{self.step_name}{self.step_number or '00'}"
         return "未命名步骤"
+
+
+class ExperimentStepLink(models.Model):
+    """Directed genealogy edge from an upstream step to a downstream step."""
+
+    parent_step = models.ForeignKey(
+        ExperimentStep,
+        on_delete=models.CASCADE,
+        related_name='outgoing_links',
+    )
+    child_step = models.ForeignKey(
+        ExperimentStep,
+        on_delete=models.CASCADE,
+        related_name='incoming_links',
+    )
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "experiment_flow_expsteplink"
+        verbose_name = "Experiment Step Link"
+        verbose_name_plural = "Experiment Step Links"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['parent_step', 'child_step'],
+                name='unique_experiment_step_link',
+            )
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.parent_step_id and self.parent_step_id == self.child_step_id:
+            raise ValidationError('步骤不能将自己设为前置步骤。')
+        if self.parent_step_id and self.child_step_id and step_link_would_create_cycle(
+            self.parent_step_id,
+            self.child_step_id,
+            exclude_link_id=self.pk,
+        ):
+            raise ValidationError('前置步骤不能形成循环谱系。')
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.parent_step} -> {self.child_step}"
+
+
+def step_link_would_create_cycle(parent_step_id, child_step_id, exclude_link_id=None):
+    """Return True when adding parent -> child would create a directed cycle."""
+    if parent_step_id == child_step_id:
+        return True
+
+    links = ExperimentStepLink.objects.all()
+    if exclude_link_id:
+        links = links.exclude(id=exclude_link_id)
+
+    adjacency = {}
+    for source_id, target_id in links.values_list('parent_step_id', 'child_step_id'):
+        adjacency.setdefault(source_id, set()).add(target_id)
+
+    stack = list(adjacency.get(child_step_id, set()))
+    seen = set()
+    while stack:
+        current_id = stack.pop()
+        if current_id == parent_step_id:
+            return True
+        if current_id in seen:
+            continue
+        seen.add(current_id)
+        stack.extend(adjacency.get(current_id, set()))
+    return False
+
+
+@receiver(m2m_changed, sender=ExperimentStep.parents.through)
+def validate_experiment_step_parent_links(sender, instance, action, reverse, pk_set, **kwargs):
+    if action == 'pre_add' and pk_set:
+        for related_step_id in pk_set:
+            parent_step_id = instance.id if reverse else related_step_id
+            child_step_id = related_step_id if reverse else instance.id
+            if step_link_would_create_cycle(parent_step_id, child_step_id):
+                raise ValidationError('前置步骤不能形成循环谱系。')
+        return
+
+    if action not in {'post_add', 'post_remove', 'post_clear'}:
+        return
+
+    affected_steps = []
+    if reverse:
+        affected_steps = list(ExperimentStep.objects.filter(id__in=pk_set or []))
+    else:
+        affected_steps = [instance]
+
+    for step in affected_steps:
+        first_parent = step.parents.order_by(
+            'experiment__project__exp_name',
+            'experiment__experiment_code',
+            'step_name',
+            'step_number',
+        ).first()
+        ExperimentStep.objects.filter(id=step.id).update(
+            parent_id=first_parent.id if first_parent else None
+        )
 
 class StepNameTemplate(models.Model):
     """Predefined step name templates that can be selected when adding/editing steps"""
@@ -280,7 +398,7 @@ class Sample(models.Model):
 
     sample_name = models.CharField(max_length = 50)
     created_on = models.DateTimeField(auto_now_add=True)
-    flow = models.ForeignKey(ExperimentStep, on_delete = models.CASCADE, related_name = 'sample', null = True)
+    step = models.ForeignKey(ExperimentStep, on_delete = models.CASCADE, related_name = 'samples', null = True)
 
     def __str__(self):
         return str(self.sample_name) if self.sample_name else "未命名样品"
@@ -391,22 +509,19 @@ class StepRawMaterialUsage(models.Model):
         amount = f" - {self.quantity:g} {self.unit or ''}".strip() if self.quantity is not None else ""
         return f"{self.step} uses {self.raw_material}{amount}"
 
-# Signal to update all flow identifiers when experiment changes
+# Signal to update all experiment identifiers when project code changes
 @receiver(post_save, sender=Project)
-def update_flow_identifiers(sender, instance, **kwargs):
-    # Update all related flows
-    for flow in instance.flow.all():
-        flow.full_flow = f"{instance.exp_name}{flow.flow_name}"
-        flow.save()
-        # Update all steps in this flow
-        for step in flow.step.all():
-            step.full_step = f"{flow.full_flow}-{step.full_step_name}"
+def update_experiment_identifiers(sender, instance, **kwargs):
+    for experiment in instance.experiments.all():
+        experiment.full_experiment_code = f"{instance.exp_name}{experiment.experiment_code}"
+        experiment.save()
+        for step in experiment.steps.all():
+            step.full_step = f"{experiment.full_experiment_code}-{step.full_step_name}"
             step.save(update_fields=['full_step'])
 
-# Signal to update ExperimentStep.full_step when flow changes
+# Signal to update ExperimentStep.full_step when experiment changes
 @receiver(post_save, sender=Experiment)
 def update_step_identifiers(sender, instance, **kwargs):
-    # Update all related steps
-    for step in instance.step.all():
-        step.full_step = f"{instance.full_flow}-{step.full_step_name}"
+    for step in instance.steps.all():
+        step.full_step = f"{instance.full_experiment_code}-{step.full_step_name}"
         step.save(update_fields=['full_step'])

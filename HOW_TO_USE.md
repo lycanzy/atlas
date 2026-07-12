@@ -13,8 +13,8 @@ The **Experiment Tracking App (ETA)** is designed to help research groups effici
 ## Key Concepts
 *   **Project**: The top-level category (e.g., "Solar Cell Research").
 *   **Experiment (Exp)**: A specific experimental run belonging to a project. Names are auto-generated (e.g., `PROJ001`).
-*   **Flow**: A sequence of steps within an experiment, identified by a 2-letter code (e.g., `AA`). Full ID: `PROJ001AA`.
-*   **Step**: A single action within a flow. Steps can be linked to *any* previous step from any experiment to create a history chain. Full ID: `PROJ001AA-BB01`.
+*   **Experiment**: A sequence of steps within an experiment, identified by a 2-letter code (e.g., `AA`). Full ID: `PROJ001AA`.
+*   **Step**: A single action within a experiment. Steps can be linked to *any* previous step from any experiment to create a history chain. Full ID: `PROJ001AA-BB01`.
 
 ## Getting Started
 
@@ -38,17 +38,17 @@ The **Experiment Tracking App (ETA)** is designed to help research groups effici
 
 ### Viewing an Experiment
 *   Click on an experiment name in the dashboard to view its details.
-*   You will see a list of **Flows** and **Steps**.
+*   You will see a list of **Experiments** and **Steps**.
 
-## Managing Flows and Steps
+## Managing Experiments and Steps
 
-### Adding a Flow
-1.  Inside an experiment, click **"Add Flow"**.
+### Adding a Experiment
+1.  Inside an experiment, click **"Add Experiment"**.
 2.  Enter a **2-letter code** (e.g., `AA`, `BB`).
-3.  The flow will be created (e.g., `SOL005AA`).
+3.  The experiment will be created (e.g., `SOL005AA`).
 
 ### Adding a Step
-1.  Click the **"+" (Add Step)** button next to a Flow.
+1.  Click the **"+" (Add Step)** button next to a Experiment.
 2.  **Step Name**: Enter a 2-letter code for the step type (e.g., `CL` for Cleaning).
 3.  **Previous Step (Crucial Feature)**:
     *   You can link this step to a parent step.
@@ -61,7 +61,7 @@ The **Experiment Tracking App (ETA)** is designed to help research groups effici
 ### Managing Steps
 *   **Edit**: Click the edit icon to change details.
 *   **Status**: You can quickly update the status (e.g., mark as Completed).
-*   **Copy Steps**: You can select multiple steps and copy them to another flow.
+*   **Copy Steps**: You can select multiple steps and copy them to another experiment.
 
 ## Equipment Management
 *   Navigate to the **Equipment** section.
@@ -77,7 +77,7 @@ The **Experiment Tracking App (ETA)** is designed to help research groups effici
 ## 核心概念
 *   **项目 (Project)**: 最高层级的分类 (例如：“太阳能电池研究”)。
 *   **实验 (Experiment)**: 属于某个项目的具体实验运行。名称由系统自动生成 (例如：`PROJ001`)。
-*   **流程 (Flow)**: 实验中的一系列步骤序列，由2个字母的代码标识 (例如：`AA`)。完整ID：`PROJ001AA`。
+*   **流程 (Experiment)**: 实验中的一系列步骤序列，由2个字母的代码标识 (例如：`AA`)。完整ID：`PROJ001AA`。
 *   **步骤 (Step)**: 流程中的单个操作。步骤可以链接到系统中*任何*实验的*任何*前置步骤，从而创建完整的历史链条。完整ID：`PROJ001AA-BB01`。
 
 ## 入门指南
@@ -102,12 +102,12 @@ The **Experiment Tracking App (ETA)** is designed to help research groups effici
 
 ### 查看实验
 *   在仪表盘中点击实验名称以查看详情。
-*   您将看到该实验下的 **Flows (流程)** 和 **Steps (步骤)** 列表。
+*   您将看到该实验下的 **Experiments (流程)** 和 **Steps (步骤)** 列表。
 
 ## 管理流程和步骤
 
-### 添加流程 (Flow)
-1.  在实验详情页，点击 **"Add Flow" (添加流程)**。
+### 添加流程 (Experiment)
+1.  在实验详情页，点击 **"Add Experiment" (添加流程)**。
 2.  输入一个 **2字母代码** (例如：`AA`, `BB`)。
 3.  流程将被创建 (例如：`SOL005AA`)。
 

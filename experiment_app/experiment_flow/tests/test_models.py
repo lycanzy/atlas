@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from datetime import date
 from experiment_flow.models import (
-    ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, Equipment,
+    ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, ExperimentStepLink, Equipment,
     RawMaterial, StepRawMaterialUsage
 )
 
@@ -77,26 +77,26 @@ class ModelTests(TestCase):
         self.assertEqual(exp2.exp_name, "TPR002")
 
     def test_flow_creation_and_signals(self):
-        """Test flow creation, validation, and full_flow signal"""
+        """Test project_experiment creation, validation, and full_experiment_code signal"""
         exp = Project.objects.create(
             exp_name="TPR001",
             project=self.project,
             owner=self.user
         )
         
-        flow = Experiment(
-            flow_name="aa", # Lowercase, should be converted
-            exp=exp
+        project_experiment = Experiment(
+            experiment_code="aa", # Lowercase, should be converted
+            project=exp
         )
-        flow.full_clean()
-        flow.save()
+        project_experiment.full_clean()
+        project_experiment.save()
         
-        self.assertEqual(flow.flow_name, "AA")
-        self.assertEqual(flow.full_flow, "TPR001AA")
-        self.assertFalse(hasattr(flow, "barcode"))
+        self.assertEqual(project_experiment.experiment_code, "AA")
+        self.assertEqual(project_experiment.full_experiment_code, "TPR001AA")
+        self.assertFalse(hasattr(project_experiment, "barcode"))
 
-        # Test invalid flow name
-        flow_bad = Experiment(flow_name="A", exp=exp)
+        # Test invalid project_experiment name
+        flow_bad = Experiment(experiment_code="A", project=exp)
         with self.assertRaises(ValidationError):
             flow_bad.full_clean()
 
@@ -107,12 +107,12 @@ class ModelTests(TestCase):
             project=self.project,
             owner=self.user
         )
-        flow = Experiment.objects.create(flow_name="AA", exp=exp)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
         
         # First step
         step1 = ExperimentStep(
             step_name="ST",
-            flow=flow,
+            experiment=project_experiment,
             step_description="Step 1"
         )
         step1.save()
@@ -124,7 +124,7 @@ class ModelTests(TestCase):
         # Second step with same name
         step2 = ExperimentStep(
             step_name="ST",
-            flow=flow,
+            experiment=project_experiment,
             step_description="Step 2"
         )
         step2.save()
@@ -134,51 +134,98 @@ class ModelTests(TestCase):
         # Step with different name
         step3 = ExperimentStep(
             step_name="XY",
-            flow=flow
+            experiment=project_experiment
         )
         step3.save()
         self.assertEqual(step3.step_number, "00")
         self.assertEqual(step3.full_step, "TPR001AA-XY00")
 
     def test_step_num_property(self):
-        """Test the step_num property which counts previous steps in the flow"""
+        """Test the step_num property which counts previous steps in the project_experiment"""
         exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
-        flow = Experiment.objects.create(flow_name="AA", exp=exp)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
         
-        step1 = ExperimentStep.objects.create(step_name="AA", flow=flow)
-        step2 = ExperimentStep.objects.create(step_name="BB", flow=flow, parent=step1)
-        step3 = ExperimentStep.objects.create(step_name="CC", flow=flow, parent=step2)
+        step1 = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
+        step2 = ExperimentStep.objects.create(step_name="BB", experiment=project_experiment, parent=step1)
+        step3 = ExperimentStep.objects.create(step_name="CC", experiment=project_experiment, parent=step2)
         
         self.assertEqual(step1.step_num, "00")
         self.assertEqual(step2.step_num, "01")
         self.assertEqual(step3.step_num, "02")
         
-        # Test with parent in different flow (should break chain)
-        flow2 = Experiment.objects.create(flow_name="BB", exp=exp)
-        step_other = ExperimentStep.objects.create(step_name="ZZ", flow=flow2)
+        # Test with parent in different project_experiment (should break chain)
+        experiment2 = Experiment.objects.create(experiment_code="BB", project=exp)
+        step_other = ExperimentStep.objects.create(step_name="ZZ", experiment=experiment2)
         
-        step4 = ExperimentStep.objects.create(step_name="DD", flow=flow, parent=step_other)
+        step4 = ExperimentStep.objects.create(step_name="DD", experiment=project_experiment, parent=step_other)
         self.assertEqual(step4.step_num, "00")
 
     def test_step_parent_cycle_is_rejected(self):
         exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
-        flow = Experiment.objects.create(flow_name="AA", exp=exp)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
 
-        step1 = ExperimentStep.objects.create(step_name="AA", flow=flow)
-        step2 = ExperimentStep.objects.create(step_name="BB", flow=flow, parent=step1)
-        step3 = ExperimentStep.objects.create(step_name="CC", flow=flow, parent=step2)
+        step1 = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
+        step2 = ExperimentStep.objects.create(step_name="BB", experiment=project_experiment, parent=step1)
+        step3 = ExperimentStep.objects.create(step_name="CC", experiment=project_experiment, parent=step2)
 
         step1.parent = step3
         with self.assertRaises(ValidationError):
             step1.save()
 
-    def test_update_flow_identifiers_signal(self):
-        """Test that changing experiment name updates flow and step identifiers"""
+    def test_step_can_have_multiple_parent_links(self):
+        exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
+
+        slurry_a = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
+        slurry_b = ExperimentStep.objects.create(step_name="BB", experiment=project_experiment)
+        final_mix = ExperimentStep.objects.create(step_name="CC", experiment=project_experiment)
+
+        final_mix.parents.set([slurry_a, slurry_b])
+
+        self.assertEqual(set(final_mix.parents.all()), {slurry_a, slurry_b})
+        self.assertIn(final_mix, slurry_a.children.all())
+        self.assertIn(final_mix, slurry_b.children.all())
+
+    def test_duplicate_step_link_is_rejected(self):
+        exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
+
+        parent = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
+        child = ExperimentStep.objects.create(step_name="BB", experiment=project_experiment)
+        ExperimentStepLink.objects.create(parent_step=parent, child_step=child)
+
+        with self.assertRaises(Exception):
+            ExperimentStepLink.objects.create(parent_step=parent, child_step=child)
+
+    def test_step_link_self_reference_is_rejected(self):
+        exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
+        step = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
+
+        with self.assertRaises(ValidationError):
+            ExperimentStepLink.objects.create(parent_step=step, child_step=step)
+
+    def test_step_link_cycle_is_rejected(self):
+        exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
+
+        step1 = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
+        step2 = ExperimentStep.objects.create(step_name="BB", experiment=project_experiment)
+        step3 = ExperimentStep.objects.create(step_name="CC", experiment=project_experiment)
+
+        ExperimentStepLink.objects.create(parent_step=step1, child_step=step2)
+        ExperimentStepLink.objects.create(parent_step=step2, child_step=step3)
+
+        with self.assertRaises(ValidationError):
+            ExperimentStepLink.objects.create(parent_step=step3, child_step=step1)
+
+    def test_update_experiment_identifiers_signal(self):
+        """Test that changing experiment name updates project_experiment and step identifiers"""
         exp = Project.objects.create(exp_name="OLD001", project=self.project, owner=self.user)
-        flow = Experiment.objects.create(flow_name="AA", exp=exp)
-        step = ExperimentStep.objects.create(step_name="BB", flow=flow)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
+        step = ExperimentStep.objects.create(step_name="BB", experiment=project_experiment)
         
-        self.assertEqual(flow.full_flow, "OLD001AA")
+        self.assertEqual(project_experiment.full_experiment_code, "OLD001AA")
         self.assertEqual(step.full_step, "OLD001AA-BB00")
         
         # Update experiment name
@@ -186,10 +233,10 @@ class ModelTests(TestCase):
         exp.save()
         
         # Refresh from db
-        flow.refresh_from_db()
+        project_experiment.refresh_from_db()
         step.refresh_from_db()
         
-        self.assertEqual(flow.full_flow, "NEW001AA")
+        self.assertEqual(project_experiment.full_experiment_code, "NEW001AA")
         self.assertEqual(step.full_step, "NEW001AA-BB00")
 
     def test_raw_material_creation_and_unique_batch(self):
@@ -215,8 +262,8 @@ class ModelTests(TestCase):
 
     def test_step_raw_material_usage_unique_per_step(self):
         exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
-        flow = Experiment.objects.create(flow_name="AA", exp=exp)
-        step = ExperimentStep.objects.create(step_name="AA", flow=flow)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
+        step = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
         material = RawMaterial.objects.create(
             material_code="RM002",
             received_date=date(2026, 6, 20),

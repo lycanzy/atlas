@@ -72,24 +72,24 @@
                 </div>
             </div>
             <div class="overview-update-list">
-                {% for flow in recent_experiment_updates %}
-                    <a class="overview-update-item" href="{% url 'experiment_detail' flow.exp.id %}?expanded_flow={{ flow.id }}">
-                        <span class="update-avatar">{{ flow.exp.owner.username|slice:":1"|upper }}</span>
+                {% for project_experiment in recent_experiment_updates %}
+                    <a class="overview-update-item" href="{% url 'experiment_detail' project_experiment.project.id %}?expanded_experiment={{ project_experiment.id }}">
+                        <span class="update-avatar">{{ project_experiment.project.owner.username|slice:":1"|upper }}</span>
                         <span class="update-body">
                             <span class="update-line">
                                 <strong>
-                                    {% if flow.exp.owner.first_name and flow.exp.owner.last_name %}
-                                        {{ flow.exp.owner.first_name }} {{ flow.exp.owner.last_name }}
+                                    {% if project_experiment.project.owner.first_name and project_experiment.project.owner.last_name %}
+                                        {{ project_experiment.project.owner.first_name }} {{ project_experiment.project.owner.last_name }}
                                     {% else %}
-                                        {{ flow.exp.owner.username }}
+                                        {{ project_experiment.project.owner.username }}
                                     {% endif %}
                                 </strong>
-                                创建了 {{ flow.full_flow }}
+                                创建了 {{ project_experiment.full_experiment_code }}
                             </span>
                             <small>
-                                {{ flow.created_on|date:"m/d/Y" }}
-                                {% if flow.exp.project and flow.exp.project.group %}
-                                    · {{ flow.exp.project.group.group_name }}
+                                {{ project_experiment.created_on|date:"m/d/Y" }}
+                                {% if project_experiment.project.project and project_experiment.project.project.group %}
+                                    · {{ project_experiment.project.project.group.group_name }}
                                 {% endif %}
                             </small>
                         </span>
