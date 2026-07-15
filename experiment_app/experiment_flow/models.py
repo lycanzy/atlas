@@ -41,6 +41,69 @@ class UserProfile(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.research_group.group_name if self.research_group else '无研究组'}"
 
+
+class AuditLog(models.Model):
+    """Immutable application audit event shown in the management center."""
+
+    ACTION_CHOICES = [
+        ('create', '新增'),
+        ('update', '修改'),
+        ('delete', '删除'),
+        ('copy', '复制'),
+        ('status', '状态变化'),
+        ('login', '登录'),
+        ('login_failed', '登录失败'),
+        ('logout', '退出'),
+        ('password_change', '修改密码'),
+        ('permission_denied', '权限拒绝'),
+    ]
+    CATEGORY_CHOICES = [
+        ('auth', '认证'),
+        ('project', 'Project'),
+        ('experiment', 'Experiment'),
+        ('step', 'Step'),
+        ('equipment', '设备'),
+        ('raw_material', '原材料'),
+        ('member', '成员'),
+        ('management', '系统管理'),
+    ]
+    OUTCOME_CHOICES = [
+        ('success', '成功'),
+        ('failed', '失败'),
+        ('denied', '拒绝'),
+    ]
+
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_events',
+    )
+    actor_username = models.CharField(max_length=150, blank=True, db_index=True)
+    actor_team = models.CharField(max_length=100, blank=True, db_index=True)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default='management', db_index=True)
+    action = models.CharField(max_length=30, choices=ACTION_CHOICES, db_index=True)
+    outcome = models.CharField(max_length=10, choices=OUTCOME_CHOICES, default='success', db_index=True)
+    entity_type = models.CharField(max_length=50, db_index=True)
+    object_id = models.CharField(max_length=64, blank=True)
+    object_repr = models.CharField(max_length=200)
+    summary = models.CharField(max_length=500)
+    changes = models.JSONField(default=dict, blank=True)
+    request_path = models.CharField(max_length=255, blank=True)
+    request_method = models.CharField(max_length=10, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_on = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_on', '-id']
+        verbose_name = 'Audit Log'
+        verbose_name_plural = 'Audit Logs'
+
+    def __str__(self):
+        actor = self.actor_username or (self.actor.username if self.actor else '匿名用户')
+        return f"{actor} {self.get_action_display()} {self.entity_type} {self.object_repr}"
+
 class ProjectCategory(models.Model):
     """Project category/program metadata used to group generated project records."""
     
@@ -395,10 +458,62 @@ class StepNameTemplate(models.Model):
         return f"{self.step_code} - {self.step_label}" if self.step_label else self.step_code
 
 class Sample(models.Model):
+    MAX_SAMPLES_PER_STEP = 200
 
-    sample_name = models.CharField(max_length = 50)
+    sample_name = models.CharField(max_length=54, db_index=True)
+    sample_number = models.PositiveSmallIntegerField(null=True, blank=True, editable=False)
     created_on = models.DateTimeField(auto_now_add=True)
-    step = models.ForeignKey(ExperimentStep, on_delete = models.CASCADE, related_name = 'samples', null = True)
+    step = models.ForeignKey(ExperimentStep, on_delete=models.CASCADE, related_name='samples', null=True)
+
+    class Meta:
+        ordering = ['sample_number', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['step', 'sample_number'],
+                name='unique_sample_number_per_step',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(sample_number__isnull=True) | (
+                    models.Q(sample_number__gte=1) & models.Q(sample_number__lte=200)
+                ),
+                name='sample_number_between_1_and_200',
+            ),
+        ]
+
+    @classmethod
+    def sync_for_step(cls, step, target_count):
+        """Create missing numbered samples up to target_count without deleting history."""
+        if not 0 <= target_count <= cls.MAX_SAMPLES_PER_STEP:
+            raise ValidationError({'sample_count': '样品数量必须在 0 到 200 之间。'})
+
+        existing_samples = {
+            sample.sample_number: sample
+            for sample in cls.objects.filter(
+                step=step,
+                sample_number__isnull=False,
+            )
+        }
+        samples_to_create = []
+        samples_to_rename = []
+        for sample_number in range(1, target_count + 1):
+            sample_name = f"{step.full_step}-{sample_number:02d}"
+            sample = existing_samples.get(sample_number)
+            if sample is None:
+                samples_to_create.append(cls(
+                    step=step,
+                    sample_number=sample_number,
+                    sample_name=sample_name,
+                ))
+            elif sample.sample_name != sample_name:
+                sample.sample_name = sample_name
+                samples_to_rename.append(sample)
+
+        if samples_to_create:
+            cls.objects.bulk_create(samples_to_create)
+        if samples_to_rename:
+            cls.objects.bulk_update(samples_to_rename, ['sample_name'])
+
+        return cls.objects.filter(step=step, sample_number__isnull=False).count()
 
     def __str__(self):
         return str(self.sample_name) if self.sample_name else "未命名样品"

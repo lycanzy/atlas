@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.contrib.auth.models import User
 from datetime import date
 from experiment_flow.models import (
-    ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, StepNameTemplate,
+    AuditLog, ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, Sample, StepNameTemplate,
     RawMaterial, StepRawMaterialUsage
 )
 import json
@@ -128,6 +128,7 @@ class ViewTests(TestCase):
             'step_name': 'AA',
             'step_description': 'Test Step',
             'status': 'Planned',
+            'sample_count': 3,
             'raw_material_usages': json.dumps([
                 {
                     'raw_material_id': self.raw_material.id,
@@ -142,6 +143,11 @@ class ViewTests(TestCase):
         usage = StepRawMaterialUsage.objects.get(step=step)
         self.assertEqual(usage.raw_material, self.raw_material)
         self.assertEqual(usage.unit, 'g')
+        self.assertEqual(step.samples.count(), 3)
+        self.assertEqual(
+            list(step.samples.values_list('sample_name', flat=True)),
+            ['PRA001AA-AA00-01', 'PRA001AA-AA00-02', 'PRA001AA-AA00-03'],
+        )
 
     def test_add_step_with_multiple_parents(self):
         self.client.login(username="user1", password="password")
@@ -374,6 +380,35 @@ class ViewTests(TestCase):
         self.assertFalse(Project.objects.filter(id=project.id).exists())
         self.client.post(reverse('delete_managed_user', args=[member.id]))
         self.assertFalse(User.objects.filter(id=member.id).exists())
+
+    def test_management_actions_create_persistent_audit_logs(self):
+        self.client.login(username="staff", password="password")
+
+        self.client.post(reverse('add_team'), {
+            'group_name': 'Audit Team',
+            'team_code': 'AUD',
+        })
+        team = ResearchGroup.objects.get(team_code='AUD')
+        create_log = AuditLog.objects.get(action='create', entity_type='Team', object_id=str(team.id))
+        self.assertEqual(create_log.actor, self.staff_user)
+        self.assertEqual(create_log.changes['team_code']['after'], 'AUD')
+
+        self.client.post(reverse('edit_team', args=[team.id]), {
+            'group_name': 'Audited Team',
+            'team_code': 'AUD',
+        })
+        update_log = AuditLog.objects.get(action='update', entity_type='Team', object_id=str(team.id))
+        self.assertEqual(update_log.changes['group_name']['before'], 'Audit Team')
+        self.assertEqual(update_log.changes['group_name']['after'], 'Audited Team')
+
+        response = self.client.get(reverse('management_dashboard'))
+        self.assertContains(response, '审计日志')
+        self.assertContains(response, '修改 Team Audited Team (AUD)')
+
+        self.client.post(reverse('delete_team', args=[team.id]))
+        self.assertFalse(ResearchGroup.objects.filter(id=team.id).exists())
+        delete_log = AuditLog.objects.get(action='delete', entity_type='Team', object_id=str(team.id))
+        self.assertEqual(delete_log.object_repr, 'Audited Team (AUD)')
 
     def test_copy_step_preserves_external_parent(self):
         self.client.login(username="user1", password="password")
