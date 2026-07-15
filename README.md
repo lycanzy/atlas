@@ -80,6 +80,17 @@ The current UI uses a compact Atlas dashboard style with a left project sidebar,
 
 ### Quick Start
 
+#### Windows one-click setup
+
+1. Install Python 3.10 or newer from [python.org](https://www.python.org/downloads/) and select **Add Python to PATH** during installation.
+2. Extract the complete Atlas project folder.
+3. Double-click `setup_and_run.bat` in the project root.
+4. On the first run, follow the prompt to create an administrator account.
+
+The script creates an isolated virtual environment, installs dependencies, applies database migrations, checks the application, opens the browser, and starts Atlas at `http://127.0.0.1:8000/`. Keep the command window open while using the app; press `Ctrl+C` to stop it. Each installation uses its own local SQLite database.
+
+#### macOS / Linux
+
 From the repository root:
 
 ```zsh
@@ -195,6 +206,17 @@ Atlas 是一个基于 Django 的实验追踪应用，用于研究团队管理 **
 - 前端静态依赖 vendored 在 `experiment_app/static/vendor/`
 
 ### 快速开始
+
+#### Windows 一键安装和启动
+
+1. 从 [python.org](https://www.python.org/downloads/) 安装 Python 3.10 或更高版本，安装时勾选 **Add Python to PATH**。
+2. 解压完整的 Atlas 项目文件夹。
+3. 双击项目根目录中的 `setup_and_run.bat`。
+4. 首次运行时，根据提示创建管理员账号。
+
+脚本会自动创建独立虚拟环境、安装依赖、执行数据库迁移、检查应用、打开浏览器，并在 `http://127.0.0.1:8000/` 启动 Atlas。使用期间请保持命令窗口开启，按 `Ctrl+C` 可以停止服务。每份安装使用各自独立的本地 SQLite 数据库。
+
+#### macOS / Linux
 
 在仓库根目录运行：
 
