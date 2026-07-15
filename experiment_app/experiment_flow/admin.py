@@ -96,8 +96,9 @@ class ResearchGroupAdmin(BaseModelAdmin):
 
 @admin.register(Sample)
 class SampleAdmin(BaseModelAdmin):
-    list_display = ("sample_name", "step", "created_on")
-    readonly_fields = ("created_on",)
+    list_display = ("sample_name", "sample_number", "step", "created_on")
+    search_fields = ("sample_name", "step__full_step")
+    readonly_fields = ("sample_number", "created_on")
 
 @admin.register(StepNameTemplate)
 class StepNameTemplateAdmin(BaseModelAdmin):

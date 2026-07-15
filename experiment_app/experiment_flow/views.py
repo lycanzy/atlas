@@ -3,18 +3,26 @@ from django.urls import reverse
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from .models import Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, StepNameTemplate, Equipment, RawMaterial, StepRawMaterialUsage
+from .models import AuditLog, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, StepRawMaterialUsage
 from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm, TeamManagementForm, ProjectManagementForm, ProjectCreateForm, ManagedUserForm, MemberTeamForm, StepTemplateManagementForm
 import json
 import string
+from functools import wraps
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
+from django.utils.dateparse import parse_date
+from .audit import (
+    EQUIPMENT_FIELDS, RAW_MATERIAL_FIELDS, changed_values, model_snapshot,
+    record_audit_event as write_audit_event, record_permission_denied,
+    step_snapshot,
+)
 
 
 STATUS_LABELS_ZH = {
@@ -24,10 +32,37 @@ STATUS_LABELS_ZH = {
 }
 
 
-management_required = user_passes_test(
+_management_access = user_passes_test(
     lambda user: user.is_authenticated and (user.is_staff or user.is_superuser),
     login_url='index',
 )
+
+
+def management_required(view_func):
+    protected_view = _management_access(view_func)
+
+    @wraps(view_func)
+    def wrapped(request, *args, **kwargs):
+        if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+            record_permission_denied(
+                request, 'management', '拒绝访问管理中心',
+                entity_type='Management Center', object_repr='管理中心',
+            )
+        return protected_view(request, *args, **kwargs)
+
+    return wrapped
+
+
+def record_audit_event(request, action, instance, summary, changes=None, object_repr=None, category=None, **kwargs):
+    """Compatibility wrapper for management operations using the audit service."""
+    if category is None:
+        category = {
+            'Project': 'project', 'User': 'member',
+        }.get(instance.__class__.__name__, 'management')
+    return write_audit_event(
+        request, action, category, summary, instance=instance,
+        changes=changes, object_repr=object_repr, **kwargs,
+    )
 
 
 @management_required
@@ -36,11 +71,53 @@ def management_dashboard(request):
     projects = Project.objects.select_related('project__group', 'owner').order_by('-created_on')
     users = User.objects.select_related('profile__research_group').order_by('username')
     step_templates = StepNameTemplate.objects.order_by('category', 'step_code')
+    audit_logs = AuditLog.objects.select_related('actor')
+    audit_q = request.GET.get('audit_q', '').strip()
+    audit_actor = request.GET.get('audit_actor', '').strip()
+    audit_team = request.GET.get('audit_team', '').strip()
+    audit_category = request.GET.get('audit_category', '').strip()
+    audit_action = request.GET.get('audit_action', '').strip()
+    audit_outcome = request.GET.get('audit_outcome', '').strip()
+    audit_from = request.GET.get('audit_from', '').strip()
+    audit_to = request.GET.get('audit_to', '').strip()
+    if audit_q:
+        audit_logs = audit_logs.filter(
+            Q(actor_username__icontains=audit_q) | Q(entity_type__icontains=audit_q) |
+            Q(object_repr__icontains=audit_q) | Q(summary__icontains=audit_q)
+        )
+    if audit_actor:
+        audit_logs = audit_logs.filter(actor_username__icontains=audit_actor)
+    if audit_team:
+        audit_logs = audit_logs.filter(actor_team__icontains=audit_team)
+    if audit_category:
+        audit_logs = audit_logs.filter(category=audit_category)
+    if audit_action:
+        audit_logs = audit_logs.filter(action=audit_action)
+    if audit_outcome:
+        audit_logs = audit_logs.filter(outcome=audit_outcome)
+    if parse_date(audit_from):
+        audit_logs = audit_logs.filter(created_on__date__gte=parse_date(audit_from))
+    if parse_date(audit_to):
+        audit_logs = audit_logs.filter(created_on__date__lte=parse_date(audit_to))
+    audit_page_obj = Paginator(audit_logs, 50).get_page(request.GET.get('audit_page', 1))
+    audit_query = request.GET.copy()
+    audit_query.pop('audit_page', None)
     return render(request, 'experiment_flow/management_dashboard.html', {
         'teams': teams,
         'managed_projects': projects,
         'managed_users': users,
         'step_templates': step_templates,
+        'audit_logs': audit_page_obj,
+        'audit_page_obj': audit_page_obj,
+        'audit_query_without_page': audit_query.urlencode(),
+        'audit_filters': {
+            'q': audit_q, 'actor': audit_actor, 'team': audit_team,
+            'category': audit_category, 'action': audit_action,
+            'outcome': audit_outcome, 'from': audit_from, 'to': audit_to,
+        },
+        'audit_categories': AuditLog.CATEGORY_CHOICES,
+        'audit_actions': AuditLog.ACTION_CHOICES,
+        'audit_outcomes': AuditLog.OUTCOME_CHOICES,
         'team_form': TeamManagementForm(),
         'project_create_form': ProjectCreateForm(),
         'member_form': ManagedUserForm(),
@@ -53,6 +130,7 @@ def management_redirect(tab):
 
 
 @management_required
+@transaction.atomic
 def add_team(request):
     if request.method == 'POST':
         form = TeamManagementForm(request.POST)
@@ -62,6 +140,11 @@ def add_team(request):
                 group=team,
                 defaults={'project_name': team.group_name, 'project_code': team.team_code},
             )
+            record_audit_event(
+                request, 'create', team, f'创建 Team {team}',
+                {'group_name': {'before': None, 'after': team.group_name},
+                 'team_code': {'before': None, 'after': team.team_code}},
+            )
             messages.success(request, f'Team {team} 已创建。')
         else:
             messages.error(request, 'Team 创建失败：' + ' '.join(form.non_field_errors() or [str(form.errors)]))
@@ -69,10 +152,12 @@ def add_team(request):
 
 
 @management_required
+@transaction.atomic
 def edit_team(request, team_id):
     team = get_object_or_404(ResearchGroup, id=team_id)
     if request.method == 'POST':
         old_code = team.team_code
+        before = {'group_name': team.group_name, 'team_code': team.team_code}
         form = TeamManagementForm(request.POST, instance=team)
         if form.is_valid():
             team = form.save()
@@ -80,6 +165,11 @@ def edit_team(request, team_id):
             if category and category.project_code == old_code:
                 category.project_code = team.team_code
                 category.save(update_fields=['project_code'])
+            changes = changed_values(before, {
+                'group_name': team.group_name,
+                'team_code': team.team_code,
+            })
+            record_audit_event(request, 'update', team, f'修改 Team {team}', changes)
             messages.success(request, f'Team {team} 已更新。')
         else:
             messages.error(request, 'Team 更新失败：' + str(form.errors))
@@ -87,35 +177,57 @@ def edit_team(request, team_id):
 
 
 @management_required
+@transaction.atomic
 def delete_team(request, team_id):
     team = get_object_or_404(ResearchGroup, id=team_id)
     if request.method == 'POST':
         name = str(team)
+        record_audit_event(
+            request, 'delete', team, f'删除 Team {name}', object_repr=name,
+            changes={'snapshot': model_snapshot(team, ('group_name', 'team_code'))},
+        )
         team.delete()
         messages.success(request, f'Team {name} 已删除。')
     return management_redirect('teams')
 
 
 @management_required
+@transaction.atomic
 def assign_member_team(request, user_id):
     member = get_object_or_404(User, id=user_id)
     if request.method == 'POST':
+        before_team = str(getattr(getattr(member, 'profile', None), 'research_group', '') or '')
         form = MemberTeamForm(request.POST)
         if form.is_valid():
             profile, _ = UserProfile.objects.get_or_create(user=member)
             profile.research_group = form.cleaned_data['research_group']
             profile.save(update_fields=['research_group'])
+            after_team = str(profile.research_group or '')
+            record_audit_event(
+                request, 'update', member, f'修改成员 {member.username} 的 Team',
+                changed_values({'team': before_team}, {'team': after_team}),
+            )
             messages.success(request, f'{member.username} 的 Team 已更新。')
     return management_redirect('members')
 
 
 @management_required
+@transaction.atomic
 def edit_managed_project(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     if request.method == 'POST':
+        before = {
+            'description': project.exp_description or '',
+            'owner': project.owner.username,
+        }
         form = ProjectManagementForm(request.POST, instance=project)
         if form.is_valid():
             form.save()
+            changes = changed_values(before, {
+                'description': project.exp_description or '',
+                'owner': project.owner.username,
+            })
+            record_audit_event(request, 'update', project, f'修改项目 {project.exp_name}', changes)
             messages.success(request, f'项目 {project.exp_name} 已更新。')
         else:
             messages.error(request, '项目更新失败：' + str(form.errors))
@@ -123,6 +235,7 @@ def edit_managed_project(request, project_id):
 
 
 @management_required
+@transaction.atomic
 def add_managed_project(request):
     if request.method == 'POST':
         form = ProjectCreateForm(request.POST)
@@ -139,6 +252,12 @@ def add_managed_project(request):
                 project=category,
                 owner=form.cleaned_data['owner'],
             )
+            record_audit_event(
+                request, 'create', project, f'创建项目 {project.exp_name}',
+                {'team': {'before': None, 'after': str(team)},
+                 'owner': {'before': None, 'after': project.owner.username},
+                 'description': {'before': None, 'after': project.exp_description or ''}},
+            )
             messages.success(request, f'项目 {project.exp_name} 已创建。')
         else:
             messages.error(request, '项目创建失败：' + str(form.errors))
@@ -146,21 +265,34 @@ def add_managed_project(request):
 
 
 @management_required
+@transaction.atomic
 def delete_managed_project(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     if request.method == 'POST':
         name = project.exp_name
+        record_audit_event(
+            request, 'delete', project, f'删除项目 {name}', object_repr=name,
+            changes={'snapshot': model_snapshot(project, ('exp_name', 'exp_description', 'owner'))},
+        )
         project.delete()
         messages.success(request, f'项目 {name} 已删除。')
     return management_redirect('projects')
 
 
 @management_required
+@transaction.atomic
 def add_managed_user(request):
     if request.method == 'POST':
         form = ManagedUserForm(request.POST)
         if form.is_valid():
             member = form.save()
+            record_audit_event(
+                request, 'create', member, f'创建成员 {member.username}',
+                {'username': {'before': None, 'after': member.username},
+                 'team': {'before': None, 'after': str(member.profile.research_group or '')},
+                 'is_active': {'before': None, 'after': member.is_active},
+                 'is_staff': {'before': None, 'after': member.is_staff}},
+            )
             messages.success(request, f'成员 {member.username} 已创建。')
         else:
             messages.error(request, '成员创建失败：' + str(form.errors))
@@ -168,12 +300,34 @@ def add_managed_user(request):
 
 
 @management_required
+@transaction.atomic
 def edit_managed_user(request, user_id):
     member = get_object_or_404(User, id=user_id)
     if request.method == 'POST':
+        before = {
+            'username': member.username,
+            'first_name': member.first_name,
+            'last_name': member.last_name,
+            'email': member.email,
+            'team': str(getattr(getattr(member, 'profile', None), 'research_group', '') or ''),
+            'is_active': member.is_active,
+            'is_staff': member.is_staff,
+        }
         form = ManagedUserForm(request.POST, instance=member)
         if form.is_valid():
             form.save()
+            changes = changed_values(before, {
+                'username': member.username,
+                'first_name': member.first_name,
+                'last_name': member.last_name,
+                'email': member.email,
+                'team': str(member.profile.research_group or ''),
+                'is_active': member.is_active,
+                'is_staff': member.is_staff,
+            })
+            if form.cleaned_data.get('password'):
+                changes['password'] = {'before': '********', 'after': '********（已更新）'}
+            record_audit_event(request, 'update', member, f'修改成员 {member.username}', changes)
             messages.success(request, f'成员 {member.username} 已更新。')
         else:
             messages.error(request, '成员更新失败：' + str(form.errors))
@@ -181,6 +335,7 @@ def edit_managed_user(request, user_id):
 
 
 @management_required
+@transaction.atomic
 def delete_managed_user(request, user_id):
     member = get_object_or_404(User, id=user_id)
     if request.method == 'POST':
@@ -190,17 +345,30 @@ def delete_managed_user(request, user_id):
             messages.error(request, '只有超级管理员可以删除超级管理员账号。')
         else:
             username = member.username
+            record_audit_event(
+                request, 'delete', member, f'删除成员 {username}', object_repr=username,
+                changes={'snapshot': model_snapshot(
+                    member, ('username', 'first_name', 'last_name', 'email', 'is_active', 'is_staff'),
+                )},
+            )
             member.delete()
             messages.success(request, f'成员 {username} 已删除。')
     return management_redirect('members')
 
 
 @management_required
+@transaction.atomic
 def add_step_template(request):
     if request.method == 'POST':
         form = StepTemplateManagementForm(request.POST)
         if form.is_valid():
             template = form.save()
+            record_audit_event(
+                request, 'create', template, f'创建步骤模板 {template}',
+                {'step_code': {'before': None, 'after': template.step_code},
+                 'step_label': {'before': None, 'after': template.step_label},
+                 'is_active': {'before': None, 'after': template.is_active}},
+            )
             messages.success(request, f'步骤模板 {template} 已创建。')
         else:
             messages.error(request, '步骤模板创建失败：' + str(form.errors))
@@ -208,12 +376,28 @@ def add_step_template(request):
 
 
 @management_required
+@transaction.atomic
 def edit_step_template(request, template_id):
     template = get_object_or_404(StepNameTemplate, id=template_id)
     if request.method == 'POST':
+        before = {
+            'step_code': template.step_code,
+            'step_label': template.step_label,
+            'category': template.category or '',
+            'default_description': template.default_description or '',
+            'is_active': template.is_active,
+        }
         form = StepTemplateManagementForm(request.POST, instance=template)
         if form.is_valid():
             form.save()
+            changes = changed_values(before, {
+                'step_code': template.step_code,
+                'step_label': template.step_label,
+                'category': template.category or '',
+                'default_description': template.default_description or '',
+                'is_active': template.is_active,
+            })
+            record_audit_event(request, 'update', template, f'修改步骤模板 {template}', changes)
             messages.success(request, f'步骤模板 {template} 已更新。')
         else:
             messages.error(request, '步骤模板更新失败：' + str(form.errors))
@@ -221,10 +405,17 @@ def edit_step_template(request, template_id):
 
 
 @management_required
+@transaction.atomic
 def delete_step_template(request, template_id):
     template = get_object_or_404(StepNameTemplate, id=template_id)
     if request.method == 'POST':
         name = str(template)
+        record_audit_event(
+            request, 'delete', template, f'删除步骤模板 {name}', object_repr=name,
+            changes={'snapshot': model_snapshot(
+                template, ('step_code', 'step_label', 'category', 'default_description', 'is_active'),
+            )},
+        )
         template.delete()
         messages.success(request, f'步骤模板 {name} 已删除。')
     return management_redirect('steps')
@@ -407,15 +598,26 @@ def login_view(request):
 
         if user is not None:
             auth_login(request, user)
+            write_audit_event(request, 'login', 'auth', f'用户 {user.username} 登录成功',
+                              instance=user, entity_type='认证', object_repr=user.username)
             # Redirect to 'next' parameter if present, otherwise to index
             next_url = request.GET.get('next', 'index')
             return redirect(next_url)
         else:
+            write_audit_event(
+                request, 'login_failed', 'auth', f'用户名 {username or "（空）"} 登录失败',
+                entity_type='认证', object_repr=username or '（空）',
+                actor_username=username or '', outcome='failed',
+            )
             messages.error(request, '用户名或密码不正确。')
 
     return render(request, 'experiment_flow/login.html')
 
 def logout_view(request):
+    username = request.user.username if request.user.is_authenticated else ''
+    if username:
+        write_audit_event(request, 'logout', 'auth', f'用户 {username} 退出登录',
+                          instance=request.user, entity_type='认证', object_repr=username)
     auth_logout(request)
     messages.success(request, '已成功退出登录。')
     return redirect('login')
@@ -428,6 +630,11 @@ def change_password(request):
             user = form.save()
             # Update session auth hash to prevent logout
             update_session_auth_hash(request, user)
+            write_audit_event(
+                request, 'password_change', 'auth', f'用户 {user.username} 修改密码',
+                instance=user, entity_type='认证', object_repr=user.username,
+                changes={'password': {'before': '已隐藏', 'after': '已更新'}},
+            )
             messages.success(request, '密码已更新。')
             return redirect('index')
         else:
@@ -748,6 +955,7 @@ def experiment_detail(request, exp_id):
     # Security: ensure the current user is in the same research group as the experiment's project
     # Staff and superusers can access all experiments
     if not user_can_access_experiment(request.user, experiment):
+        record_permission_denied(request, 'project', f'拒绝访问项目 {experiment.exp_name}', instance=experiment)
         messages.error(request, '你没有权限查看该实验。')
         return redirect('index')
     project_experiments = Experiment.objects.filter(project=experiment).order_by('created_on')
@@ -775,7 +983,13 @@ def delete_project_experiment(request, exp_id, experiment_id):
 
     experiment = Project.objects.get(id=exp_id)
     project_experiment = Experiment.objects.get(id=experiment_id)
-    project_experiment.delete()
+    with transaction.atomic():
+        snapshot = model_snapshot(project_experiment, ('experiment_code', 'full_experiment_code', 'experiment_description'))
+        write_audit_event(
+            request, 'delete', 'experiment', f'删除 Experiment {project_experiment}',
+            instance=project_experiment, changes={'snapshot': snapshot},
+        )
+        project_experiment.delete()
 
     return redirect('experiment_detail', exp_id=exp_id)
 
@@ -787,7 +1001,11 @@ def delete_step(request, exp_id, experiment_id, step_id):
         messages.error(request, '该步骤已有下游关联步骤，无法删除。请先移除下游步骤的前置关系。')
         return redirect(f'/experiment/{exp_id}/?expanded_experiment={experiment_id}')
 
-    step.delete()
+    with transaction.atomic():
+        snapshot = step_snapshot(step)
+        write_audit_event(request, 'delete', 'step', f'删除 Step {step}', instance=step,
+                          changes={'snapshot': snapshot})
+        step.delete()
 
     return redirect(f'/experiment/{exp_id}/?expanded_experiment={experiment_id}')
 
@@ -863,7 +1081,15 @@ def add_experiment(request):
                     exp_description=exp_description,
                     owner=request.user  # Automatically set the logged-in user as owner
                 )
-                new_exp.save()
+                with transaction.atomic():
+                    new_exp.save()
+                    write_audit_event(
+                        request, 'create', 'project', f'创建 Project {new_exp.exp_name}',
+                        instance=new_exp,
+                        changes={'team': {'before': None, 'after': str(team)},
+                                 'owner': {'before': None, 'after': request.user.username},
+                                 'description': {'before': None, 'after': exp_description or ''}},
+                    )
                 if is_ajax:
                     return JsonResponse({
                         'success': True,
@@ -873,6 +1099,10 @@ def add_experiment(request):
                     })
                 return redirect('index')
             except ResearchGroup.DoesNotExist:
+                record_permission_denied(
+                    request, 'project', '拒绝在无权限的 Team 中创建 Project',
+                    entity_type='Project', object_repr=f'Team #{team_id}',
+                )
                 return render_add_experiment_form('未找到所选 Team。Selected team not found.', status=400 if is_ajax else 200)
             except ValidationError as e:
                 return render_add_experiment_form(str(e), status=400 if is_ajax else 200)
@@ -890,6 +1120,7 @@ def add_project_experiment(request, exp_id):
             profile = getattr(request.user, 'profile', None)
             user_group = getattr(profile, 'research_group', None)
             if not user_group or not getattr(experiment, 'project', None) or experiment.project.group != user_group:
+                record_permission_denied(request, 'experiment', f'拒绝访问项目 {experiment.exp_name}', instance=experiment)
                 messages.error(request, "你没有权限访问该实验。")
                 return redirect('index')
 
@@ -898,7 +1129,14 @@ def add_project_experiment(request, exp_id):
             if experiment_code:
                 try:
                     new_experiment = Experiment(experiment_code=experiment_code, project=experiment)
-                    new_experiment.save()
+                    with transaction.atomic():
+                        new_experiment.save()
+                        write_audit_event(
+                            request, 'create', 'experiment', f'创建 Experiment {new_experiment}',
+                            instance=new_experiment,
+                            changes={'experiment_code': {'before': None, 'after': new_experiment.experiment_code},
+                                     'project_code': {'before': None, 'after': experiment.exp_name}},
+                        )
 
                     # Return JSON for AJAX requests
                     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -959,12 +1197,18 @@ def add_step(request, exp_id, experiment_id):
     if request.method == 'POST':
         form = ExperimentStepForm(request.POST, experiment=project_experiment)
         if form.is_valid():
-            step = form.save(commit=False)
-            step.experiment = project_experiment
-            step.save()
-            form.save_m2m()
-            sync_legacy_parent(step)
-            save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
+            with transaction.atomic():
+                step = form.save(commit=False)
+                step.experiment = project_experiment
+                step.save()
+                form.save_m2m()
+                sync_legacy_parent(step)
+                save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
+                Sample.sync_for_step(step, form.cleaned_data['sample_count'])
+                write_audit_event(
+                    request, 'create', 'step', f'创建 Step {step.full_step}', instance=step,
+                    changes={'after': step_snapshot(step)},
+                )
 
             # Return JSON for AJAX requests
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -999,15 +1243,23 @@ def edit_step(request, exp_id, experiment_id, step_id):
     project_experiment = get_object_or_404(Experiment, id=experiment_id)
 
     if request.method == 'POST':
+        before = step_snapshot(step)
         form = ExperimentStepForm(request.POST, instance=step, experiment=project_experiment)
         if form.is_valid():
-            step = form.save(commit=False)
-            # Ensure the step is associated with the correct project_experiment
-            step.experiment = project_experiment
-            step.save()
-            form.save_m2m()
-            sync_legacy_parent(step)
-            save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
+            with transaction.atomic():
+                step = form.save(commit=False)
+                # Ensure the step is associated with the correct project_experiment
+                step.experiment = project_experiment
+                step.save()
+                form.save_m2m()
+                sync_legacy_parent(step)
+                save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
+                Sample.sync_for_step(step, form.cleaned_data['sample_count'])
+                changes = changed_values(before, step_snapshot(step))
+                write_audit_event(
+                    request, 'update', 'step', f'修改 Step {step.full_step}', instance=step,
+                    changes=changes,
+                )
 
             # Return JSON response for AJAX requests
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -1048,6 +1300,7 @@ def step_genealogy(request, step_id):
     )
 
     if not user_can_access_step(request.user, step):
+        record_permission_denied(request, 'step', f'拒绝访问 Step 谱系 {step.full_step}', instance=step)
         messages.error(request, '你没有权限查看该步骤谱系。')
         return redirect('index')
 
@@ -1092,8 +1345,15 @@ def update_experiment_desc(request, experiment_id):
         desc = data.get('description', '')
         try:
             project_experiment = Experiment.objects.get(id=experiment_id)
-            project_experiment.experiment_description = desc
-            project_experiment.save()
+            before = {'description': project_experiment.experiment_description or ''}
+            with transaction.atomic():
+                project_experiment.experiment_description = desc
+                project_experiment.save()
+                write_audit_event(
+                    request, 'update', 'experiment', f'修改 Experiment {project_experiment} 描述',
+                    instance=project_experiment,
+                    changes=changed_values(before, {'description': desc}),
+                )
             return JsonResponse({'success': True})
         except Experiment.DoesNotExist:
             return JsonResponse({'success': False}, status=404)
@@ -1105,8 +1365,15 @@ def update_step_desc(request, step_id):
         try:
             data = json.loads(request.body)
             step = ExperimentStep.objects.get(id=step_id)
-            step.step_description = data.get('description', '')
-            step.save()
+            desc = data.get('description', '')
+            before = {'description': step.step_description or ''}
+            with transaction.atomic():
+                step.step_description = desc
+                step.save()
+                write_audit_event(
+                    request, 'update', 'step', f'修改 Step {step.full_step} 描述', instance=step,
+                    changes=changed_values(before, {'description': desc}),
+                )
             return JsonResponse({'success': True})
         except ExperimentStep.DoesNotExist:
             return JsonResponse({'success': False, 'error': '未找到步骤'})
@@ -1125,15 +1392,18 @@ def update_step_status(request, step_id):
             if new_status not in valid_statuses:
                 return JsonResponse({'success': False, 'error': '无效状态'})
 
-            # Update status
-            step.status = new_status
-
-            # If status is Completed, update completed_on timestamp
-            if new_status == 'Completed':
-                from django.utils import timezone
-                step.completed_on = timezone.now()
-
-            step.save()
+            before = {'status': step.status, 'completed_on': step.completed_on}
+            with transaction.atomic():
+                step.status = new_status
+                if new_status == 'Completed':
+                    step.completed_on = timezone.now()
+                step.save()
+                after = {'status': step.status, 'completed_on': step.completed_on}
+                write_audit_event(
+                    request, 'status', 'step',
+                    f'Step {step.full_step} 状态改为 {STATUS_LABELS_ZH.get(new_status, new_status)}',
+                    instance=step, changes=changed_values(before, after),
+                )
 
             # Return success with completed_on timestamp if applicable
             response_data = {'success': True}
@@ -1171,15 +1441,21 @@ def bulk_update_status(request, exp_id):
             if not steps.exists():
                 return JsonResponse({'success': False, 'error': '未找到有效步骤'})
 
-            # Update all steps
-            from django.utils import timezone
-            updated_count = 0
-            for step in steps:
-                step.status = new_status
-                if new_status == 'Completed':
-                    step.completed_on = timezone.now()
-                step.save()
-                updated_count += 1
+            before_steps = [{'id': step.id, 'step_code': step.full_step, 'status': step.status} for step in steps]
+            with transaction.atomic():
+                updated_count = 0
+                for step in steps:
+                    step.status = new_status
+                    if new_status == 'Completed':
+                        step.completed_on = timezone.now()
+                    step.save()
+                    updated_count += 1
+                write_audit_event(
+                    request, 'status', 'step', f'批量修改 {updated_count} 个 Step 状态',
+                    entity_type='Experiment Steps', object_id=','.join(str(item['id']) for item in before_steps),
+                    object_repr=f'{updated_count} 个步骤',
+                    changes={'steps': [{**item, 'new_status': new_status} for item in before_steps]},
+                )
 
             return JsonResponse({
                 'success': True,
@@ -1193,6 +1469,7 @@ def bulk_update_status(request, exp_id):
     return JsonResponse({'success': False, 'error': 'Invalid request'})
 
 @login_required
+@transaction.atomic
 def copy_steps(request, exp_id):
     if request.method == 'POST':
         try:
@@ -1306,6 +1583,16 @@ def copy_steps(request, exp_id):
                 sync_legacy_parent(new_step)
 
             target_exp_name = target_experiment.project.exp_name if target_experiment.project else "未知"
+            write_audit_event(
+                request, 'copy', 'step', f'复制 {copied_count} 个 Step 到 {target_experiment.full_experiment_code}',
+                instance=target_experiment, entity_type='Experiment Steps',
+                object_repr=f'{copied_count} 个步骤 → {target_experiment.full_experiment_code}',
+                changes={
+                    'source_steps': [{'id': step.id, 'step_code': step.full_step} for step in steps_to_copy],
+                    'created_steps': [{'id': step.id, 'step_code': step.full_step} for step in orig_to_new.values()],
+                    'target_experiment': target_experiment.full_experiment_code,
+                },
+            )
             return JsonResponse({
                 'success': True,
                 'message': f'已复制 {copied_count} 个步骤到实验 {target_experiment.full_experiment_code}（项目 {target_exp_name}）',
@@ -1313,6 +1600,7 @@ def copy_steps(request, exp_id):
             })
 
         except Exception as e:
+            transaction.set_rollback(True)
             return JsonResponse({'success': False, 'error': str(e)})
 
     return JsonResponse({'success': False, 'error': '无效请求方式'})
@@ -1344,11 +1632,16 @@ def delete_steps(request, exp_id):
                     'error': '以下步骤已有下游关联步骤，无法删除：' + '，'.join(blocked_steps)
                 })
 
-            # Count before deletion
-            deleted_count = steps_to_delete.count()
-
-            # Delete the steps
-            steps_to_delete.delete()
+            snapshots = [step_snapshot(step) for step in steps_to_delete]
+            deleted_count = len(snapshots)
+            with transaction.atomic():
+                write_audit_event(
+                    request, 'delete', 'step', f'批量删除 {deleted_count} 个 Step',
+                    entity_type='Experiment Steps',
+                    object_id=','.join(str(step.id) for step in steps_to_delete),
+                    object_repr=f'{deleted_count} 个步骤', changes={'steps': snapshots},
+                )
+                steps_to_delete.delete()
 
             return JsonResponse({
                 'success': True,
@@ -1398,7 +1691,14 @@ def add_equipment(request):
     if request.method == 'POST':
         form = EquipmentForm(request.POST)
         if form.is_valid():
-            form.save()
+            with transaction.atomic():
+                equipment = form.save()
+                after = model_snapshot(equipment, EQUIPMENT_FIELDS)
+                write_audit_event(
+                    request, 'create', 'equipment', f'登记设备 {equipment.equipment_name}',
+                    instance=equipment,
+                    changes={field: {'before': None, 'after': value} for field, value in after.items()},
+                )
             return redirect('equipment_list')
     else:
         form = EquipmentForm()
@@ -1412,9 +1712,16 @@ def edit_equipment(request, equipment_id):
     equipment = get_object_or_404(Equipment, id=equipment_id)
 
     if request.method == 'POST':
+        before = model_snapshot(equipment, EQUIPMENT_FIELDS)
         form = EquipmentForm(request.POST, instance=equipment)
         if form.is_valid():
-            form.save()
+            with transaction.atomic():
+                equipment = form.save()
+                write_audit_event(
+                    request, 'update', 'equipment', f'修改设备 {equipment.equipment_name}',
+                    instance=equipment,
+                    changes=changed_values(before, model_snapshot(equipment, EQUIPMENT_FIELDS)),
+                )
             return redirect('equipment_detail', equipment_id=equipment_id)
     else:
         form = EquipmentForm(instance=equipment)
@@ -1471,7 +1778,14 @@ def add_raw_material(request):
     if request.method == 'POST':
         form = RawMaterialForm(request.POST)
         if form.is_valid():
-            form.save()
+            with transaction.atomic():
+                material = form.save()
+                after = model_snapshot(material, RAW_MATERIAL_FIELDS)
+                write_audit_event(
+                    request, 'create', 'raw_material', f'登记原材料 {material.batch_number}',
+                    instance=material,
+                    changes={field: {'before': None, 'after': value} for field, value in after.items()},
+                )
             return redirect('raw_material_list')
     else:
         form = RawMaterialForm()
@@ -1485,9 +1799,16 @@ def edit_raw_material(request, raw_material_id):
     raw_material = get_object_or_404(RawMaterial, id=raw_material_id)
 
     if request.method == 'POST':
+        before = model_snapshot(raw_material, RAW_MATERIAL_FIELDS)
         form = RawMaterialForm(request.POST, instance=raw_material)
         if form.is_valid():
-            form.save()
+            with transaction.atomic():
+                raw_material = form.save()
+                write_audit_event(
+                    request, 'update', 'raw_material', f'修改原材料 {raw_material.batch_number}',
+                    instance=raw_material,
+                    changes=changed_values(before, model_snapshot(raw_material, RAW_MATERIAL_FIELDS)),
+                )
             return redirect('raw_material_detail', raw_material_id=raw_material_id)
     else:
         form = RawMaterialForm(instance=raw_material)

@@ -318,19 +318,18 @@
     width: 100%;
 }
 
-.steps-row .table th:nth-child(1) { width: 40px; }   /* Checkbox */
-.steps-row .table th:nth-child(2) { width: 200px; }  /* Step Name */
-.steps-row .table th:nth-child(3) { width: 80px; }   /* Step Num */
-.steps-row .table th:nth-child(4) { width: 140px; }  /* Status */
-.steps-row .table th:nth-child(5) { width: calc(100% - 560px); } /* Description (remaining space) */
-.steps-row .table th:nth-child(6) { width: 100px; }  /* Actions */
-
-.steps-row .table td:nth-child(1) { width: 40px; }
-.steps-row .table td:nth-child(2) { width: 200px; }
-.steps-row .table td:nth-child(3) { width: 80px; }
-.steps-row .table td:nth-child(4) { width: 140px; }
-.steps-row .table td:nth-child(5) { width: calc(100% - 560px); }
-.steps-row .table td:nth-child(6) { width: 100px; }
+.steps-row .table th:nth-child(1),
+.steps-row .table td:nth-child(1) { width: 36px; }  /* Checkbox */
+.steps-row .table th:nth-child(2),
+.steps-row .table td:nth-child(2) { width: 160px; white-space: nowrap; } /* Step ID */
+.steps-row .table th:nth-child(3),
+.steps-row .table td:nth-child(3) { width: 52px; white-space: nowrap; }  /* Sequence */
+.steps-row .table th:nth-child(4),
+.steps-row .table td:nth-child(4) { width: 116px; white-space: nowrap; } /* Status */
+.steps-row .table th:nth-child(5),
+.steps-row .table td:nth-child(5) { width: auto; } /* Description gets remaining space */
+.steps-row .table th:nth-child(6),
+.steps-row .table td:nth-child(6) { width: 96px; white-space: nowrap; }  /* Actions */
 </style>
 
 <div class="main-section">
@@ -421,14 +420,14 @@
                     <table class="table mb-0">
                         <thead class="table-secondary">
                             <tr>
-                                <th style="width:40px;">
+                                <th>
                                     <input type="checkbox" class="form-check-input select-all-steps" data-experiment-id="{{ project_experiment.id }}" title="全选步骤">
                                 </th>
-                                <th style="width:200px;">步骤编号</th>
-                                <th style="width:80px;">序号</th>
-                                <th style="width:140px;">状态</th>
-                                <th style="width:auto;">描述</th>
-                                <th style="width:100px;">操作</th>
+                                <th>步骤编号</th>
+                                <th>序号</th>
+                                <th>状态</th>
+                                <th>描述</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -467,7 +466,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="5" class="text-muted">暂无步骤</td>
+                                <td colspan="6" class="text-muted">暂无步骤</td>
                             </tr>
                             {% endfor %}
                         </tbody>

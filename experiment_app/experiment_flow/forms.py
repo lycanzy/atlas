@@ -159,6 +159,21 @@ class ExperimentForm(forms.ModelForm):
         fields = ['experiment_code']
 
 class ExperimentStepForm(forms.ModelForm):
+    sample_count = forms.IntegerField(
+        label='样品数量',
+        required=False,
+        min_value=0,
+        max_value=200,
+        initial=0,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': 0,
+            'max': 200,
+            'step': 1,
+        }),
+        help_text='保存后自动生成 0–200 个样品编号',
+    )
+
     # Override step_name to use a dropdown
     step_name = forms.ChoiceField(
         label='步骤名称',
@@ -254,6 +269,9 @@ class ExperimentStepForm(forms.ModelForm):
         # Set initial value if editing existing step
         if self.instance and self.instance.pk:
             self.fields['step_name'].initial = self.instance.step_name
+            self.fields['sample_count'].initial = self.instance.samples.filter(
+                sample_number__isnull=False
+            ).count()
         
         # Allow upstream parents to be any step from any experiment, except itself
         if self.instance and self.instance.pk:
@@ -305,6 +323,17 @@ class ExperimentStepForm(forms.ModelForm):
                     if step_link_would_create_cycle(parent_id, child_id):
                         raise forms.ValidationError('前置步骤不能形成循环谱系。')
         return parents
+
+    def clean_sample_count(self):
+        sample_count = self.cleaned_data.get('sample_count')
+        sample_count = 0 if sample_count is None else sample_count
+        if self.instance and self.instance.pk:
+            current_count = self.instance.samples.filter(sample_number__isnull=False).count()
+            if sample_count < current_count:
+                raise forms.ValidationError(
+                    f'为保留实验追溯记录，样品数量不能低于当前的 {current_count}。'
+                )
+        return sample_count
 class EquipmentForm(forms.ModelForm):
     # Override owner to use a searchable select
     owner = forms.ModelChoiceField(

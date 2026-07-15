@@ -1,6 +1,6 @@
 from django.test import TestCase
 from experiment_flow.forms import ExperimentStepForm, ExperimentForm, RawMaterialForm
-from experiment_flow.models import StepNameTemplate, ExperimentStep, Experiment, Project, ProjectCategory, ResearchGroup, User, Equipment
+from experiment_flow.models import StepNameTemplate, ExperimentStep, Experiment, Project, ProjectCategory, ResearchGroup, Sample, User, Equipment
 
 class FormTests(TestCase):
     def setUp(self):
@@ -22,6 +22,28 @@ class FormTests(TestCase):
         }
         form = ExperimentStepForm(data=form_data, experiment=self.experiment)
         self.assertTrue(form.is_valid())
+
+    def test_step_form_rejects_more_than_200_samples(self):
+        form = ExperimentStepForm(data={
+            'step_name': 'AA',
+            'status': 'Planned',
+            'sample_count': 201,
+        }, experiment=self.experiment)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('sample_count', form.errors)
+
+    def test_step_form_does_not_allow_removing_existing_samples(self):
+        step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment)
+        Sample.sync_for_step(step, 2)
+        form = ExperimentStepForm(data={
+            'step_name': 'AA',
+            'status': 'Planned',
+            'sample_count': 1,
+        }, instance=step, experiment=self.experiment)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('sample_count', form.errors)
 
     def test_step_form_invalid_name(self):
         # 'CC' is not in StepNameTemplate, but the form choice field is populated from DB.

@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from datetime import date
 from experiment_flow.models import (
-    ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, ExperimentStepLink, Equipment,
+    ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, ExperimentStepLink, Sample, Equipment,
     RawMaterial, StepRawMaterialUsage
 )
 
@@ -139,6 +139,32 @@ class ModelTests(TestCase):
         step3.save()
         self.assertEqual(step3.step_number, "00")
         self.assertEqual(step3.full_step, "TPR001AA-XY00")
+
+    def test_samples_are_generated_with_step_based_numbers(self):
+        exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
+        step = ExperimentStep.objects.create(step_name="MX", experiment=project_experiment)
+
+        generated_count = Sample.sync_for_step(step, 200)
+
+        self.assertEqual(generated_count, 200)
+        self.assertEqual(step.samples.get(sample_number=1).sample_name, "TPR001AA-MX00-01")
+        self.assertEqual(step.samples.get(sample_number=200).sample_name, "TPR001AA-MX00-200")
+
+    def test_sample_sync_only_adds_and_never_duplicates(self):
+        exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
+        step = ExperimentStep.objects.create(step_name="MX", experiment=project_experiment)
+
+        Sample.sync_for_step(step, 2)
+        Sample.sync_for_step(step, 2)
+        Sample.sync_for_step(step, 3)
+
+        self.assertEqual(step.samples.count(), 3)
+        self.assertEqual(
+            list(step.samples.values_list('sample_number', flat=True)),
+            [1, 2, 3],
+        )
 
     def test_step_num_property(self):
         """Test the step_num property which counts previous steps in the project_experiment"""
