@@ -21,11 +21,17 @@ if exist "%ROOT_DIR%experiment_app\manage.py" (
 
 set "PY_CMD="
 where py >nul 2>&1
-if not errorlevel 1 set "PY_CMD=py -3"
+if not errorlevel 1 (
+    py -3 -c "import sys" >nul 2>&1
+    if not errorlevel 1 set "PY_CMD=py -3"
+)
 
 if not defined PY_CMD (
     where python >nul 2>&1
-    if not errorlevel 1 set "PY_CMD=python"
+    if not errorlevel 1 (
+        python -c "import sys" >nul 2>&1
+        if not errorlevel 1 set "PY_CMD=python"
+    )
 )
 
 if not defined PY_CMD (
@@ -43,11 +49,43 @@ if errorlevel 1 (
 )
 
 echo [2/6] Preparing the virtual environment...
-if not exist ".venv\Scripts\python.exe" (
+set "VENV_DIR=.venv"
+set "VENV_PY=%VENV_DIR%\Scripts\python.exe"
+
+rem Virtual environments contain absolute paths and cannot be copied between PCs.
+rem Rebuild an incomplete or non-working environment instead of reusing it.
+if exist "%VENV_PY%" (
+    "%VENV_PY%" -c "import sys" >nul 2>&1
+    if errorlevel 1 (
+        echo The existing virtual environment belongs to another Python installation.
+        echo Rebuilding it for this computer...
+        rmdir /s /q "%VENV_DIR%"
+        if exist "%VENV_DIR%" (
+            echo ERROR: The old virtual environment could not be removed.
+            echo Close programs using the .venv folder, then run this script again.
+            goto :failed
+        )
+    )
+) else if exist "%VENV_DIR%" (
+    echo The existing virtual environment is not compatible with Windows.
+    echo Rebuilding it for this computer...
+    rmdir /s /q "%VENV_DIR%"
+    if exist "%VENV_DIR%" (
+        echo ERROR: The old virtual environment could not be removed.
+        echo Close programs using the .venv folder, then run this script again.
+        goto :failed
+    )
+)
+
+if not exist "%VENV_PY%" (
     %PY_CMD% -m venv .venv
     if errorlevel 1 goto :failed
 )
-set "VENV_PY=.venv\Scripts\python.exe"
+
+if not exist "%VENV_PY%" (
+    echo ERROR: Python could not create the virtual environment.
+    goto :failed
+)
 
 echo [3/6] Installing dependencies...
 "%VENV_PY%" -m pip install --disable-pip-version-check --upgrade pip
