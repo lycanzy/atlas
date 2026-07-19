@@ -38,5 +38,36 @@
                 {{ genealogy_graph_json|json_script:"genealogyGraphData" }}
             </section>
         </div>
+        <div class="col-12">
+            <section class="genealogy-cells">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h5 class="mb-1">当前步骤电芯</h5>
+                        <div class="text-muted small">按 Package 号分组展示关联 Barcode</div>
+                    </div>
+                    <span class="badge bg-secondary">{{ step.cells.count }} 个</span>
+                </div>
+                {% if step.cells.all %}
+                    {% regroup step.cells.all by package_number as package_groups %}
+                    <div class="cell-package-groups">
+                        {% for package in package_groups %}
+                        <div class="cell-package-group">
+                            <div class="cell-package-header">
+                                <strong>Package {{ package.grouper }}</strong>
+                                <span class="cell-package-count">{{ package.list|length }} 个电芯</span>
+                            </div>
+                            <div class="cell-barcode-list">
+                                {% for cell in package.list %}
+                                <span class="cell-barcode-chip">{{ cell.barcode }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-muted">暂无电芯。</div>
+                {% endif %}
+            </section>
+        </div>
     </div>
 </div>

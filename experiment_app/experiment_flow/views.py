@@ -3,16 +3,17 @@ from django.urls import reverse
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from .models import AuditLog, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, StepRawMaterialUsage
+from .models import AuditLog, Cell, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, StepRawMaterialUsage
 from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm, TeamManagementForm, ProjectManagementForm, ProjectCreateForm, ManagedUserForm, MemberTeamForm, StepTemplateManagementForm
 import json
 import string
+from urllib.parse import urlencode
 from functools import wraps
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
@@ -71,6 +72,21 @@ def management_dashboard(request):
     projects = Project.objects.select_related('project__group', 'owner').order_by('-created_on')
     users = User.objects.select_related('profile__research_group').order_by('username')
     step_templates = StepNameTemplate.objects.order_by('category', 'step_code')
+    cells = Cell.objects.select_related(
+        'step__experiment__project__project__group',
+    ).order_by('package_number', 'barcode', 'id')
+    cell_q = request.GET.get('cell_q', '').strip()
+    if cell_q:
+        cells = cells.filter(
+            Q(package_number__icontains=cell_q) |
+            Q(barcode__icontains=cell_q) |
+            Q(step__full_step__icontains=cell_q) |
+            Q(step__experiment__full_experiment_code__icontains=cell_q) |
+            Q(step__experiment__project__exp_name__icontains=cell_q) |
+            Q(step__experiment__project__project__group__team_code__icontains=cell_q) |
+            Q(step__experiment__project__project__group__group_name__icontains=cell_q)
+        )
+    cell_page_obj = Paginator(cells, 50).get_page(request.GET.get('cell_page', 1))
     audit_logs = AuditLog.objects.select_related('actor')
     audit_q = request.GET.get('audit_q', '').strip()
     audit_actor = request.GET.get('audit_actor', '').strip()
@@ -107,6 +123,10 @@ def management_dashboard(request):
         'managed_projects': projects,
         'managed_users': users,
         'step_templates': step_templates,
+        'managed_cells': cell_page_obj,
+        'cell_page_obj': cell_page_obj,
+        'cell_q': cell_q,
+        'cell_query_without_page': urlencode({'cell_q': cell_q}) if cell_q else '',
         'audit_logs': audit_page_obj,
         'audit_page_obj': audit_page_obj,
         'audit_query_without_page': audit_query.urlencode(),
@@ -468,6 +488,131 @@ def save_raw_material_usages(step, usages_json):
         )
 
 
+def save_step_cells(step, payload_json):
+    """Apply explicit cell creates, updates, and deletions for one step."""
+    if not payload_json:
+        return
+
+    try:
+        payload = json.loads(payload_json)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValidationError('电芯数据格式无效。') from exc
+
+    if not isinstance(payload, dict):
+        raise ValidationError('电芯数据格式无效。')
+    records = payload.get('records', [])
+    deleted_ids = payload.get('deleted_ids', [])
+    if not isinstance(records, list) or not isinstance(deleted_ids, list):
+        raise ValidationError('电芯数据格式无效。')
+
+    normalized_records = []
+    record_ids = set()
+    barcodes = set()
+    for record in records:
+        if not isinstance(record, dict):
+            raise ValidationError('电芯记录格式无效。')
+        raw_id = record.get('id')
+        if raw_id in (None, ''):
+            cell_id = None
+        else:
+            try:
+                cell_id = int(raw_id)
+            except (TypeError, ValueError) as exc:
+                raise ValidationError('电芯记录 ID 无效。') from exc
+            if cell_id <= 0 or cell_id in record_ids:
+                raise ValidationError('电芯记录 ID 重复或无效。')
+            record_ids.add(cell_id)
+
+        package_number = str(record.get('package_number') or '').strip().upper()
+        barcode = str(record.get('barcode') or '').strip().upper()
+        if not package_number:
+            raise ValidationError('每个电芯都必须填写 Package 号。')
+        if not barcode:
+            raise ValidationError('每个电芯都必须填写 Barcode。')
+        if len(package_number) > 100 or len(barcode) > 100:
+            raise ValidationError('Package 号和 Barcode 不能超过 100 个字符。')
+        if barcode in barcodes:
+            raise ValidationError(f'Barcode {barcode} 在本次提交中重复。')
+        barcodes.add(barcode)
+        normalized_records.append({
+            'id': cell_id,
+            'package_number': package_number,
+            'barcode': barcode,
+        })
+
+    normalized_deleted_ids = set()
+    for raw_id in deleted_ids:
+        try:
+            cell_id = int(raw_id)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError('待移除的电芯记录 ID 无效。') from exc
+        if cell_id <= 0:
+            raise ValidationError('待移除的电芯记录 ID 无效。')
+        normalized_deleted_ids.add(cell_id)
+
+    if record_ids & normalized_deleted_ids:
+        raise ValidationError('同一电芯不能同时保存和移除。')
+
+    referenced_ids = record_ids | normalized_deleted_ids
+    existing_cells = {
+        cell.id: cell
+        for cell in Cell.objects.select_for_update().filter(
+            step=step,
+            id__in=referenced_ids,
+        )
+    }
+    if set(existing_cells) != referenced_ids:
+        raise ValidationError('包含不属于当前步骤的电芯记录。')
+
+    conflicting_barcodes = set(
+        Cell.objects.filter(barcode__in=barcodes)
+        .exclude(id__in=referenced_ids)
+        .values_list('barcode', flat=True)
+    )
+    if conflicting_barcodes:
+        barcode = sorted(conflicting_barcodes)[0]
+        raise ValidationError(f'Barcode {barcode} 已经关联到其他步骤。')
+
+    if normalized_deleted_ids:
+        Cell.objects.filter(step=step, id__in=normalized_deleted_ids).delete()
+
+    for record in normalized_records:
+        cell_id = record['id']
+        if cell_id is None:
+            Cell.objects.create(
+                step=step,
+                package_number=record['package_number'],
+                barcode=record['barcode'],
+            )
+            continue
+
+        cell = existing_cells[cell_id]
+        if (
+            cell.package_number != record['package_number']
+            or cell.barcode != record['barcode']
+        ):
+            cell.package_number = record['package_number']
+            cell.barcode = record['barcode']
+            cell.save()
+
+
+def cell_save_error_message(exc):
+    if isinstance(exc, ValidationError):
+        return ' '.join(exc.messages)
+    return 'Barcode 已存在，请检查后重试。'
+
+
+def cell_save_error_response(request, form, exc):
+    message = cell_save_error_message(exc)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': False,
+            'errors': {'cells': [message]},
+        }, status=400)
+    form.add_error(None, message)
+    return None
+
+
 # Helpe r to return experiments visible to the current user (by research group)
 def get_experiments_for_user(user, search_query='', my_experiments=''):
     """Return a queryset of Project filtered to the user's research group.
@@ -502,8 +647,10 @@ def get_experiments_for_user(user, search_query='', my_experiments=''):
             Q(project__project_name__icontains=search_query) |
             Q(project__project_code__icontains=search_query) |
             Q(project__group__team_code__icontains=search_query) |
-            Q(project__group__group_name__icontains=search_query)
-        )
+            Q(project__group__group_name__icontains=search_query) |
+            Q(experiments__steps__cells__barcode__icontains=search_query) |
+            Q(experiments__steps__cells__package_number__icontains=search_query)
+        ).distinct()
 
     return qs
 
@@ -958,7 +1105,12 @@ def experiment_detail(request, exp_id):
         record_permission_denied(request, 'project', f'拒绝访问项目 {experiment.exp_name}', instance=experiment)
         messages.error(request, '你没有权限查看该实验。')
         return redirect('index')
-    project_experiments = Experiment.objects.filter(project=experiment).order_by('created_on')
+    project_experiments = (
+        Experiment.objects
+        .filter(project=experiment)
+        .prefetch_related('steps__cells')
+        .order_by('created_on')
+    )
     available_experiment_codes = get_available_experiment_codes(experiment)
 
     search_query = request.GET.get('search', '')
@@ -1191,33 +1343,48 @@ def add_project_experiment(request, exp_id):
 @login_required
 def add_step(request, exp_id, experiment_id):
 
-    experiment = Project.objects.get(id=exp_id)
-    project_experiment = Experiment.objects.get(id=experiment_id)
+    experiment = get_object_or_404(Project, id=exp_id)
+    project_experiment = get_object_or_404(Experiment, id=experiment_id, project=experiment)
+    if not user_can_access_experiment(request.user, experiment):
+        record_permission_denied(
+            request, 'step', f'拒绝在 Experiment {project_experiment} 中创建 Step',
+            instance=project_experiment,
+        )
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': '无权访问该实验。'}, status=403)
+        messages.error(request, '你没有权限修改该实验。')
+        return redirect('index')
 
     if request.method == 'POST':
         form = ExperimentStepForm(request.POST, experiment=project_experiment)
         if form.is_valid():
-            with transaction.atomic():
-                step = form.save(commit=False)
-                step.experiment = project_experiment
-                step.save()
-                form.save_m2m()
-                sync_legacy_parent(step)
-                save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
-                Sample.sync_for_step(step, form.cleaned_data['sample_count'])
-                write_audit_event(
-                    request, 'create', 'step', f'创建 Step {step.full_step}', instance=step,
-                    changes={'after': step_snapshot(step)},
-                )
+            try:
+                with transaction.atomic():
+                    step = form.save(commit=False)
+                    step.experiment = project_experiment
+                    step.save()
+                    form.save_m2m()
+                    sync_legacy_parent(step)
+                    save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
+                    Sample.sync_for_step(step, form.cleaned_data['sample_count'])
+                    save_step_cells(step, request.POST.get('cells_payload'))
+                    write_audit_event(
+                        request, 'create', 'step', f'创建 Step {step.full_step}', instance=step,
+                        changes={'after': step_snapshot(step)},
+                    )
+            except (ValidationError, IntegrityError) as exc:
+                error_response = cell_save_error_response(request, form, exc)
+                if error_response:
+                    return error_response
+            else:
+                # Return JSON for AJAX requests
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'redirect_url': f'/experiment/{exp_id}/?expanded_experiment={experiment_id}'
+                    })
 
-            # Return JSON for AJAX requests
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': True,
-                    'redirect_url': f'/experiment/{exp_id}/?expanded_experiment={experiment_id}'
-                })
-
-            return redirect(f'/experiment/{exp_id}/?expanded_experiment={experiment_id}')
+                return redirect(f'/experiment/{exp_id}/?expanded_experiment={experiment_id}')
         else:
             # Return errors for AJAX requests
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -1234,41 +1401,57 @@ def add_step(request, exp_id, experiment_id):
         'project_experiment': project_experiment,
         'form': form,
         'raw_materials': RawMaterial.objects.filter(is_active=True).order_by('material_code', 'batch_number'),
+        'cells': [],
         'is_add': True  # Flag to indicate this is add mode, not edit mode
     })
 
 @login_required
 def edit_step(request, exp_id, experiment_id, step_id):
-    step = get_object_or_404(ExperimentStep, id=step_id, experiment_id=experiment_id)
-    project_experiment = get_object_or_404(Experiment, id=experiment_id)
+    project_experiment = get_object_or_404(Experiment, id=experiment_id, project_id=exp_id)
+    step = get_object_or_404(ExperimentStep, id=step_id, experiment=project_experiment)
+    if not user_can_access_step(request.user, step):
+        record_permission_denied(
+            request, 'step', f'拒绝修改 Step {step.full_step}', instance=step,
+        )
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': '无权访问该步骤。'}, status=403)
+        messages.error(request, '你没有权限修改该步骤。')
+        return redirect('index')
 
     if request.method == 'POST':
         before = step_snapshot(step)
         form = ExperimentStepForm(request.POST, instance=step, experiment=project_experiment)
         if form.is_valid():
-            with transaction.atomic():
-                step = form.save(commit=False)
-                # Ensure the step is associated with the correct project_experiment
-                step.experiment = project_experiment
-                step.save()
-                form.save_m2m()
-                sync_legacy_parent(step)
-                save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
-                Sample.sync_for_step(step, form.cleaned_data['sample_count'])
-                changes = changed_values(before, step_snapshot(step))
-                write_audit_event(
-                    request, 'update', 'step', f'修改 Step {step.full_step}', instance=step,
-                    changes=changes,
-                )
+            try:
+                with transaction.atomic():
+                    step = form.save(commit=False)
+                    # Ensure the step is associated with the correct project_experiment
+                    step.experiment = project_experiment
+                    step.save()
+                    form.save_m2m()
+                    sync_legacy_parent(step)
+                    save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
+                    Sample.sync_for_step(step, form.cleaned_data['sample_count'])
+                    save_step_cells(step, request.POST.get('cells_payload'))
+                    changes = changed_values(before, step_snapshot(step))
+                    write_audit_event(
+                        request, 'update', 'step', f'修改 Step {step.full_step}', instance=step,
+                        changes=changes,
+                    )
+            except (ValidationError, IntegrityError) as exc:
+                error_response = cell_save_error_response(request, form, exc)
+                if error_response:
+                    return error_response
+            else:
+                # Return JSON response for AJAX requests
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'redirect_url': f'/experiment/{exp_id}/?expanded_experiment={experiment_id}'
+                    })
 
-            # Return JSON response for AJAX requests
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': True,
-                    'redirect_url': f'/experiment/{exp_id}/?expanded_experiment={experiment_id}'
-                })
-            # Regular form submission redirect
-            return redirect(f'/experiment/{exp_id}/?expanded_experiment={experiment_id}')
+                # Regular form submission redirect
+                return redirect(f'/experiment/{exp_id}/?expanded_experiment={experiment_id}')
         else:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
@@ -1287,6 +1470,8 @@ def edit_step(request, exp_id, experiment_id, step_id):
             'step': step,
             'project_experiment': project_experiment,
             'raw_materials': RawMaterial.objects.filter(Q(is_active=True) | Q(step_usages__step=step)).distinct().order_by('material_code', 'batch_number'),
+            'cells': step.cells.all(),
+            'samples': step.samples.all(),
         }
     )
 
@@ -1295,7 +1480,7 @@ def step_genealogy(request, step_id):
     step = get_object_or_404(
         ExperimentStep.objects
         .select_related('experiment__project__project__group', 'tool')
-        .prefetch_related('raw_material_usages__raw_material'),
+        .prefetch_related('raw_material_usages__raw_material', 'cells'),
         id=step_id
     )
 
@@ -1903,9 +2088,7 @@ def get_experiments_with_items(request):
 @login_required
 def global_search(request):
     """
-    Global search for experiments and steps by their full codes.
-    Searches full_experiment_code (e.g., MLO001AB) or full_step (e.g., MLO001AB-MX00).
-    Redirects to the project detail page with the experiment expanded.
+    Resolve exact experiment, step, and barcode identifiers, or list matching cells.
     """
     query = request.GET.get('q', '').strip().upper()
 
@@ -1913,22 +2096,63 @@ def global_search(request):
         messages.warning(request, '请输入搜索内容。')
         return redirect('index')
 
-    # First, try to find an experiment by full_experiment_code code
-    try:
-        project_experiment = Experiment.objects.get(full_experiment_code=query)
-        # Redirect to the project with the experiment expanded
+    visible_projects = get_experiments_for_user(request.user)
+
+    project_experiment = (
+        Experiment.objects
+        .filter(project__in=visible_projects, full_experiment_code=query)
+        .first()
+    )
+    if project_experiment:
         return redirect(f'/experiment/{project_experiment.project.id}/?expanded_experiment={project_experiment.id}')
-    except Experiment.DoesNotExist:
-        pass
 
-    # Next, try to find a step by full_step code
-    try:
-        step = ExperimentStep.objects.get(full_step=query)
-        # Redirect to the project with the experiment expanded
+    step = (
+        ExperimentStep.objects
+        .filter(experiment__project__in=visible_projects, full_step=query)
+        .select_related('experiment__project')
+        .first()
+    )
+    if step:
         return redirect(f'/experiment/{step.experiment.project.id}/?expanded_experiment={step.experiment.id}&highlight_step={step.id}')
-    except ExperimentStep.DoesNotExist:
-        pass
 
-    # If nothing found, show error and redirect back
-    messages.error(request, f'未找到匹配 "{query}" 的实验或步骤。')
+    visible_cells = (
+        Cell.objects
+        .filter(step__experiment__project__in=visible_projects)
+        .select_related('step__experiment__project')
+    )
+    exact_cell = visible_cells.filter(barcode=query).first()
+    if exact_cell:
+        step = exact_cell.step
+        params = urlencode({
+            'expanded_experiment': step.experiment_id,
+            'highlight_step': step.id,
+            'expanded_cells': step.id,
+            'highlight_cell': exact_cell.id,
+        })
+        return redirect(f'/experiment/{step.experiment.project_id}/?{params}')
+
+    cell_matches = visible_cells.filter(
+        Q(package_number__icontains=query) | Q(barcode__icontains=query)
+    ).order_by(
+        'package_number', 'barcode', 'step__experiment__project__exp_name',
+        'step__experiment__full_experiment_code', 'step__full_step',
+    )
+    if cell_matches.exists():
+        cell_page_obj = Paginator(cell_matches, 50).get_page(request.GET.get('cell_page', 1))
+        sidebar_page_obj = Paginator(
+            get_experiments_for_user(request.user, query), 10
+        ).get_page(request.GET.get('page', 1))
+        return render(request, 'experiment_flow/cell_search_results.html', {
+            'cell_results': cell_page_obj,
+            'cell_page_obj': cell_page_obj,
+            'experiments': sidebar_page_obj,
+            'page_obj': sidebar_page_obj,
+            'search_query': query,
+            'query': query,
+        })
+
+    if get_experiments_for_user(request.user, query).exists():
+        return redirect(f"{reverse('index')}?{urlencode({'search': query})}")
+
+    messages.error(request, f'未找到匹配 "{query}" 的项目、实验、步骤或电芯。')
     return redirect('index')

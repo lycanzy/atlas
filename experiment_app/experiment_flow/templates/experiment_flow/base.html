@@ -276,7 +276,7 @@
     <!-- Select2 for searchable dropdowns -->
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2.min.css' %}" />
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2-bootstrap-5-theme.min.css' %}" />
-    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=13" />
+    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=15" />
     <script src="{% static 'vendor/jquery/jquery-3.7.0.min.js' %}?v=2"></script>
     <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'vendor/select2/js/select2.min.js' %}"></script>
@@ -365,7 +365,7 @@
                             name="search" 
                             class="search-input" 
                             placeholder=" "
-                            aria-label="搜索项目、实验或步骤编号"
+                            aria-label="搜索项目、实验、步骤、Package 或 Barcode"
                             autocomplete="off"
                             value="{{ search_query|default:'' }}"
                             id="searchInput">
@@ -465,8 +465,13 @@
                 }
                 
                 function clearSearch() {
+                    if (window.location.pathname === '/search/') {
+                        window.location.href = '/';
+                        return;
+                    }
                     const url = new URL(window.location.href);
                     url.searchParams.delete('search');
+                    url.searchParams.delete('q');
                     url.searchParams.set('page', '1');
                     window.location.href = url.toString();
                 }
@@ -501,20 +506,25 @@
                 }
                 
                 // Function to handle search submission
-                function handleSearch(searchValue) {
+                function handleSearch(searchValue, forceGlobal = false) {
                     searchValue = searchValue.trim().toUpperCase();
                     
                     if (!searchValue) {
                         // Clear search
+                        if (window.location.pathname === '/search/') {
+                            window.location.href = '/';
+                            return;
+                        }
                         const url = new URL(window.location.href);
                         url.searchParams.delete('search');
+                        url.searchParams.delete('q');
                         url.searchParams.set('page', '1');
                         window.location.href = url.toString();
                         return;
                     }
                     
                     // Check if it looks like an experiment or step code
-                    if (looksLikeExperimentOrStepCode(searchValue)) {
+                    if (forceGlobal || window.location.pathname === '/search/' || looksLikeExperimentOrStepCode(searchValue)) {
                         // Redirect to global search
                         window.location.href = `/search/?q=${encodeURIComponent(searchValue)}`;
                     } else {
@@ -539,7 +549,7 @@
                         if (e.key === 'Enter') {
                             e.preventDefault();
                             clearTimeout(searchTimeout);
-                            handleSearch(searchInput.value);
+                            handleSearch(searchInput.value, true);
                         }
                     });
                 }

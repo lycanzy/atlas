@@ -323,17 +323,62 @@
 .steps-row .table th:nth-child(2),
 .steps-row .table td:nth-child(2) { width: 160px; white-space: nowrap; } /* Step ID */
 .steps-row .table th:nth-child(3),
-.steps-row .table td:nth-child(3) { width: 52px; white-space: nowrap; }  /* Sequence */
+.steps-row .table td:nth-child(3) { width: 116px; white-space: nowrap; } /* Status */
 .steps-row .table th:nth-child(4),
-.steps-row .table td:nth-child(4) { width: 116px; white-space: nowrap; } /* Status */
+.steps-row .table td:nth-child(4) { width: auto; } /* Description gets remaining space */
 .steps-row .table th:nth-child(5),
-.steps-row .table td:nth-child(5) { width: auto; } /* Description gets remaining space */
+.steps-row .table td:nth-child(5) { width: 76px; white-space: nowrap; } /* Cells */
 .steps-row .table th:nth-child(6),
 .steps-row .table td:nth-child(6) { width: 96px; white-space: nowrap; }  /* Actions */
+
+.cell-count-btn {
+    align-items: center;
+    display: inline-flex;
+    font-size: 0.75rem;
+    gap: 0.25rem;
+    padding: 0.15rem 0.4rem;
+}
+
+.steps-row .table .step-cells-detail-row > td {
+    background: #f8fafc;
+    padding: 0.65rem !important;
+    width: auto;
+}
+
+.step-cells-detail-panel {
+    border-left: 3px solid var(--eta-accent);
+    padding-left: 0.65rem;
+}
+
+.project-detail-heading {
+    align-items: baseline;
+    display: flex;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.project-detail-code {
+    flex-shrink: 0;
+}
+
+.project-detail-description {
+    color: var(--eta-text-muted);
+    font-size: 0.85rem;
+    font-weight: 400;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 </style>
 
 <div class="main-section">
-    <h2>{{ experiment.exp_name }}</h2>
+    <h2 class="project-detail-heading">
+        <span class="project-detail-code">{{ experiment.exp_name }}</span>
+        <span class="project-detail-description" title="{{ experiment.exp_description|default:'无描述' }}">
+            — {{ experiment.exp_description|default:"无描述" }}
+        </span>
+    </h2>
     <h3>实验列表</h3>
     <table class="table table-striped table-bordered align-middle">
         <thead class="table-light">
@@ -424,18 +469,18 @@
                                     <input type="checkbox" class="form-check-input select-all-steps" data-experiment-id="{{ project_experiment.id }}" title="全选步骤">
                                 </th>
                                 <th>步骤编号</th>
-                                <th>序号</th>
                                 <th>状态</th>
                                 <th>描述</th>
+                                <th>电芯</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for step in project_experiment.steps.all|dictsort:"step_num" %}
-                            <tr>
+                            {% with step_cells=step.cells.all %}
+                            <tr data-step-row-id="{{ step.id }}">
                                 <td><input type="checkbox" class="form-check-input step-checkbox" data-step-id="{{ step.id }}" data-experiment-id="{{ project_experiment.id }}"></td>
                                 <td>{{ step.full_step }}</td>
-                                <td>{{ step.step_num }}</td>
                                 <td>
                                     <select class="form-select form-select-sm status-dropdown" data-step-id="{{ step.id }}" data-current-status="{{ step.status }}">
                                         <option value="Planned" {% if step.status == "Planned" %}selected{% endif %}>计划中</option>
@@ -445,6 +490,13 @@
                                 </td>
                                 <td>
                                     <span class="step-desc" data-step-id="{{ step.id }}">{{ step.step_description | default:"无" }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary cell-count-btn"
+                                            data-step-id="{{ step.id }}" title="查看电芯">
+                                        <i class="bi bi-chevron-right"></i>
+                                        <span>{{ step_cells|length }}</span>
+                                    </button>
                                 </td>
                                 <td class="text-center">
                                     <div class="table-action-group">
@@ -464,6 +516,33 @@
                                     </div>
                                 </td>
                             </tr>
+                            <tr id="step-cells-{{ step.id }}" class="step-cells-detail-row" style="display:none;">
+                                <td colspan="6">
+                                    <div class="step-cells-detail-panel">
+                                        {% if step_cells %}
+                                            {% regroup step_cells by package_number as package_groups %}
+                                            <div class="cell-package-groups">
+                                                {% for package in package_groups %}
+                                                <div class="cell-package-group">
+                                                    <div class="cell-package-header">
+                                                        <strong>Package {{ package.grouper }}</strong>
+                                                        <span class="cell-package-count">{{ package.list|length }} 个电芯</span>
+                                                    </div>
+                                                    <div class="cell-barcode-list">
+                                                        {% for cell in package.list %}
+                                                        <span class="cell-barcode-chip" data-cell-id="{{ cell.id }}">{{ cell.barcode }}</span>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <div class="text-muted">暂无电芯。</div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endwith %}
                             {% empty %}
                             <tr>
                                 <td colspan="6" class="text-muted">暂无步骤</td>
@@ -705,11 +784,32 @@ document.querySelectorAll('.expand-btn').forEach(function(btn) {
     });
 });
 
+function setStepCellsExpanded(stepId, expanded) {
+    const detailRow = document.getElementById(`step-cells-${stepId}`);
+    const button = document.querySelector(`.cell-count-btn[data-step-id="${stepId}"]`);
+    if (!detailRow || !button) return;
+    detailRow.style.display = expanded ? '' : 'none';
+    button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    const icon = button.querySelector('i');
+    if (icon) icon.className = expanded ? 'bi bi-chevron-down' : 'bi bi-chevron-right';
+}
+
+document.querySelectorAll('.cell-count-btn').forEach(function(button) {
+    button.setAttribute('aria-expanded', 'false');
+    button.addEventListener('click', function() {
+        const stepId = button.getAttribute('data-step-id');
+        const detailRow = document.getElementById(`step-cells-${stepId}`);
+        setStepCellsExpanded(stepId, detailRow?.style.display === 'none');
+    });
+});
+
 // Auto-expand experiment if expanded_experiment parameter is present in URL
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const expandedExperimentId = urlParams.get('expanded_experiment');
     const highlightStepId = urlParams.get('highlight_step');
+    const expandedCellsStepId = urlParams.get('expanded_cells');
+    const highlightCellId = urlParams.get('highlight_cell');
 
     if (expandedExperimentId) {
         const row = document.getElementById('steps-' + expandedExperimentId);
@@ -727,6 +827,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 100);
         }
+    }
+
+    if (expandedCellsStepId) {
+        setStepCellsExpanded(expandedCellsStepId, true);
     }
 
     // Highlight the specific step if highlight_step parameter is present
@@ -748,6 +852,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 3000);
             }
         }, 300);
+    }
+
+    if (highlightCellId) {
+        setTimeout(() => {
+            const cellChip = document.querySelector(`.cell-barcode-chip[data-cell-id="${highlightCellId}"]`);
+            if (!cellChip) return;
+            cellChip.classList.add('cell-highlight');
+            cellChip.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => cellChip.classList.remove('cell-highlight'), 5000);
+        }, 350);
     }
 });
 
@@ -900,6 +1014,208 @@ document.getElementById('genealogyModal').addEventListener('hidden.bs.modal', fu
     showGenealogyLoading();
 });
 
+function formatCurrentDateTimeLocal() {
+    const now = new Date();
+    const pad = value => String(value).padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+function initializeCompletionTimeAutomation(form) {
+    const statusField = form?.querySelector('#id_status');
+    if (statusField) {
+        statusField.dataset.previousStatus = statusField.value;
+    }
+}
+
+function normalizeCellIdentifier(value) {
+    return (value || '').trim().toUpperCase();
+}
+
+function showStepEditorTab(form, paneSelector) {
+    const trigger = form?.querySelector(`[data-bs-target="${paneSelector}"]`);
+    if (!trigger || typeof bootstrap === 'undefined') return;
+    bootstrap.Tab.getOrCreateInstance(trigger).show();
+}
+
+function showCellEditorError(form, message) {
+    const errorBox = form?.querySelector('.cell-editor-error');
+    if (!errorBox) return;
+    errorBox.textContent = message || '';
+    errorBox.hidden = !message;
+    if (message) showStepEditorTab(form, '#step-cells-pane');
+}
+
+function updateCellEditorState(form) {
+    const rows = form?.querySelectorAll('.cell-editor-row') || [];
+    const count = form?.querySelector('.cell-editor-count');
+    const tabCount = form?.querySelector('.cell-tab-count');
+    const empty = form?.querySelector('.cell-editor-empty');
+    if (count) count.textContent = `${rows.length} 个`;
+    if (tabCount) tabCount.textContent = String(rows.length);
+    if (empty) empty.hidden = rows.length > 0;
+}
+
+function initializeStepEditorTabs(form) {
+    const sampleCountField = form?.querySelector('#id_sample_count');
+    const sampleTabCount = form?.querySelector('.sample-tab-count');
+    if (!sampleCountField || !sampleTabCount) return;
+
+    const updateSampleTabCount = function() {
+        const value = Number.parseInt(sampleCountField.value, 10);
+        sampleTabCount.textContent = Number.isFinite(value) && value >= 0 ? String(value) : '0';
+    };
+    sampleCountField.addEventListener('input', updateSampleTabCount);
+    sampleCountField.addEventListener('change', updateSampleTabCount);
+}
+
+function createCellEditorRow(form, packageNumber, barcode, cellId = null) {
+    const container = form.querySelector('.cells-editor-container');
+    if (!container) return;
+
+    const row = document.createElement('tr');
+    row.className = 'cell-editor-row';
+    if (cellId) row.dataset.cellId = String(cellId);
+    row.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm cell-row-package" maxlength="100" aria-label="Package 号"></td>
+        <td><input type="text" class="form-control form-control-sm cell-row-barcode" maxlength="100" aria-label="Barcode"></td>
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-danger remove-cell-row-btn" title="移除电芯">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>`;
+    row.querySelector('.cell-row-package').value = packageNumber;
+    row.querySelector('.cell-row-barcode').value = barcode;
+    container.appendChild(row);
+    updateCellEditorState(form);
+}
+
+function addCellsToEditor(form) {
+    const packageInput = form.querySelector('.cell-package-input');
+    const barcodeInput = form.querySelector('.cell-barcode-input');
+    const packageNumber = normalizeCellIdentifier(packageInput?.value);
+    const scannedBarcodes = (barcodeInput?.value || '')
+        .split(/\r?\n/)
+        .map(normalizeCellIdentifier)
+        .filter(Boolean);
+
+    if (!packageNumber) {
+        showCellEditorError(form, '请先填写 Package 号。');
+        packageInput?.focus();
+        return;
+    }
+    if (!scannedBarcodes.length) {
+        showCellEditorError(form, '请扫描或粘贴至少一个 Barcode。');
+        barcodeInput?.focus();
+        return;
+    }
+
+    const existingBarcodes = new Set(
+        Array.from(form.querySelectorAll('.cell-row-barcode'))
+            .map(input => normalizeCellIdentifier(input.value))
+            .filter(Boolean)
+    );
+    const duplicates = [];
+    let addedCount = 0;
+    scannedBarcodes.forEach(barcode => {
+        if (existingBarcodes.has(barcode)) {
+            duplicates.push(barcode);
+            return;
+        }
+        existingBarcodes.add(barcode);
+        createCellEditorRow(form, packageNumber, barcode);
+        addedCount++;
+    });
+
+    if (packageInput) packageInput.value = packageNumber;
+    if (barcodeInput && addedCount) barcodeInput.value = '';
+    if (duplicates.length) {
+        showCellEditorError(form, `已跳过重复 Barcode：${duplicates.join('、')}`);
+    } else {
+        showCellEditorError(form, '');
+    }
+    barcodeInput?.focus();
+}
+
+function initializeCellEditor(form) {
+    if (!form) return;
+    form._deletedCellIds = new Set();
+    updateCellEditorState(form);
+
+    form.querySelector('.add-cells-to-list-btn')?.addEventListener('click', function() {
+        addCellsToEditor(form);
+    });
+    form.querySelector('.cell-barcode-input')?.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            addCellsToEditor(form);
+        }
+    });
+    form.addEventListener('change', function(e) {
+        if (e.target.matches('.cell-row-package, .cell-row-barcode, .cell-package-input')) {
+            e.target.value = normalizeCellIdentifier(e.target.value);
+        }
+    });
+    form.addEventListener('click', function(e) {
+        const removeButton = e.target.closest('.remove-cell-row-btn');
+        if (!removeButton) return;
+        const row = removeButton.closest('.cell-editor-row');
+        const cellId = row?.dataset.cellId;
+        if (cellId && !window.confirm('保存后将移除此电芯，确定继续吗？')) {
+            return;
+        }
+        if (cellId) form._deletedCellIds.add(Number(cellId));
+        row?.remove();
+        showCellEditorError(form, '');
+        updateCellEditorState(form);
+    });
+}
+
+function collectCellPayload(form) {
+    const records = [];
+    const seenBarcodes = new Set();
+    for (const row of form.querySelectorAll('.cell-editor-row')) {
+        const packageNumber = normalizeCellIdentifier(row.querySelector('.cell-row-package')?.value);
+        const barcode = normalizeCellIdentifier(row.querySelector('.cell-row-barcode')?.value);
+        if (!packageNumber || !barcode) {
+            showCellEditorError(form, '每个电芯都必须填写 Package 号和 Barcode。');
+            return null;
+        }
+        if (seenBarcodes.has(barcode)) {
+            showCellEditorError(form, `Barcode ${barcode} 在当前列表中重复。`);
+            return null;
+        }
+        seenBarcodes.add(barcode);
+        row.querySelector('.cell-row-package').value = packageNumber;
+        row.querySelector('.cell-row-barcode').value = barcode;
+        records.push({
+            id: row.dataset.cellId ? Number(row.dataset.cellId) : null,
+            package_number: packageNumber,
+            barcode: barcode
+        });
+    }
+    showCellEditorError(form, '');
+    return {
+        records: records,
+        deleted_ids: Array.from(form._deletedCellIds || [])
+    };
+}
+
+document.addEventListener('change', function(e) {
+    if (!e.target.matches('.edit-step-form #id_status')) {
+        return;
+    }
+
+    const statusField = e.target;
+    const previousStatus = statusField.dataset.previousStatus || statusField.defaultValue;
+    const completedOnField = statusField.form?.querySelector('#id_completed_on');
+
+    if (statusField.value === 'Completed' && previousStatus !== 'Completed' && completedOnField) {
+        completedOnField.value = formatCurrentDateTimeLocal();
+    }
+
+    statusField.dataset.previousStatus = statusField.value;
+});
+
 // Edit step modal handler
 document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -910,6 +1226,9 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
             .then(response => response.text())
             .then(html => {
                 document.getElementById('editStepModalBody').innerHTML = html;
+                initializeCompletionTimeAutomation(document.getElementById('expstepEditForm'));
+                initializeCellEditor(document.getElementById('expstepEditForm'));
+                initializeStepEditorTabs(document.getElementById('expstepEditForm'));
                 const modal = new bootstrap.Modal(document.getElementById('editStepModal'));
                 modal.show();
 
@@ -962,8 +1281,11 @@ document.addEventListener('submit', function(e) {
     if (e.target && e.target.id === 'expstepEditForm') {
         e.preventDefault();
 
+        const cellsPayload = collectCellPayload(e.target);
+        if (!cellsPayload) return;
         const formData = new FormData(e.target);
         formData.append('raw_material_usages', JSON.stringify(collectRawMaterialUsages(e.target)));
+        formData.append('cells_payload', JSON.stringify(cellsPayload));
 
         fetch(e.target.action || window.location.href, {
             method: "POST",
@@ -995,10 +1317,21 @@ document.addEventListener('submit', function(e) {
                         errorMessages.push(data.errors[field].join(', '));
                     } else if (field === 'parents') {
 	                        errorMessages.push('前置步骤：' + data.errors[field].join(', '));
+                    } else if (field === 'cells') {
+                        showCellEditorError(e.target, data.errors[field].join(', '));
+                        errorMessages.push('电芯：' + data.errors[field].join(', '));
                     } else {
                         errorMessages.push(field + ': ' + data.errors[field].join(', '));
                     }
                 }
+	                if (!Object.prototype.hasOwnProperty.call(data.errors, 'cells')) {
+	                    showStepEditorTab(
+	                        e.target,
+	                        Object.prototype.hasOwnProperty.call(data.errors, 'sample_count')
+	                            ? '#step-samples-pane'
+	                            : '#step-details-pane'
+	                    );
+	                }
 	                showToast('表单验证错误', errorMessages.join('\\n'), 'danger');
             }
         })
@@ -1018,6 +1351,9 @@ document.querySelectorAll('.add-step-btn').forEach(function(btn) {
             .then(response => response.text())
             .then(html => {
                 document.getElementById('addStepModalBody').innerHTML = html;
+                initializeCompletionTimeAutomation(document.getElementById('addStepForm'));
+                initializeCellEditor(document.getElementById('addStepForm'));
+                initializeStepEditorTabs(document.getElementById('addStepForm'));
                 const modal = new bootstrap.Modal(document.getElementById('addStepModal'));
                 modal.show();
 
@@ -1070,8 +1406,11 @@ document.addEventListener('submit', function(e) {
     if (e.target && e.target.id === 'addStepForm') {
         e.preventDefault();
 
+        const cellsPayload = collectCellPayload(e.target);
+        if (!cellsPayload) return;
         const formData = new FormData(e.target);
         formData.append('raw_material_usages', JSON.stringify(collectRawMaterialUsages(e.target)));
+        formData.append('cells_payload', JSON.stringify(cellsPayload));
 
         fetch(e.target.action || window.location.href, {
             method: "POST",
@@ -1103,10 +1442,21 @@ document.addEventListener('submit', function(e) {
                         errorMessages.push(data.errors[field].join(', '));
                     } else if (field === 'parents') {
 	                        errorMessages.push('前置步骤：' + data.errors[field].join(', '));
+                    } else if (field === 'cells') {
+                        showCellEditorError(e.target, data.errors[field].join(', '));
+                        errorMessages.push('电芯：' + data.errors[field].join(', '));
                     } else {
                         errorMessages.push(field + ': ' + data.errors[field].join(', '));
                     }
                 }
+	                if (!Object.prototype.hasOwnProperty.call(data.errors, 'cells')) {
+	                    showStepEditorTab(
+	                        e.target,
+	                        Object.prototype.hasOwnProperty.call(data.errors, 'sample_count')
+	                            ? '#step-samples-pane'
+	                            : '#step-details-pane'
+	                    );
+	                }
 	                showToast('表单验证错误', errorMessages.join('\\n'), 'danger');
             }
         })

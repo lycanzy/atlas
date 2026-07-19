@@ -89,6 +89,95 @@
     margin-top: 0.15rem;
 }
 
+.step-editor-tabs {
+    margin-bottom: 0.75rem;
+}
+
+.step-editor-tabs .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.8rem;
+    color: #5b6675;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.step-editor-tabs .nav-link.active {
+    color: #0d6efd;
+}
+
+.step-editor-tabs .tab-count {
+    min-width: 1.4rem;
+    padding: 0.15rem 0.35rem;
+    border-radius: 999px;
+    background: #eef2f6;
+    color: #5b6675;
+    font-size: 0.65rem;
+    line-height: 1;
+    text-align: center;
+}
+
+.step-editor-tabs .nav-link.active .tab-count {
+    background: #dbeafe;
+    color: #0d6efd;
+}
+
+.step-editor-tab-content {
+    min-height: 21rem;
+}
+
+.step-editor-tab-content > .tab-pane > .form-section:last-child {
+    border-bottom: none;
+}
+
+.sample-tab-intro {
+    margin-bottom: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #dce3ea;
+    border-radius: 0.35rem;
+    background: #f8fafc;
+}
+
+.sample-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+    color: #495057;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.sample-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    max-height: 15rem;
+    overflow-y: auto;
+    padding: 0.1rem;
+}
+
+.sample-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.5rem;
+    border: 1px solid #dce3ea;
+    border-radius: 0.3rem;
+    background: #fff;
+    color: #344054;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.7rem;
+}
+
+.sample-empty-state {
+    padding: 2rem 1rem;
+    border: 1px dashed #ced4da;
+    border-radius: 0.35rem;
+    color: #6c757d;
+    text-align: center;
+}
+
 .modal-footer-custom {
     display: flex;
     justify-content: flex-end;
@@ -353,124 +442,183 @@
 
 <form method="post" id="expstepEditForm" action="{% url 'edit_step' step.experiment.project.id step.experiment.id step.id %}" class="edit-step-form">
   {% csrf_token %}
-  
-  <!-- Main Form Section -->
-  <div class="form-section">
-    <div class="section-title">步骤信息</div>
-    <div class="compact-grid">
-      <div class="form-group col-span-2">
-        <label for="id_step_name">步骤名称 *</label>
-        {{ form.step_name }}
-        {% if form.step_name.errors %}
-          <div class="error-message">{{ form.step_name.errors.0 }}</div>
-        {% endif %}
+
+  <ul class="nav nav-tabs step-editor-tabs" id="step-editor-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="step-details-tab" data-bs-toggle="tab"
+              data-bs-target="#step-details-pane" type="button" role="tab"
+              aria-controls="step-details-pane" aria-selected="true">
+        <i class="bi bi-clipboard2-check"></i> 实验步骤
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="step-cells-tab" data-bs-toggle="tab"
+              data-bs-target="#step-cells-pane" type="button" role="tab"
+              aria-controls="step-cells-pane" aria-selected="false">
+        <i class="bi bi-battery-half"></i> 电芯
+        <span class="tab-count cell-tab-count">{{ cells|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="step-samples-tab" data-bs-toggle="tab"
+              data-bs-target="#step-samples-pane" type="button" role="tab"
+              aria-controls="step-samples-pane" aria-selected="false">
+        <i class="bi bi-collection"></i> 样品
+        <span class="tab-count sample-tab-count">{{ samples|length }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content step-editor-tab-content" id="step-editor-tab-content">
+    <div class="tab-pane fade show active" id="step-details-pane" role="tabpanel"
+         aria-labelledby="step-details-tab" tabindex="0">
+      <!-- Main Form Section -->
+      <div class="form-section">
+        <div class="section-title">步骤信息</div>
+        <div class="compact-grid">
+          <div class="form-group col-span-2">
+            <label for="id_step_name">步骤名称 *</label>
+            {{ form.step_name }}
+            {% if form.step_name.errors %}
+              <div class="error-message">{{ form.step_name.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="form-group">
+            <label for="id_status">状态 *</label>
+            {{ form.status }}
+            {% if form.status.errors %}
+              <div class="error-message">{{ form.status.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="form-group col-span-2">
+            <label for="id_parents">前置步骤</label>
+            {{ form.parents }}
+            {% if form.parents.errors %}
+              <div class="error-message">{{ form.parents.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="form-group">
+            <label for="id_completed_on">完成时间</label>
+            {{ form.completed_on }}
+            {% if form.completed_on.errors %}
+              <div class="error-message">{{ form.completed_on.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="form-group">
+            <label for="id_tool">设备</label>
+            {{ form.tool }}
+            {% if form.tool.errors %}
+              <div class="error-message">{{ form.tool.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="form-group col-span-2">
+            <label for="id_recipe">配方</label>
+            {{ form.recipe }}
+            {% if form.recipe.errors %}
+              <div class="error-message">{{ form.recipe.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="form-group col-span-3">
+            <label for="id_step_description">描述</label>
+            {{ form.step_description }}
+            {% if form.step_description.errors %}
+              <div class="error-message">{{ form.step_description.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
       </div>
-      <div class="form-group">
-        <label for="id_status">状态 *</label>
-        {{ form.status }}
-        {% if form.status.errors %}
-          <div class="error-message">{{ form.status.errors.0 }}</div>
-        {% endif %}
+
+      <!-- Raw Materials Section -->
+      <div class="form-section">
+        <div class="section-title">原材料使用</div>
+        <table class="table table-sm table-bordered" id="raw-materials-table">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 42%;">原材料</th>
+              <th style="width: 16%;">用量</th>
+              <th style="width: 14%;">单位</th>
+              <th style="width: 18%;">备注</th>
+              <th style="width: 10%; text-align: center;">
+                <button type="button" class="btn btn-xs btn-success" id="add-raw-material-btn" style="font-size: 0.7rem; padding: 0.1rem 0.3rem;">
+                  <i class="bi bi-plus-circle"></i>
+                </button>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="raw-materials-container">
+            {% for usage in step.raw_material_usages.all %}
+            <tr class="raw-material-row">
+              <td>
+                <select class="form-select form-select-sm raw-material-select">
+                  <option value="">选择原材料...</option>
+                  {% for raw_material in raw_materials %}
+                    <option value="{{ raw_material.id }}" {% if raw_material.id == usage.raw_material.id %}selected{% endif %}>
+                      {{ raw_material.batch_number }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td><input type="number" step="0.0001" class="form-control form-control-sm raw-material-quantity" value="{{ usage.quantity|default:'' }}"></td>
+              <td><input type="text" class="form-control form-control-sm raw-material-unit" value="{{ usage.unit|default:'' }}"></td>
+              <td><input type="text" class="form-control form-control-sm raw-material-notes" value="{{ usage.notes|default:'' }}"></td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-danger remove-raw-material-btn" title="移除" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      <div class="form-group col-span-2">
-        <label for="id_parents">前置步骤</label>
-        {{ form.parents }}
-        {% if form.parents.errors %}
-          <div class="error-message">{{ form.parents.errors.0 }}</div>
-        {% endif %}
-      </div>
-      <div class="form-group">
-        <label for="id_completed_on">完成时间</label>
-        {{ form.completed_on }}
-        {% if form.completed_on.errors %}
-          <div class="error-message">{{ form.completed_on.errors.0 }}</div>
-        {% endif %}
-      </div>
-      <div class="form-group">
-        <label for="id_tool">设备</label>
-        {{ form.tool }}
-        {% if form.tool.errors %}
-          <div class="error-message">{{ form.tool.errors.0 }}</div>
-        {% endif %}
-      </div>
-      <div class="form-group col-span-2">
-        <label for="id_recipe">配方</label>
-        {{ form.recipe }}
-        {% if form.recipe.errors %}
-          <div class="error-message">{{ form.recipe.errors.0 }}</div>
-        {% endif %}
-      </div>
-      <div class="form-group">
-        <label for="id_sample_count">样品数量</label>
-        {{ form.sample_count }}
-        {% if form.sample_count.errors %}
-          <div class="error-message">{{ form.sample_count.errors.0 }}</div>
-        {% else %}
-          <small>可增加至 200；已有样品不会删除</small>
-        {% endif %}
-      </div>
-      <div class="form-group col-span-3">
-        <label for="id_step_description">描述</label>
-        {{ form.step_description }}
-        {% if form.step_description.errors %}
-          <div class="error-message">{{ form.step_description.errors.0 }}</div>
-        {% endif %}
+
+      <!-- Notes Section -->
+      <div class="form-section">
+        <div class="section-title">备注</div>
+        <div class="form-group">
+          <label for="id_notes">补充备注</label>
+          {{ form.notes }}
+          {% if form.notes.errors %}
+            <div class="error-message">{{ form.notes.errors.0 }}</div>
+          {% endif %}
+        </div>
       </div>
     </div>
-  </div>
-  
-  <!-- Raw Materials Section -->
-  <div class="form-section">
-    <div class="section-title">原材料使用</div>
-    <table class="table table-sm table-bordered" id="raw-materials-table">
-      <thead class="table-light">
-        <tr>
-          <th style="width: 42%;">原材料</th>
-          <th style="width: 16%;">用量</th>
-          <th style="width: 14%;">单位</th>
-          <th style="width: 18%;">备注</th>
-          <th style="width: 10%; text-align: center;">
-            <button type="button" class="btn btn-xs btn-success" id="add-raw-material-btn" style="font-size: 0.7rem; padding: 0.1rem 0.3rem;">
-              <i class="bi bi-plus-circle"></i>
-            </button>
-          </th>
-        </tr>
-      </thead>
-      <tbody id="raw-materials-container">
-        {% for usage in step.raw_material_usages.all %}
-        <tr class="raw-material-row">
-          <td>
-            <select class="form-select form-select-sm raw-material-select">
-              <option value="">选择原材料...</option>
-              {% for raw_material in raw_materials %}
-                <option value="{{ raw_material.id }}" {% if raw_material.id == usage.raw_material.id %}selected{% endif %}>
-                  {{ raw_material.batch_number }}
-                </option>
-              {% endfor %}
-            </select>
-          </td>
-          <td><input type="number" step="0.0001" class="form-control form-control-sm raw-material-quantity" value="{{ usage.quantity|default:'' }}"></td>
-          <td><input type="text" class="form-control form-control-sm raw-material-unit" value="{{ usage.unit|default:'' }}"></td>
-          <td><input type="text" class="form-control form-control-sm raw-material-notes" value="{{ usage.notes|default:'' }}"></td>
-          <td class="text-center">
-            <button type="button" class="btn btn-sm btn-danger remove-raw-material-btn" title="移除" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">
-              <i class="bi bi-trash"></i>
-            </button>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  
-  <!-- Notes Section -->
-  <div class="form-section">
-    <div class="section-title">备注</div>
-    <div class="form-group">
-      <label for="id_notes">补充备注</label>
-      {{ form.notes }}
-      {% if form.notes.errors %}
-        <div class="error-message">{{ form.notes.errors.0 }}</div>
+
+    <div class="tab-pane fade" id="step-cells-pane" role="tabpanel"
+         aria-labelledby="step-cells-tab" tabindex="0">
+      {% include "experiment_flow/_step_cells_editor.html" %}
+    </div>
+
+    <div class="tab-pane fade" id="step-samples-pane" role="tabpanel"
+         aria-labelledby="step-samples-tab" tabindex="0">
+      <div class="sample-tab-intro">
+        <div class="form-group">
+          <label for="id_sample_count">样品数量</label>
+          {{ form.sample_count }}
+          {% if form.sample_count.errors %}
+            <div class="error-message">{{ form.sample_count.errors.0 }}</div>
+          {% else %}
+            <small>保存后自动补充缺少的样品编号，最多 200 个；已有样品不会删除。</small>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sample-list-header">
+        <span>已生成样品</span>
+        <span>{{ samples|length }} 个</span>
+      </div>
+      {% if samples %}
+        <div class="sample-chip-list" aria-label="已生成样品列表">
+          {% for sample in samples %}
+            <span class="sample-chip">{{ sample.sample_name }}</span>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="sample-empty-state">
+          <i class="bi bi-inbox d-block mb-1"></i>
+          暂无样品。填写数量并保存后将自动生成样品编号。
+        </div>
       {% endif %}
     </div>
   </div>

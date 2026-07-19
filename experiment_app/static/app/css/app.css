@@ -914,6 +914,143 @@ a {
     font-weight: 700;
 }
 
+.cell-entry-grid {
+    align-items: start;
+    display: grid;
+    column-gap: 0.75rem;
+    grid-template-columns: minmax(180px, 0.85fr) minmax(320px, 1.65fr) max-content;
+    row-gap: 0.35rem;
+}
+
+.cell-entry-grid .form-group {
+    margin-bottom: 0;
+    min-width: 0;
+}
+
+.cell-entry-grid .form-group label {
+    line-height: 1.2;
+    min-height: 0.95rem;
+}
+
+.cell-entry-grid .form-control {
+    width: 100%;
+}
+
+.cell-entry-grid .cell-barcode-input {
+    min-height: 3.35rem;
+}
+
+.cell-entry-grid .add-cells-to-list-btn {
+    align-self: start;
+    margin-top: 1.15rem;
+    min-height: 2rem;
+    white-space: nowrap;
+}
+
+.cell-editor-count {
+    color: var(--eta-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.cell-editor-error {
+    background: var(--eta-danger-soft);
+    border: 1px solid rgba(220, 53, 69, 0.24);
+    border-radius: 6px;
+    color: var(--eta-danger);
+    font-size: 0.78rem;
+    margin-top: 0.65rem;
+    padding: 0.45rem 0.6rem;
+}
+
+.cell-editor-table-wrap {
+    margin-top: 0.7rem;
+    max-height: 260px;
+    overflow: auto;
+}
+
+.cell-editor-table {
+    margin-bottom: 0;
+}
+
+.cell-editor-table th:last-child,
+.cell-editor-table td:last-child {
+    width: 64px;
+}
+
+.cell-editor-empty {
+    border: 1px dashed var(--eta-border);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    padding: 0.7rem;
+    text-align: center;
+}
+
+.cell-package-groups {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.cell-package-group {
+    background: #ffffff;
+    border: 1px solid var(--eta-border-soft);
+    border-radius: 7px;
+    padding: 0.6rem 0.7rem;
+}
+
+.cell-package-header {
+    align-items: center;
+    color: var(--eta-text);
+    display: flex;
+    font-size: 0.78rem;
+    justify-content: space-between;
+    margin-bottom: 0.45rem;
+}
+
+.cell-package-count {
+    color: var(--eta-text-muted);
+    font-size: 0.72rem;
+}
+
+.cell-barcode-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.cell-barcode-chip {
+    background: #f1f5f9;
+    border: 1px solid #dbe3ec;
+    border-radius: 999px;
+    color: #334155;
+    font-size: 0.72rem;
+    padding: 0.22rem 0.5rem;
+}
+
+.cell-barcode-chip.cell-highlight {
+    background: #fff3cd;
+    border-color: #e6b800;
+    box-shadow: 0 0 0 2px rgba(230, 184, 0, 0.18);
+}
+
+.genealogy-cells {
+    background: #ffffff;
+    border: 1px solid var(--eta-border-soft);
+    border-radius: var(--eta-radius);
+    padding: 0.9rem 1rem;
+}
+
+@media (max-width: 768px) {
+    .cell-entry-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cell-entry-grid .add-cells-to-list-btn {
+        margin-top: 0;
+        width: 100%;
+    }
+}
+
 .genealogy-content h2 {
     font-size: 1.2rem;
 }
