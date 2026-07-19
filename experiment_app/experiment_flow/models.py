@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
+from django.utils import timezone
 import re
 
 # Create your models here.
@@ -282,6 +283,11 @@ class ExperimentStep(models.Model):
 
 
     def save(self, *args, **kwargs):
+        if self.status == "Completed" and not self.completed_on:
+            self.completed_on = timezone.now()
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"completed_on"}
+
         if not self.step_number:  # Only set number if it's not already set
             # Get the highest number for this step name in this experiment
             existing_steps = ExperimentStep.objects.filter(
@@ -517,6 +523,42 @@ class Sample(models.Model):
 
     def __str__(self):
         return str(self.sample_name) if self.sample_name else "未命名样品"
+
+
+class Cell(models.Model):
+    """A physical battery cell assigned to exactly one experiment step."""
+
+    step = models.ForeignKey(
+        ExperimentStep,
+        on_delete=models.CASCADE,
+        related_name='cells',
+    )
+    package_number = models.CharField(max_length=100, db_index=True)
+    barcode = models.CharField(max_length=100, unique=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['package_number', 'barcode', 'id']
+
+    def clean(self):
+        super().clean()
+        self.package_number = (self.package_number or '').strip().upper()
+        self.barcode = (self.barcode or '').strip().upper()
+        errors = {}
+        if not self.package_number:
+            errors['package_number'] = 'Package 号不能为空。'
+        if not self.barcode:
+            errors['barcode'] = 'Barcode 不能为空。'
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.barcode
 
 class Equipment(models.Model):
     """Equipment/Tool database for tracking lab equipment"""

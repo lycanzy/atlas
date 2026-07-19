@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.utils import timezone
 from experiment_flow.forms import ExperimentStepForm, ExperimentForm, RawMaterialForm
 from experiment_flow.models import StepNameTemplate, ExperimentStep, Experiment, Project, ProjectCategory, ResearchGroup, Sample, User, Equipment
 
@@ -22,6 +23,22 @@ class FormTests(TestCase):
         }
         form = ExperimentStepForm(data=form_data, experiment=self.experiment)
         self.assertTrue(form.is_valid())
+
+    def test_completed_step_without_time_uses_current_time(self):
+        form = ExperimentStepForm(data={
+            'step_name': 'AA',
+            'status': 'Completed',
+        }, experiment=self.experiment)
+        self.assertTrue(form.is_valid())
+
+        before_save = timezone.now()
+        step = form.save(commit=False)
+        step.experiment = self.experiment
+        step.save()
+        after_save = timezone.now()
+
+        self.assertGreaterEqual(step.completed_on, before_save)
+        self.assertLessEqual(step.completed_on, after_save)
 
     def test_step_form_rejects_more_than_200_samples(self):
         form = ExperimentStepForm(data={

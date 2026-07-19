@@ -6,7 +6,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from experiment_flow.models import (
-    AuditLog, Equipment, Experiment, ExperimentStep, Project, ProjectCategory,
+    AuditLog, Cell, Equipment, Experiment, ExperimentStep, Project, ProjectCategory,
     RawMaterial, ResearchGroup, StepNameTemplate, UserProfile,
 )
 
@@ -93,6 +93,12 @@ class FullAuditTests(TestCase):
         self.client.post(reverse('add_step', args=[self.project.id, self.experiment.id]), {
             'step_name': 'BB', 'step_description': 'Mix', 'status': 'Planned',
             'parents': [str(parent.id)], 'sample_count': 2,
+            'cells_payload': json.dumps({
+                'records': [{
+                    'id': None, 'package_number': 'pkg-01', 'barcode': 'cell-001',
+                }],
+                'deleted_ids': [],
+            }),
             'raw_material_usages': json.dumps([{
                 'raw_material_id': material.id, 'quantity': '2.5', 'unit': 'g', 'notes': 'charge',
             }]),
@@ -101,6 +107,9 @@ class FullAuditTests(TestCase):
         details = log.changes['after']
         self.assertEqual(details['sample_count'], 2)
         self.assertEqual(details['parents'], [parent.full_step])
+        self.assertEqual(details['cell_count'], 1)
+        self.assertEqual(details['cells'][0]['package_number'], 'PKG-01')
+        self.assertEqual(details['cells'][0]['barcode'], 'CELL-001')
         self.assertEqual(details['raw_material_usages'][0]['batch_number'], material.batch_number)
         self.assertEqual(details['raw_material_usages'][0]['quantity'], '2.5000')
 
@@ -118,6 +127,39 @@ class FullAuditTests(TestCase):
             json.dumps({'step_ids': ids}), content_type='application/json',
         )
         self.assertEqual(AuditLog.objects.filter(category='step', action='delete').count(), 1)
+
+    def test_cell_correction_and_removal_are_recorded_in_step_audit(self):
+        self.client.login(username='auditor', password='old-password')
+        step = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment)
+        changed_cell = Cell.objects.create(
+            step=step, package_number='PKG-01', barcode='CELL-001',
+        )
+        removed_cell = Cell.objects.create(
+            step=step, package_number='PKG-01', barcode='CELL-002',
+        )
+        AuditLog.objects.all().delete()
+
+        response = self.client.post(
+            reverse('edit_step', args=[self.project.id, self.experiment.id, step.id]),
+            {
+                'step_name': 'AA', 'status': 'Planned',
+                'cells_payload': json.dumps({
+                    'records': [{
+                        'id': changed_cell.id,
+                        'package_number': 'PKG-02',
+                        'barcode': 'CELL-001A',
+                    }],
+                    'deleted_ids': [removed_cell.id],
+                }),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        log = AuditLog.objects.get(category='step', action='update')
+        self.assertIn('cells', log.changes)
+        self.assertEqual(len(log.changes['cells']['before']), 2)
+        self.assertEqual(log.changes['cells']['after'][0]['package_number'], 'PKG-02')
+        self.assertEqual(log.changes['cells']['after'][0]['barcode'], 'CELL-001A')
 
     def test_deleted_actor_uses_username_snapshot(self):
         self.client.login(username='auditor', password='old-password')

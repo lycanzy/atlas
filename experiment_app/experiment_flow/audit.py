@@ -81,6 +81,10 @@ def step_snapshot(step):
         'notes': step.notes or '',
         'sample_count': step.samples.count(),
         'samples': list(step.samples.order_by('sample_number', 'id').values('id', 'sample_number', 'sample_name')),
+        'cell_count': step.cells.count(),
+        'cells': list(step.cells.order_by('package_number', 'barcode', 'id').values(
+            'id', 'package_number', 'barcode',
+        )),
         'raw_material_usages': raw_material_usage_snapshot(step),
     }
 

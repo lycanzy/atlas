@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from datetime import date
 from experiment_flow.models import (
-    ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, ExperimentStepLink, Sample, Equipment,
+    Cell, ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, ExperimentStepLink, Sample, Equipment,
     RawMaterial, StepRawMaterialUsage
 )
 
@@ -165,6 +165,43 @@ class ModelTests(TestCase):
             list(step.samples.values_list('sample_number', flat=True)),
             [1, 2, 3],
         )
+
+    def test_cell_normalizes_identifiers_and_allows_shared_package(self):
+        exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
+        first_step = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
+        second_step = ExperimentStep.objects.create(step_name="BB", experiment=project_experiment)
+
+        first_cell = Cell.objects.create(
+            step=first_step,
+            package_number=" pkg-01 ",
+            barcode=" cell-001 ",
+        )
+        second_cell = Cell.objects.create(
+            step=second_step,
+            package_number="pkg-01",
+            barcode="cell-002",
+        )
+
+        self.assertEqual(first_cell.package_number, "PKG-01")
+        self.assertEqual(first_cell.barcode, "CELL-001")
+        self.assertEqual(second_cell.package_number, "PKG-01")
+        self.assertEqual(first_cell.step, first_step)
+        self.assertEqual(second_cell.step, second_step)
+
+    def test_cell_barcode_is_globally_unique(self):
+        exp = Project.objects.create(exp_name="TPR001", project=self.project, owner=self.user)
+        project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
+        first_step = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
+        second_step = ExperimentStep.objects.create(step_name="BB", experiment=project_experiment)
+        Cell.objects.create(step=first_step, package_number="PKG-01", barcode="CELL-001")
+
+        with self.assertRaises(ValidationError):
+            Cell.objects.create(
+                step=second_step,
+                package_number="PKG-02",
+                barcode=" cell-001 ",
+            )
 
     def test_step_num_property(self):
         """Test the step_num property which counts previous steps in the project_experiment"""

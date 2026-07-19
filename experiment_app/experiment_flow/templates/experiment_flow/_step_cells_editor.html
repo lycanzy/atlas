@@ -1,0 +1,56 @@
+<div class="form-section cell-editor-section">
+  <div class="section-title d-flex align-items-center justify-content-between">
+    <span>电芯</span>
+    <span class="cell-editor-count">{{ cells|length }} 个</span>
+  </div>
+  <div class="cell-entry-grid">
+    <div class="form-group">
+      <label for="cell-package-input">Package 号 *</label>
+      <input type="text" id="cell-package-input" class="form-control cell-package-input"
+             maxlength="100" autocomplete="off" placeholder="例如 PKG-001">
+    </div>
+    <div class="form-group cell-barcode-entry">
+      <label for="cell-barcode-input">Barcode *</label>
+      <textarea id="cell-barcode-input" class="form-control cell-barcode-input" rows="2"
+                autocomplete="off"
+                placeholder="连续扫码，或每行粘贴一个 Barcode"></textarea>
+      <small>扫码后按 Enter 添加；批量粘贴时每行一个 Barcode。</small>
+    </div>
+    <button type="button" class="btn btn-sm btn-success add-cells-to-list-btn">
+      <i class="bi bi-plus-lg"></i> 加入列表
+    </button>
+  </div>
+  <div class="cell-editor-error" role="alert" hidden></div>
+  <div class="cell-editor-table-wrap">
+    <table class="table table-sm table-bordered cell-editor-table">
+      <thead class="table-light">
+        <tr>
+          <th>Package 号</th>
+          <th>Barcode</th>
+          <th class="text-center">操作</th>
+        </tr>
+      </thead>
+      <tbody class="cells-editor-container">
+        {% for cell in cells %}
+        <tr class="cell-editor-row" data-cell-id="{{ cell.id }}">
+          <td>
+            <input type="text" class="form-control form-control-sm cell-row-package"
+                   maxlength="100" value="{{ cell.package_number }}" aria-label="Package 号">
+          </td>
+          <td>
+            <input type="text" class="form-control form-control-sm cell-row-barcode"
+                   maxlength="100" value="{{ cell.barcode }}" aria-label="Barcode">
+          </td>
+          <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-danger remove-cell-row-btn" title="移除电芯">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="cell-editor-empty text-muted" {% if cells %}hidden{% endif %}>尚未添加电芯。</div>
+  </div>
+  <small class="text-muted">样品与电芯分开记录；Package 号可以重复，Barcode 在系统内唯一。</small>
+</div>
