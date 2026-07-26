@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Cell, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, StepRawMaterialUsage
+from .models import Cell, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
 
 # Base admin class with custom CSS
 class BaseModelAdmin(admin.ModelAdmin):
@@ -172,6 +172,15 @@ class RawMaterialAdmin(BaseModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+@admin.register(RawMaterialType)
+class RawMaterialTypeAdmin(BaseModelAdmin):
+    list_display = ("name", "description", "is_active", "created_on")
+    list_filter = ("is_active",)
+    search_fields = ("name", "description")
+    readonly_fields = ("created_on",)
+
 
 @admin.register(StepRawMaterialUsage)
 class StepRawMaterialUsageAdmin(BaseModelAdmin):

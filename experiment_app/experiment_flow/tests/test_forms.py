@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.utils import timezone
 from experiment_flow.forms import ExperimentStepForm, ExperimentForm, RawMaterialForm
-from experiment_flow.models import StepNameTemplate, ExperimentStep, Experiment, Project, ProjectCategory, ResearchGroup, Sample, User, Equipment
+from experiment_flow.models import StepNameTemplate, ExperimentStep, Experiment, Project, ProjectCategory, ResearchGroup, Sample, User, Equipment, RawMaterial, RawMaterialType
 
 class FormTests(TestCase):
     def setUp(self):
@@ -14,6 +14,7 @@ class FormTests(TestCase):
         # Create templates
         StepNameTemplate.objects.create(step_code="AA", step_label="Step A")
         StepNameTemplate.objects.create(step_code="BB", step_label="Step B")
+        RawMaterialType.objects.create(name="Powder")
 
     def test_step_form_valid(self):
         form_data = {
@@ -126,3 +127,31 @@ class FormTests(TestCase):
             'is_active': 'on'
         })
         self.assertTrue(form.is_valid())
+
+    def test_raw_material_type_is_a_managed_choice(self):
+        form = RawMaterialForm()
+        self.assertEqual(form.fields['material_type'].widget.__class__.__name__, 'Select')
+        self.assertIn(('Powder', 'Powder'), form.fields['material_type'].choices)
+
+        invalid_form = RawMaterialForm(data={
+            'material_code': 'RM002',
+            'received_date': '2026-06-20',
+            'material_type': 'Unmanaged type',
+            'owner': self.user.id,
+            'is_active': 'on',
+        })
+        self.assertFalse(invalid_form.is_valid())
+        self.assertIn('material_type', invalid_form.errors)
+
+    def test_edit_form_keeps_current_inactive_type_available(self):
+        RawMaterialType.objects.filter(name='Powder').update(is_active=False)
+        material = RawMaterial.objects.create(
+            material_code='RM003',
+            received_date='2026-06-21',
+            material_type='Powder',
+            owner=self.user,
+        )
+
+        form = RawMaterialForm(instance=material)
+
+        self.assertIn(('Powder', 'Powder'), form.fields['material_type'].choices)
