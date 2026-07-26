@@ -809,3 +809,32 @@ class ViewTests(TestCase):
         response = self.client.get(reverse('step_genealogy', args=[other_step.id]))
 
         self.assertEqual(response.status_code, 302)
+
+    def test_insights_requires_login(self):
+        response = self.client.get(reverse('insights'))
+
+        self.assertRedirects(response, f"{reverse('login')}?next={reverse('insights')}")
+
+    def test_logged_in_user_can_open_insights_workspace(self):
+        self.client.login(username="user1", password="password")
+
+        response = self.client.get(reverse('insights'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'experiment_flow/insights.html')
+        self.assertContains(response, '数据洞察')
+        self.assertContains(response, 'data-query-mode="mock"')
+        self.assertContains(response, 'PCA001 首圈克容量')
+        self.assertContains(response, 'GM001 × FS02 循环衰减')
+        self.assertContains(response, '正极配方横向对比')
+        self.assertContains(response, '模拟电化学数据')
+        self.assertContains(response, '模拟 SQL · 未来分析数据结构')
+
+    def test_navigation_links_to_insights_workspace(self):
+        self.client.login(username="user1", password="password")
+
+        sidebar_response = self.client.get(reverse('index'))
+        no_sidebar_response = self.client.get(reverse('equipment_list'))
+
+        self.assertContains(sidebar_response, reverse('insights'))
+        self.assertContains(no_sidebar_response, reverse('insights'))

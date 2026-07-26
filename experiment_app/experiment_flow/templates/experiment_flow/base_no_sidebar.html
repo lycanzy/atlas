@@ -67,6 +67,7 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=8" />
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
     <!-- Navigation Bar -->
@@ -77,6 +78,7 @@
             <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">实验</button>
             <button onclick="location.href='{% url 'equipment_list' %}'" class="btn btn-primary btn-sm">设备</button>
             <button onclick="location.href='{% url 'raw_material_list' %}'" class="btn btn-primary btn-sm">原材料</button>
+            <button onclick="location.href='{% url 'insights' %}'" class="btn btn-primary btn-sm">数据洞察</button>
             {% if user.is_staff or user.is_superuser %}<button onclick="location.href='{% url 'management_dashboard' %}'" class="btn btn-primary btn-sm">管理</button>{% endif %}
             {% if user.is_authenticated %}
                 <div class="dropdown user-menu">

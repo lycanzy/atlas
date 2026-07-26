@@ -313,6 +313,10 @@
                     class="btn btn-primary btn-sm"
                     data-url="{% url 'raw_material_list' %}"
                     onclick="window.location.href=this.dataset.url;">原材料</button>
+                <button type="button"
+                    class="btn btn-primary btn-sm"
+                    data-url="{% url 'insights' %}"
+                    onclick="window.location.href=this.dataset.url;">数据洞察</button>
             {% if user.is_staff or user.is_superuser %}
                 <button type="button"
                     class="btn btn-primary btn-sm"
