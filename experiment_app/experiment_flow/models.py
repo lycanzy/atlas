@@ -595,6 +595,34 @@ class Equipment(models.Model):
     def __str__(self):
         return self.equipment_name
 
+
+class RawMaterialType(models.Model):
+    """Managed choices used by the raw material type dropdown."""
+
+    name = models.CharField(max_length=100, unique=True)
+    description = models.CharField(max_length=255, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Raw Material Type"
+        verbose_name_plural = "Raw Material Types"
+
+    def clean(self):
+        if self.name:
+            self.name = self.name.strip()
+        if not self.name:
+            raise ValidationError({'name': '原材料种类名称不能为空。'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
 class RawMaterial(models.Model):
     """Raw material database for tracking material batches used in steps"""
 

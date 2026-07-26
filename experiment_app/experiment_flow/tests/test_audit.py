@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from experiment_flow.models import (
     AuditLog, Cell, Equipment, Experiment, ExperimentStep, Project, ProjectCategory,
-    RawMaterial, ResearchGroup, StepNameTemplate, UserProfile,
+    RawMaterial, RawMaterialType, ResearchGroup, StepNameTemplate, UserProfile,
 )
 
 
@@ -25,6 +25,7 @@ class FullAuditTests(TestCase):
         self.experiment = Experiment.objects.create(experiment_code='AA', project=self.project)
         StepNameTemplate.objects.create(step_code='AA', step_label='Parent')
         StepNameTemplate.objects.create(step_code='BB', step_label='Mixing')
+        RawMaterialType.objects.create(name='Powder')
 
     def test_authentication_events_exclude_credentials(self):
         response = self.client.post(reverse('login'), {'username': 'auditor', 'password': 'old-password'})

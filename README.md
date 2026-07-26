@@ -89,6 +89,8 @@ The current UI uses a compact Atlas dashboard style with a left project sidebar,
 
 The script creates an isolated virtual environment, installs dependencies, applies database migrations, checks the application, opens the browser, and starts Atlas at `http://127.0.0.1:8000/`. Keep the command window open while using the app; press `Ctrl+C` to stop it. Each installation uses its own local SQLite database.
 
+When sharing the project, leave out the `experiment_app/.venv/` folder. Virtual environments are computer-specific; the setup script creates or repairs it on the recipient's computer.
+
 #### macOS / Linux
 
 From the repository root:
@@ -215,6 +217,8 @@ Atlas 是一个基于 Django 的实验追踪应用，用于研究团队管理 **
 4. 首次运行时，根据提示创建管理员账号。
 
 脚本会自动创建独立虚拟环境、安装依赖、执行数据库迁移、检查应用、打开浏览器，并在 `http://127.0.0.1:8000/` 启动 Atlas。使用期间请保持命令窗口开启，按 `Ctrl+C` 可以停止服务。每份安装使用各自独立的本地 SQLite 数据库。
+
+分享项目时请不要包含 `experiment_app/.venv/` 文件夹。虚拟环境与具体电脑绑定；安装脚本会在同事的电脑上自动创建或修复它。
 
 #### macOS / Linux
 

@@ -1,3 +1,4 @@
 experiment_app/db.sqlite3
 experiment_app/.venv/
 *.pyc
+*.swp

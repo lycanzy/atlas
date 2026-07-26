@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from datetime import date
 from experiment_flow.models import (
     AuditLog, Cell, ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, Sample, StepNameTemplate,
-    RawMaterial, StepRawMaterialUsage
+    RawMaterial, RawMaterialType, StepRawMaterialUsage
 )
 import json
 
@@ -35,6 +35,8 @@ class ViewTests(TestCase):
 
         # Setup templates
         StepNameTemplate.objects.create(step_code="AA", step_label="Step A")
+        RawMaterialType.objects.create(name="Powder")
+        RawMaterialType.objects.create(name="Liquid")
         self.raw_material = RawMaterial.objects.create(
             material_code="RM001",
             received_date=date(2026, 6, 19),
@@ -622,6 +624,43 @@ class ViewTests(TestCase):
         self.assertFalse(Project.objects.filter(id=project.id).exists())
         self.client.post(reverse('delete_managed_user', args=[member.id]))
         self.assertFalse(User.objects.filter(id=member.id).exists())
+
+    def test_management_crud_for_raw_material_types(self):
+        self.client.login(username="staff", password="password")
+
+        dashboard = self.client.get(reverse('management_dashboard'))
+        self.assertContains(dashboard, 'data-bs-target="#material-types"')
+        self.assertContains(dashboard, 'Powder')
+
+        response = self.client.post(reverse('add_raw_material_type'), {
+            'name': 'Foil',
+            'description': 'Metal sheet',
+            'is_active': 'on',
+        })
+        self.assertRedirects(response, reverse('management_dashboard') + '#material-types')
+        material_type = RawMaterialType.objects.get(name='Foil')
+
+        RawMaterial.objects.create(
+            material_code='RM-FOIL',
+            received_date='2026-07-01',
+            material_type='Foil',
+            owner=self.user1,
+        )
+        self.client.post(reverse('edit_raw_material_type', args=[material_type.id]), {
+            'name': 'Metal Foil',
+            'description': 'Renamed option',
+            'is_active': 'on',
+        })
+        material_type.refresh_from_db()
+        self.assertEqual(material_type.name, 'Metal Foil')
+        self.assertTrue(RawMaterial.objects.filter(material_type='Metal Foil').exists())
+
+        self.client.post(reverse('delete_raw_material_type', args=[material_type.id]))
+        self.assertTrue(RawMaterialType.objects.filter(id=material_type.id).exists())
+
+        unused_type = RawMaterialType.objects.create(name='Unused')
+        self.client.post(reverse('delete_raw_material_type', args=[unused_type.id]))
+        self.assertFalse(RawMaterialType.objects.filter(id=unused_type.id).exists())
 
     def test_management_actions_create_persistent_audit_logs(self):
         self.client.login(username="staff", password="password")

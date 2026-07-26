@@ -1,7 +1,7 @@
 from django import forms
 from .models import (
     ExperimentStep, Experiment, Project, ProjectCategory, ResearchGroup, StepNameTemplate,
-    Equipment, RawMaterial, UserProfile, step_link_would_create_cycle,
+    Equipment, RawMaterial, RawMaterialType, UserProfile, step_link_would_create_cycle,
 )
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordChangeForm
@@ -139,6 +139,20 @@ class StepTemplateManagementForm(forms.ModelForm):
             'step_label': forms.TextInput(attrs={'class': 'form-control'}),
             'category': forms.TextInput(attrs={'class': 'form-control'}),
             'default_description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class RawMaterialTypeManagementForm(forms.ModelForm):
+    class Meta:
+        model = RawMaterialType
+        fields = ['name', 'description', 'is_active']
+        labels = {
+            'name': '种类名称', 'description': '说明', 'is_active': '启用',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.TextInput(attrs={'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
@@ -378,6 +392,12 @@ class EquipmentForm(forms.ModelForm):
         self.fields['owner'].label_from_instance = lambda obj: obj.get_full_name() if obj.get_full_name() else obj.username
 
 class RawMaterialForm(forms.ModelForm):
+    material_type = forms.ChoiceField(
+        label='原材料种类',
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
     owner = forms.ModelChoiceField(
         label='负责人',
         queryset=User.objects.none(),
@@ -399,7 +419,6 @@ class RawMaterialForm(forms.ModelForm):
         widgets = {
             'material_code': forms.TextInput(attrs={'class': 'form-control'}),
             'received_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
-            'material_type': forms.TextInput(attrs={'class': 'form-control'}),
             'material_name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'supplier': forms.TextInput(attrs={'class': 'form-control'}),
@@ -415,6 +434,18 @@ class RawMaterialForm(forms.ModelForm):
         self.fields['received_date'].required = True
         self.fields['received_date'].input_formats = ['%Y-%m-%d']
         self.fields['material_name'].required = False
+        type_names = list(
+            RawMaterialType.objects.filter(is_active=True)
+            .order_by('name')
+            .values_list('name', flat=True)
+        )
+        current_type = self.instance.material_type if self.instance and self.instance.pk else None
+        if current_type and current_type not in type_names:
+            type_names.append(current_type)
+        self.fields['material_type'].choices = [
+            ('', '--- 请选择原材料种类 ---'),
+            *((name, name) for name in type_names),
+        ]
 
 
 class CustomPasswordChangeForm(PasswordChangeForm):

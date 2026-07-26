@@ -4,13 +4,13 @@ from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from .models import AuditLog, Cell, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, StepRawMaterialUsage
-from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm, TeamManagementForm, ProjectManagementForm, ProjectCreateForm, ManagedUserForm, MemberTeamForm, StepTemplateManagementForm
+from .models import AuditLog, Cell, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
+from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm, TeamManagementForm, ProjectManagementForm, ProjectCreateForm, ManagedUserForm, MemberTeamForm, StepTemplateManagementForm, RawMaterialTypeManagementForm
 import json
 import string
 from urllib.parse import urlencode
@@ -72,6 +72,16 @@ def management_dashboard(request):
     projects = Project.objects.select_related('project__group', 'owner').order_by('-created_on')
     users = User.objects.select_related('profile__research_group').order_by('username')
     step_templates = StepNameTemplate.objects.order_by('category', 'step_code')
+    raw_material_types = list(RawMaterialType.objects.order_by('name'))
+    material_type_usage_counts = dict(
+        RawMaterial.objects.exclude(material_type__isnull=True)
+        .exclude(material_type='')
+        .values('material_type')
+        .annotate(count=Count('id'))
+        .values_list('material_type', 'count')
+    )
+    for material_type in raw_material_types:
+        material_type.usage_count = material_type_usage_counts.get(material_type.name, 0)
     cells = Cell.objects.select_related(
         'step__experiment__project__project__group',
     ).order_by('package_number', 'barcode', 'id')
@@ -123,6 +133,7 @@ def management_dashboard(request):
         'managed_projects': projects,
         'managed_users': users,
         'step_templates': step_templates,
+        'raw_material_types': raw_material_types,
         'managed_cells': cell_page_obj,
         'cell_page_obj': cell_page_obj,
         'cell_q': cell_q,
@@ -142,6 +153,7 @@ def management_dashboard(request):
         'project_create_form': ProjectCreateForm(),
         'member_form': ManagedUserForm(),
         'step_template_form': StepTemplateManagementForm(),
+        'raw_material_type_form': RawMaterialTypeManagementForm(),
     })
 
 
@@ -439,6 +451,82 @@ def delete_step_template(request, template_id):
         template.delete()
         messages.success(request, f'步骤模板 {name} 已删除。')
     return management_redirect('steps')
+
+
+@management_required
+@transaction.atomic
+def add_raw_material_type(request):
+    if request.method == 'POST':
+        form = RawMaterialTypeManagementForm(request.POST)
+        if form.is_valid():
+            material_type = form.save()
+            record_audit_event(
+                request, 'create', material_type, f'创建原材料种类 {material_type}',
+                {'name': {'before': None, 'after': material_type.name},
+                 'is_active': {'before': None, 'after': material_type.is_active}},
+            )
+            messages.success(request, f'原材料种类 {material_type} 已创建。')
+        else:
+            messages.error(request, '原材料种类创建失败：' + str(form.errors))
+    return management_redirect('material-types')
+
+
+@management_required
+@transaction.atomic
+def edit_raw_material_type(request, type_id):
+    material_type = get_object_or_404(RawMaterialType, id=type_id)
+    if request.method == 'POST':
+        old_name = material_type.name
+        before = {
+            'name': old_name,
+            'description': material_type.description,
+            'is_active': material_type.is_active,
+        }
+        form = RawMaterialTypeManagementForm(request.POST, instance=material_type)
+        if form.is_valid():
+            material_type = form.save()
+            if old_name != material_type.name:
+                RawMaterial.objects.filter(material_type=old_name).update(
+                    material_type=material_type.name
+                )
+            changes = changed_values(before, {
+                'name': material_type.name,
+                'description': material_type.description,
+                'is_active': material_type.is_active,
+            })
+            record_audit_event(
+                request, 'update', material_type,
+                f'修改原材料种类 {material_type}', changes,
+            )
+            messages.success(request, f'原材料种类 {material_type} 已更新。')
+        else:
+            messages.error(request, '原材料种类更新失败：' + str(form.errors))
+    return management_redirect('material-types')
+
+
+@management_required
+@transaction.atomic
+def delete_raw_material_type(request, type_id):
+    material_type = get_object_or_404(RawMaterialType, id=type_id)
+    if request.method == 'POST':
+        usage_count = RawMaterial.objects.filter(material_type=material_type.name).count()
+        if usage_count:
+            messages.error(
+                request,
+                f'原材料种类 {material_type} 已被 {usage_count} 条原材料记录使用，不能删除；可以将其停用。',
+            )
+        else:
+            name = str(material_type)
+            record_audit_event(
+                request, 'delete', material_type,
+                f'删除原材料种类 {name}', object_repr=name,
+                changes={'snapshot': model_snapshot(
+                    material_type, ('name', 'description', 'is_active'),
+                )},
+            )
+            material_type.delete()
+            messages.success(request, f'原材料种类 {name} 已删除。')
+    return management_redirect('material-types')
 
 
 def step_has_downstream_steps(step):
