@@ -66,6 +66,16 @@ def record_audit_event(request, action, instance, summary, changes=None, object_
     )
 
 
+@login_required
+def insights(request):
+    """Render the read-only data insights workspace.
+
+    The first release is intentionally frontend-only: no SQL or model request is
+    executed by this view.
+    """
+    return render(request, 'experiment_flow/insights.html')
+
+
 @management_required
 def management_dashboard(request):
     teams = ResearchGroup.objects.prefetch_related('members__user').order_by('group_name')

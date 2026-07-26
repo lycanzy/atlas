@@ -130,6 +130,7 @@ python manage.py runserver 8000
 - No JavaScript build step is required.
 - The database table names still use the original legacy names for compatibility, but the Django model classes now use the current business names.
 - A sample uWSGI config is available at `experiment_app/uwsgi.ini`.
+- The frontend-only Data Insights workspace has a provider-neutral [AI API integration guide](docs/nl2sql-api-integration.md).
 
 ---
 
@@ -259,6 +260,7 @@ python manage.py runserver 8000
 - 不需要 JavaScript build step。
 - 数据库表名仍保留原 legacy 名称以兼容现有数据，但 Django model class 已改为当前业务命名。
 - 示例 uWSGI 配置位于 `experiment_app/uwsgi.ini`。
+- 仅前端演示的数据洞察工作台提供了与模型供应商无关的 [AI API 接入说明](docs/nl2sql-api-integration.md)。
 
 ---
 

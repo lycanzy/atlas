@@ -23,6 +23,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('change_password/', views.change_password, name='change_password'),
     path('search/', views.global_search, name='global_search'),
+    path('insights/', views.insights, name='insights'),
     path('', views.index, name = 'index'),
     path('experiment/<int:exp_id>/', views.experiment_detail, name='experiment_detail'),
     path('add_experiment/', views.add_experiment, name='add_experiment'),
