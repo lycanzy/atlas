@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository centers on a Django 5.2 experiment tracking app in `experiment_app/`. The Django project package is `experiment_app/experiment_app/`, and the main app is `experiment_app/experiment_flow/`. Models, forms, views, admin registration, and context processors live there. Templates are under `experiment_app/experiment_flow/templates/experiment_flow/`; CSS/JS and vendored Bootstrap, Select2, jQuery, Cytoscape, and Bootstrap Icons assets are under `experiment_app/static/`. Django tests live in `experiment_app/experiment_flow/tests/`. Helper checks are in `scripts/`. `atlas-demo-site/` is a separate Vinext/Next demo site.
+This repository centers on a Django 5.2 experiment tracking app in `experiment_app/`. The Django project package is `experiment_app/experiment_app/`, and the main app is `experiment_app/experiment_flow/`. Models, forms, views, admin registration, and context processors live there. Templates are under `experiment_app/experiment_flow/templates/experiment_flow/`; CSS/JS and vendored Bootstrap, Select2, jQuery, Cytoscape, and Bootstrap Icons assets are under `experiment_app/static/`. Django tests live in `experiment_app/experiment_flow/tests/`. Helper checks are in `scripts/`.
 
 
 ## Product context
