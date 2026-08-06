@@ -530,7 +530,7 @@
                                                     </div>
                                                     <div class="cell-barcode-list">
                                                         {% for cell in package.list %}
-                                                        <span class="cell-barcode-chip" data-cell-id="{{ cell.id }}">{{ cell.barcode }}</span>
+                                                        <span class="cell-barcode-chip" data-cell-id="{{ cell.id }}">{{ cell.barcode }}{% if cell.test_item %} · {{ cell.test_item.name }}{% endif %}</span>
                                                         {% endfor %}
                                                     </div>
                                                 </div>
@@ -1068,7 +1068,7 @@ function initializeStepEditorTabs(form) {
     sampleCountField.addEventListener('change', updateSampleTabCount);
 }
 
-function createCellEditorRow(form, packageNumber, barcode, cellId = null) {
+function createCellEditorRow(form, packageNumber, barcode, testItemId = '', cellId = null) {
     const container = form.querySelector('.cells-editor-container');
     if (!container) return;
 
@@ -1078,6 +1078,7 @@ function createCellEditorRow(form, packageNumber, barcode, cellId = null) {
     row.innerHTML = `
         <td><input type="text" class="form-control form-control-sm cell-row-package" maxlength="100" aria-label="Package 号"></td>
         <td><input type="text" class="form-control form-control-sm cell-row-barcode" maxlength="100" aria-label="Barcode"></td>
+        <td><select class="form-select form-select-sm cell-row-test-item" aria-label="测试项目"></select></td>
         <td class="text-center">
             <button type="button" class="btn btn-sm btn-outline-danger remove-cell-row-btn" title="移除电芯">
                 <i class="bi bi-trash"></i>
@@ -1085,6 +1086,8 @@ function createCellEditorRow(form, packageNumber, barcode, cellId = null) {
         </td>`;
     row.querySelector('.cell-row-package').value = packageNumber;
     row.querySelector('.cell-row-barcode').value = barcode;
+    row.querySelector('.cell-row-test-item').innerHTML = form.querySelector('.cell-test-item-input')?.innerHTML || '<option value="">未指定</option>';
+    row.querySelector('.cell-row-test-item').value = String(testItemId || '');
     container.appendChild(row);
     updateCellEditorState(form);
 }
@@ -1092,6 +1095,7 @@ function createCellEditorRow(form, packageNumber, barcode, cellId = null) {
 function addCellsToEditor(form) {
     const packageInput = form.querySelector('.cell-package-input');
     const barcodeInput = form.querySelector('.cell-barcode-input');
+    const testItemId = form.querySelector('.cell-test-item-input')?.value || '';
     const packageNumber = normalizeCellIdentifier(packageInput?.value);
     const scannedBarcodes = (barcodeInput?.value || '')
         .split(/\r?\n/)
@@ -1122,7 +1126,7 @@ function addCellsToEditor(form) {
             return;
         }
         existingBarcodes.add(barcode);
-        createCellEditorRow(form, packageNumber, barcode);
+        createCellEditorRow(form, packageNumber, barcode, testItemId);
         addedCount++;
     });
 
@@ -1176,6 +1180,7 @@ function collectCellPayload(form) {
     for (const row of form.querySelectorAll('.cell-editor-row')) {
         const packageNumber = normalizeCellIdentifier(row.querySelector('.cell-row-package')?.value);
         const barcode = normalizeCellIdentifier(row.querySelector('.cell-row-barcode')?.value);
+        const testItemId = row.querySelector('.cell-row-test-item')?.value || null;
         if (!packageNumber || !barcode) {
             showCellEditorError(form, '每个电芯都必须填写 Package 号和 Barcode。');
             return null;
@@ -1190,7 +1195,8 @@ function collectCellPayload(form) {
         records.push({
             id: row.dataset.cellId ? Number(row.dataset.cellId) : null,
             package_number: packageNumber,
-            barcode: barcode
+            barcode: barcode,
+            test_item_id: testItemId ? Number(testItemId) : null
         });
     }
     showCellEditorError(form, '');

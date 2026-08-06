@@ -1,7 +1,7 @@
 from django import forms
 from .models import (
     ExperimentStep, Experiment, Project, ProjectCategory, ResearchGroup, StepNameTemplate,
-    Equipment, RawMaterial, RawMaterialType, UserProfile, step_link_would_create_cycle,
+    CellTestItem, Equipment, RawMaterial, RawMaterialType, UserProfile, step_link_would_create_cycle,
 )
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordChangeForm
@@ -150,6 +150,18 @@ class RawMaterialTypeManagementForm(forms.ModelForm):
         labels = {
             'name': '种类名称', 'description': '说明', 'is_active': '启用',
         }
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.TextInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class CellTestItemManagementForm(forms.ModelForm):
+    class Meta:
+        model = CellTestItem
+        fields = ['name', 'description', 'is_active']
+        labels = {'name': '测试项目名称', 'description': '说明', 'is_active': '启用'}
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.TextInput(attrs={'class': 'form-control'}),
@@ -414,12 +426,20 @@ class RawMaterialForm(forms.ModelForm):
         model = RawMaterial
         fields = [
             'material_code', 'received_date', 'material_type', 'material_name',
-            'description', 'owner', 'supplier', 'location', 'is_active', 'notes'
+            'description', 'total_quantity', 'total_unit', 'owner', 'supplier',
+            'location', 'is_active', 'notes'
         ]
         widgets = {
             'material_code': forms.TextInput(attrs={'class': 'form-control'}),
             'received_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
             'material_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'total_quantity': forms.NumberInput(attrs={
+                'class': 'form-control', 'min': '0', 'step': '0.0001',
+                'placeholder': '请输入数值',
+            }),
+            'total_unit': forms.TextInput(attrs={
+                'class': 'form-control', 'placeholder': '例如：g、kg、mL、个',
+            }),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'supplier': forms.TextInput(attrs={'class': 'form-control'}),
             'location': forms.TextInput(attrs={'class': 'form-control'}),

@@ -918,7 +918,7 @@ a {
     align-items: start;
     display: grid;
     column-gap: 0.75rem;
-    grid-template-columns: minmax(180px, 0.85fr) minmax(320px, 1.65fr) max-content;
+    grid-template-columns: minmax(160px, 0.8fr) minmax(170px, 0.8fr) minmax(280px, 1.4fr) max-content;
     row-gap: 0.35rem;
 }
 
@@ -971,6 +971,35 @@ a {
 
 .cell-editor-table {
     margin-bottom: 0;
+}
+
+table.table.cell-editor-table {
+    table-layout: auto;
+    min-width: 720px;
+}
+
+table.table.cell-editor-table th:nth-child(1),
+table.table.cell-editor-table td:nth-child(1) {
+    min-width: 180px;
+    width: 28%;
+}
+
+table.table.cell-editor-table th:nth-child(2),
+table.table.cell-editor-table td:nth-child(2) {
+    min-width: 220px;
+    width: 34%;
+}
+
+table.table.cell-editor-table th:nth-child(3),
+table.table.cell-editor-table td:nth-child(3) {
+    min-width: 190px;
+    width: 30%;
+}
+
+table.table.cell-editor-table th:nth-child(4),
+table.table.cell-editor-table td:nth-child(4) {
+    min-width: 64px;
+    width: 64px;
 }
 
 .cell-editor-table th:last-child,

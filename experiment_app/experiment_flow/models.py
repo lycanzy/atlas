@@ -1,10 +1,12 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.utils import timezone
 import re
+from decimal import Decimal
 
 # Create your models here.
 
@@ -525,6 +527,32 @@ class Sample(models.Model):
         return str(self.sample_name) if self.sample_name else "未命名样品"
 
 
+class CellTestItem(models.Model):
+    """Administrator-managed test option assignable to battery cells."""
+
+    name = models.CharField(max_length=100, unique=True)
+    description = models.CharField(max_length=255, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'id']
+
+    def clean(self):
+        super().clean()
+        self.name = (self.name or '').strip()
+        if not self.name:
+            raise ValidationError({'name': '测试项目名称不能为空。'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
 class Cell(models.Model):
     """A physical battery cell assigned to exactly one experiment step."""
 
@@ -535,6 +563,13 @@ class Cell(models.Model):
     )
     package_number = models.CharField(max_length=100, db_index=True)
     barcode = models.CharField(max_length=100, unique=True)
+    test_item = models.ForeignKey(
+        CellTestItem,
+        on_delete=models.PROTECT,
+        related_name='cells',
+        null=True,
+        blank=True,
+    )
     created_on = models.DateTimeField(auto_now_add=True)
     updated_on = models.DateTimeField(auto_now=True)
 
@@ -632,6 +667,8 @@ class RawMaterial(models.Model):
     material_type = models.CharField(max_length=100, blank=True, null=True, help_text="Raw material type/category")
     material_name = models.CharField(max_length=100, blank=True, null=True, help_text="Raw material name")
     description = models.TextField(blank=True, null=True, help_text="Detailed description of the raw material")
+    total_quantity = models.DecimalField(max_digits=14, decimal_places=4, blank=True, null=True, validators=[MinValueValidator(Decimal('0'))], help_text="Total quantity received")
+    total_unit = models.CharField(max_length=50, blank=True, null=True, help_text="Unit for the total quantity")
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='raw_materials', help_text="Raw material owner/responsible person")
     supplier = models.CharField(max_length=200, blank=True, null=True, help_text="Supplier/vendor")
     location = models.CharField(max_length=200, blank=True, null=True, help_text="Storage location")

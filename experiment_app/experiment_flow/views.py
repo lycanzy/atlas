@@ -9,8 +9,8 @@ from django.contrib.auth import authenticate, login as auth_login, logout as aut
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from .models import AuditLog, Cell, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
-from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm, TeamManagementForm, ProjectManagementForm, ProjectCreateForm, ManagedUserForm, MemberTeamForm, StepTemplateManagementForm, RawMaterialTypeManagementForm
+from .models import AuditLog, Cell, CellTestItem, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
+from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm, TeamManagementForm, ProjectManagementForm, ProjectCreateForm, ManagedUserForm, MemberTeamForm, StepTemplateManagementForm, RawMaterialTypeManagementForm, CellTestItemManagementForm
 import json
 import string
 from urllib.parse import urlencode
@@ -83,6 +83,7 @@ def management_dashboard(request):
     users = User.objects.select_related('profile__research_group').order_by('username')
     step_templates = StepNameTemplate.objects.order_by('category', 'step_code')
     raw_material_types = list(RawMaterialType.objects.order_by('name'))
+    cell_test_items = list(CellTestItem.objects.annotate(usage_count=Count('cells')).order_by('name'))
     material_type_usage_counts = dict(
         RawMaterial.objects.exclude(material_type__isnull=True)
         .exclude(material_type='')
@@ -93,13 +94,14 @@ def management_dashboard(request):
     for material_type in raw_material_types:
         material_type.usage_count = material_type_usage_counts.get(material_type.name, 0)
     cells = Cell.objects.select_related(
-        'step__experiment__project__project__group',
+        'test_item', 'step__experiment__project__project__group',
     ).order_by('package_number', 'barcode', 'id')
     cell_q = request.GET.get('cell_q', '').strip()
     if cell_q:
         cells = cells.filter(
             Q(package_number__icontains=cell_q) |
             Q(barcode__icontains=cell_q) |
+            Q(test_item__name__icontains=cell_q) |
             Q(step__full_step__icontains=cell_q) |
             Q(step__experiment__full_experiment_code__icontains=cell_q) |
             Q(step__experiment__project__exp_name__icontains=cell_q) |
@@ -144,6 +146,7 @@ def management_dashboard(request):
         'managed_users': users,
         'step_templates': step_templates,
         'raw_material_types': raw_material_types,
+        'cell_test_items': cell_test_items,
         'managed_cells': cell_page_obj,
         'cell_page_obj': cell_page_obj,
         'cell_q': cell_q,
@@ -164,6 +167,7 @@ def management_dashboard(request):
         'member_form': ManagedUserForm(),
         'step_template_form': StepTemplateManagementForm(),
         'raw_material_type_form': RawMaterialTypeManagementForm(),
+        'cell_test_item_form': CellTestItemManagementForm(),
     })
 
 
@@ -539,6 +543,69 @@ def delete_raw_material_type(request, type_id):
     return management_redirect('material-types')
 
 
+@management_required
+@transaction.atomic
+def add_cell_test_item(request):
+    if request.method == 'POST':
+        form = CellTestItemManagementForm(request.POST)
+        if form.is_valid():
+            test_item = form.save()
+            record_audit_event(
+                request, 'create', test_item, f'创建电芯测试项目 {test_item}',
+                {'name': {'before': None, 'after': test_item.name},
+                 'is_active': {'before': None, 'after': test_item.is_active}},
+            )
+            messages.success(request, f'电芯测试项目 {test_item} 已创建。')
+        else:
+            messages.error(request, '电芯测试项目创建失败：' + str(form.errors))
+    return management_redirect('cell-test-items')
+
+
+@management_required
+@transaction.atomic
+def edit_cell_test_item(request, item_id):
+    test_item = get_object_or_404(CellTestItem, id=item_id)
+    if request.method == 'POST':
+        before = model_snapshot(test_item, ('name', 'description', 'is_active'))
+        form = CellTestItemManagementForm(request.POST, instance=test_item)
+        if form.is_valid():
+            test_item = form.save()
+            changes = changed_values(
+                before, model_snapshot(test_item, ('name', 'description', 'is_active')),
+            )
+            record_audit_event(
+                request, 'update', test_item, f'修改电芯测试项目 {test_item}', changes,
+            )
+            messages.success(request, f'电芯测试项目 {test_item} 已更新。')
+        else:
+            messages.error(request, '电芯测试项目更新失败：' + str(form.errors))
+    return management_redirect('cell-test-items')
+
+
+@management_required
+@transaction.atomic
+def delete_cell_test_item(request, item_id):
+    test_item = get_object_or_404(CellTestItem, id=item_id)
+    if request.method == 'POST':
+        usage_count = test_item.cells.count()
+        if usage_count:
+            messages.error(
+                request,
+                f'测试项目 {test_item} 已被 {usage_count} 个电芯使用，不能删除；可以将其停用。',
+            )
+        else:
+            name = str(test_item)
+            record_audit_event(
+                request, 'delete', test_item, f'删除电芯测试项目 {name}', object_repr=name,
+                changes={'snapshot': model_snapshot(
+                    test_item, ('name', 'description', 'is_active'),
+                )},
+            )
+            test_item.delete()
+            messages.success(request, f'电芯测试项目 {name} 已删除。')
+    return management_redirect('cell-test-items')
+
+
 def step_has_downstream_steps(step):
     """Return True when another step depends on this step."""
     return step.children.exists() or step.child.exists()
@@ -623,6 +690,16 @@ def save_step_cells(step, payload_json):
 
         package_number = str(record.get('package_number') or '').strip().upper()
         barcode = str(record.get('barcode') or '').strip().upper()
+        raw_test_item_id = record.get('test_item_id')
+        if raw_test_item_id in (None, ''):
+            test_item_id = None
+        else:
+            try:
+                test_item_id = int(raw_test_item_id)
+            except (TypeError, ValueError) as exc:
+                raise ValidationError('测试项目 ID 无效。') from exc
+            if test_item_id <= 0:
+                raise ValidationError('测试项目 ID 无效。')
         if not package_number:
             raise ValidationError('每个电芯都必须填写 Package 号。')
         if not barcode:
@@ -636,7 +713,17 @@ def save_step_cells(step, payload_json):
             'id': cell_id,
             'package_number': package_number,
             'barcode': barcode,
+            'test_item_id': test_item_id,
         })
+
+    requested_test_item_ids = {
+        record['test_item_id'] for record in normalized_records if record['test_item_id'] is not None
+    }
+    valid_test_item_ids = set(
+        CellTestItem.objects.filter(id__in=requested_test_item_ids).values_list('id', flat=True)
+    )
+    if valid_test_item_ids != requested_test_item_ids:
+        raise ValidationError('包含不存在的测试项目。')
 
     normalized_deleted_ids = set()
     for raw_id in deleted_ids:
@@ -681,6 +768,7 @@ def save_step_cells(step, payload_json):
                 step=step,
                 package_number=record['package_number'],
                 barcode=record['barcode'],
+                test_item_id=record['test_item_id'],
             )
             continue
 
@@ -688,9 +776,11 @@ def save_step_cells(step, payload_json):
         if (
             cell.package_number != record['package_number']
             or cell.barcode != record['barcode']
+            or cell.test_item_id != record['test_item_id']
         ):
             cell.package_number = record['package_number']
             cell.barcode = record['barcode']
+            cell.test_item_id = record['test_item_id']
             cell.save()
 
 
@@ -1206,7 +1296,7 @@ def experiment_detail(request, exp_id):
     project_experiments = (
         Experiment.objects
         .filter(project=experiment)
-        .prefetch_related('steps__cells')
+        .prefetch_related('steps__cells__test_item')
         .order_by('created_on')
     )
     available_experiment_codes = get_available_experiment_codes(experiment)
@@ -1225,7 +1315,8 @@ def experiment_detail(request, exp_id):
         'available_experiment_codes': available_experiment_codes,
         'experiments': page_obj,
         'page_obj': page_obj,
-        'search_query': search_query
+        'search_query': search_query,
+        'cell_test_items': CellTestItem.objects.order_by('name'),
     })
 
 @login_required
@@ -1500,6 +1591,7 @@ def add_step(request, exp_id, experiment_id):
         'form': form,
         'raw_materials': RawMaterial.objects.filter(is_active=True).order_by('material_code', 'batch_number'),
         'cells': [],
+        'cell_test_items': CellTestItem.objects.filter(is_active=True).order_by('name'),
         'is_add': True  # Flag to indicate this is add mode, not edit mode
     })
 
@@ -1568,7 +1660,10 @@ def edit_step(request, exp_id, experiment_id, step_id):
             'step': step,
             'project_experiment': project_experiment,
             'raw_materials': RawMaterial.objects.filter(Q(is_active=True) | Q(step_usages__step=step)).distinct().order_by('material_code', 'batch_number'),
-            'cells': step.cells.all(),
+            'cells': step.cells.select_related('test_item'),
+            'cell_test_items': CellTestItem.objects.filter(
+                Q(is_active=True) | Q(cells__step=step)
+            ).distinct().order_by('name'),
             'samples': step.samples.all(),
         }
     )
@@ -2113,6 +2208,8 @@ def get_raw_materials(request):
             'received_date': material.received_date.isoformat() if material.received_date else '',
             'material_type': material.material_type or '',
             'material_name': material.material_name,
+            'total_quantity': str(material.total_quantity) if material.total_quantity is not None else '',
+            'total_unit': material.total_unit or '',
             'supplier': material.supplier or '',
             'location': material.location or '',
             'owner': material.owner.get_full_name() if material.owner and material.owner.get_full_name() else (material.owner.username if material.owner else ''),
