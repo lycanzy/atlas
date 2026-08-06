@@ -2,6 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth.models import User
 from datetime import date
+from decimal import Decimal
 from experiment_flow.models import (
     AuditLog, Cell, ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, Sample, StepNameTemplate,
     RawMaterial, RawMaterialType, StepRawMaterialUsage
@@ -42,6 +43,8 @@ class ViewTests(TestCase):
             received_date=date(2026, 6, 19),
             material_type="Powder",
             material_name="Test Powder",
+            total_quantity="1000.0000",
+            total_unit="g",
             owner=self.user1,
             supplier="Vendor A",
             location="Shelf 1"
@@ -481,25 +484,33 @@ class ViewTests(TestCase):
         detail_response = self.client.get(reverse('raw_material_detail', args=[self.raw_material.id]))
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(detail_response, "RM001-061926")
+        self.assertContains(detail_response, "1000 g")
 
         add_response = self.client.post(reverse('add_raw_material'), {
             'material_code': 'RM002',
             'received_date': '2026-06-20',
             'material_type': 'Liquid',
             'material_name': '',
+            'total_quantity': '2000',
+            'total_unit': 'mL',
             'owner': self.user1.id,
             'supplier': 'Vendor B',
             'location': 'Cabinet 2',
             'is_active': 'on'
         })
         self.assertEqual(add_response.status_code, 302)
-        self.assertTrue(RawMaterial.objects.filter(material_code="RM002", batch_number="RM002-062026", material_name__isnull=True).exists())
+        self.assertTrue(RawMaterial.objects.filter(
+            material_code="RM002", batch_number="RM002-062026",
+            material_name__isnull=True, total_quantity="2000", total_unit="mL",
+        ).exists())
 
         edit_response = self.client.post(reverse('edit_raw_material', args=[self.raw_material.id]), {
             'material_code': 'RM001',
             'received_date': '2026-06-21',
             'material_type': 'Powder',
             'material_name': '',
+            'total_quantity': '750.5',
+            'total_unit': 'g',
             'owner': self.user1.id,
             'supplier': 'Vendor A',
             'location': 'Shelf 2',
@@ -509,6 +520,8 @@ class ViewTests(TestCase):
         self.raw_material.refresh_from_db()
         self.assertEqual(self.raw_material.batch_number, "RM001-062126")
         self.assertIsNone(self.raw_material.material_name)
+        self.assertEqual(self.raw_material.total_quantity, Decimal("750.5000"))
+        self.assertEqual(self.raw_material.total_unit, "g")
 
     def test_management_dashboard_requires_staff(self):
         self.client.login(username="user1", password="password")

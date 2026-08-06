@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Cell, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
+from .models import Cell, CellTestItem, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
 
 # Base admin class with custom CSS
 class BaseModelAdmin(admin.ModelAdmin):
@@ -103,8 +103,17 @@ class SampleAdmin(BaseModelAdmin):
 
 @admin.register(Cell)
 class CellAdmin(BaseModelAdmin):
-    list_display = ("barcode", "package_number", "step", "created_on", "updated_on")
-    search_fields = ("barcode", "package_number", "step__full_step")
+    list_display = ("barcode", "package_number", "test_item", "step", "created_on", "updated_on")
+    search_fields = ("barcode", "package_number", "test_item__name", "step__full_step")
+    list_filter = ("test_item",)
+    readonly_fields = ("created_on", "updated_on")
+
+
+@admin.register(CellTestItem)
+class CellTestItemAdmin(BaseModelAdmin):
+    list_display = ("name", "description", "is_active", "created_on", "updated_on")
+    list_filter = ("is_active",)
+    search_fields = ("name", "description")
     readonly_fields = ("created_on", "updated_on")
 
 @admin.register(StepNameTemplate)
@@ -153,13 +162,13 @@ class EquipmentAdmin(BaseModelAdmin):
 
 @admin.register(RawMaterial)
 class RawMaterialAdmin(BaseModelAdmin):
-    list_display = ("material_code", "batch_number", "received_date", "material_name", "material_type", "owner", "location", "is_active", "created_on")
+    list_display = ("material_code", "batch_number", "received_date", "material_name", "material_type", "total_quantity", "total_unit", "owner", "location", "is_active", "created_on")
     list_filter = ("is_active", "material_type", "owner")
     search_fields = ("material_code", "batch_number", "material_name", "material_type", "description", "supplier", "location")
     readonly_fields = ("batch_number", "created_on", "updated_on")
     fieldsets = (
         ('Basic Information', {
-            'fields': ('material_code', 'received_date', 'batch_number', 'material_type', 'material_name', 'description', 'owner', 'is_active')
+            'fields': ('material_code', 'received_date', 'batch_number', 'material_type', 'material_name', 'total_quantity', 'total_unit', 'description', 'owner', 'is_active')
         }),
         ('Storage and Supplier', {
             'fields': ('supplier', 'location')

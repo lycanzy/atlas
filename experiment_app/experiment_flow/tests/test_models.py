@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from datetime import date
+from decimal import Decimal
 from experiment_flow.models import (
     Cell, ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, ExperimentStepLink, Sample, Equipment,
     RawMaterial, StepRawMaterialUsage
@@ -307,12 +308,16 @@ class ModelTests(TestCase):
             material_code="rm001",
             received_date=date(2026, 6, 19),
             material_type="Powder",
+            total_quantity="2500.0000",
+            total_unit="g",
             owner=self.user
         )
 
         self.assertEqual(material.material_code, "RM001")
         self.assertEqual(material.batch_number, "RM001-061926")
         self.assertIsNone(material.material_name)
+        self.assertEqual(material.total_quantity, Decimal("2500.0000"))
+        self.assertEqual(material.total_unit, "g")
         self.assertEqual(material.owner, self.user)
 
         duplicate = RawMaterial(

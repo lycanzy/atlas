@@ -60,6 +60,16 @@
                                 <p>{{ raw_material.material_type|default:"未填写" }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
+                                <label class="fw-bold">总量：</label>
+                                <p>
+                                    {% if raw_material.total_quantity is not None %}
+                                        {{ raw_material.total_quantity|floatformat:"-4" }} {{ raw_material.total_unit|default:"" }}
+                                    {% else %}
+                                        未填写
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
                                 <label class="fw-bold">负责人：</label>
                                 <p>
                                     {% if raw_material.owner %}

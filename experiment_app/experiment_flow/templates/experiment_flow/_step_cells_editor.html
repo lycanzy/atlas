@@ -9,6 +9,15 @@
       <input type="text" id="cell-package-input" class="form-control cell-package-input"
              maxlength="100" autocomplete="off" placeholder="例如 PKG-001">
     </div>
+    <div class="form-group">
+      <label for="cell-test-item-input">测试项目</label>
+      <select id="cell-test-item-input" class="form-select cell-test-item-input">
+        <option value="">未指定</option>
+        {% for item in cell_test_items %}
+        <option value="{{ item.id }}" {% if not item.is_active %}disabled{% endif %}>{{ item.name }}{% if not item.is_active %}（已停用）{% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="form-group cell-barcode-entry">
       <label for="cell-barcode-input">Barcode *</label>
       <textarea id="cell-barcode-input" class="form-control cell-barcode-input" rows="2"
@@ -27,6 +36,7 @@
         <tr>
           <th>Package 号</th>
           <th>Barcode</th>
+          <th>测试项目</th>
           <th class="text-center">操作</th>
         </tr>
       </thead>
@@ -40,6 +50,14 @@
           <td>
             <input type="text" class="form-control form-control-sm cell-row-barcode"
                    maxlength="100" value="{{ cell.barcode }}" aria-label="Barcode">
+          </td>
+          <td>
+            <select class="form-select form-select-sm cell-row-test-item" aria-label="测试项目">
+              <option value="">未指定</option>
+              {% for item in cell_test_items %}
+              <option value="{{ item.id }}" {% if cell.test_item_id == item.id %}selected{% elif not item.is_active %}disabled{% endif %}>{{ item.name }}{% if not item.is_active %}（已停用）{% endif %}</option>
+              {% endfor %}
+            </select>
           </td>
           <td class="text-center">
             <button type="button" class="btn btn-sm btn-outline-danger remove-cell-row-btn" title="移除电芯">

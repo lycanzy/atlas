@@ -83,7 +83,7 @@ def step_snapshot(step):
         'samples': list(step.samples.order_by('sample_number', 'id').values('id', 'sample_number', 'sample_name')),
         'cell_count': step.cells.count(),
         'cells': list(step.cells.order_by('package_number', 'barcode', 'id').values(
-            'id', 'package_number', 'barcode',
+            'id', 'package_number', 'barcode', 'test_item_id', 'test_item__name',
         )),
         'raw_material_usages': raw_material_usage_snapshot(step),
     }
@@ -96,7 +96,7 @@ EQUIPMENT_FIELDS = (
 )
 RAW_MATERIAL_FIELDS = (
     'material_code', 'batch_number', 'received_date', 'material_name',
-    'material_type', 'owner', 'supplier', 'location', 'is_active',
+    'material_type', 'total_quantity', 'total_unit', 'owner', 'supplier', 'location', 'is_active',
     'description', 'notes',
 )
 

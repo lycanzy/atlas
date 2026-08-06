@@ -1,5 +1,6 @@
 from django.test import TestCase
 from django.utils import timezone
+from decimal import Decimal
 from experiment_flow.forms import ExperimentStepForm, ExperimentForm, RawMaterialForm
 from experiment_flow.models import StepNameTemplate, ExperimentStep, Experiment, Project, ProjectCategory, ResearchGroup, Sample, User, Equipment, RawMaterial, RawMaterialType
 
@@ -121,12 +122,28 @@ class FormTests(TestCase):
             'received_date': '2026-06-19',
             'material_type': 'Powder',
             'material_name': '',
+            'total_quantity': '2500.5',
+            'total_unit': 'g',
             'owner': self.user.id,
             'supplier': 'Vendor A',
             'location': 'Shelf 1',
             'is_active': 'on'
         })
         self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data['total_quantity'], Decimal('2500.5'))
+        self.assertEqual(form.cleaned_data['total_unit'], 'g')
+
+        invalid_form = RawMaterialForm(data={
+            'material_code': 'RM002',
+            'received_date': '2026-06-20',
+            'material_type': 'Powder',
+            'total_quantity': '-1',
+            'total_unit': 'g',
+            'owner': self.user.id,
+            'is_active': 'on',
+        })
+        self.assertFalse(invalid_form.is_valid())
+        self.assertIn('total_quantity', invalid_form.errors)
 
     def test_raw_material_type_is_a_managed_choice(self):
         form = RawMaterialForm()
