@@ -1,8 +1,9 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth.models import User
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
+from django.utils import timezone
 from experiment_flow.models import (
     AuditLog, Cell, ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, Sample, StepNameTemplate,
     RawMaterial, RawMaterialType, StepRawMaterialUsage
@@ -356,6 +357,23 @@ class ViewTests(TestCase):
         self.assertContains(response, 'CELL-001')
         self.assertContains(response, f'{step.full_step}-01')
         self.assertContains(response, f'{step.full_step}-02')
+
+    def test_edit_step_renders_existing_completed_time(self):
+        completed_on = timezone.make_aware(datetime(2026, 8, 6, 14, 35))
+        step = ExperimentStep.objects.create(
+            step_name="AA",
+            experiment=self.experiment1_item,
+            status="Completed",
+            completed_on=completed_on,
+        )
+        self.client.login(username="user1", password="password")
+
+        response = self.client.get(
+            reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, step.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="2026-08-06T14:35"')
 
     def test_add_step_with_multiple_parents(self):
         self.client.login(username="user1", password="password")

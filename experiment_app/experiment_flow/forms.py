@@ -249,7 +249,7 @@ class ExperimentStepForm(forms.ModelForm):
             'status': forms.Select(attrs={
                 'class': 'form-select'
             }),
-            'completed_on': forms.DateTimeInput(attrs={
+            'completed_on': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={
                 'class': 'form-control',
                 'type': 'datetime-local'
             }),
