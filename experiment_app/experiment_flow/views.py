@@ -16,13 +16,19 @@ import string
 from urllib.parse import urlencode
 from functools import wraps
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from .audit import (
     EQUIPMENT_FIELDS, RAW_MATERIAL_FIELDS, changed_values, model_snapshot,
     record_audit_event as write_audit_event, record_permission_denied,
     step_snapshot,
+)
+from .inventory import (
+    allows_negative, attach_inventory_summaries, completed_usage_delta,
+    inventory_ready, inventory_summary, inventory_totals, negative_inventory_shortages,
+    parse_usage_payload, replace_step_usages, shortage_response,
+    validate_usage_records_for_completion, RawMaterialUsageValidationError,
 )
 
 
@@ -611,48 +617,6 @@ def step_has_downstream_steps(step):
     return step.children.exists() or step.child.exists()
 
 
-def save_raw_material_usages(step, usages_json):
-    """Replace structured raw material usage records for a step."""
-    try:
-        usages = json.loads(usages_json or '[]')
-    except json.JSONDecodeError:
-        usages = []
-
-    StepRawMaterialUsage.objects.filter(step=step).delete()
-    seen_material_ids = set()
-
-    for usage in usages:
-        try:
-            raw_material_id = int(usage.get('raw_material_id'))
-        except (TypeError, ValueError):
-            continue
-        if not raw_material_id or raw_material_id in seen_material_ids:
-            continue
-
-        try:
-            raw_material = RawMaterial.objects.get(id=raw_material_id)
-        except RawMaterial.DoesNotExist:
-            continue
-
-        seen_material_ids.add(raw_material_id)
-        quantity = usage.get('quantity')
-        if quantity == '':
-            quantity = None
-        elif quantity is not None:
-            try:
-                quantity = Decimal(str(quantity))
-            except (InvalidOperation, ValueError):
-                quantity = None
-
-        StepRawMaterialUsage.objects.create(
-            step=step,
-            raw_material=raw_material,
-            quantity=quantity,
-            unit=(usage.get('unit') or '').strip() or None,
-            notes=(usage.get('notes') or '').strip() or None,
-        )
-
-
 def save_step_cells(step, payload_json):
     """Apply explicit cell creates, updates, and deletions for one step."""
     if not payload_json:
@@ -796,6 +760,17 @@ def cell_save_error_response(request, form, exc):
         return JsonResponse({
             'success': False,
             'errors': {'cells': [message]},
+        }, status=400)
+    form.add_error(None, message)
+    return None
+
+
+def raw_material_save_error_response(request, form, exc):
+    message = ' '.join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': False,
+            'errors': {'raw_material_usages': [message]},
         }, status=400)
     form.add_error(None, message)
     return None
@@ -1011,6 +986,25 @@ def user_can_access_experiment(user, experiment):
 def user_can_access_step(user, step):
     project = getattr(getattr(step, 'experiment', None), 'project', None)
     return bool(project and user_can_access_experiment(user, project))
+
+
+def user_can_edit_raw_material(user, material):
+    return bool(
+        user.is_staff or user.is_superuser
+        or (material.owner_id and material.owner_id == user.id)
+    )
+
+
+def selectable_raw_materials(existing_step=None):
+    queryset = RawMaterial.objects.filter(
+        is_active=True,
+        total_quantity__isnull=False,
+    ).exclude(total_unit__isnull=True).exclude(total_unit='')
+    if existing_step:
+        queryset = RawMaterial.objects.filter(
+            Q(id__in=queryset.values('id')) | Q(step_usages__step=existing_step)
+        )
+    return queryset.distinct().order_by('material_code', 'batch_number')
 
 
 def sync_legacy_parent(step):
@@ -1549,18 +1543,33 @@ def add_step(request, exp_id, experiment_id):
         if form.is_valid():
             try:
                 with transaction.atomic():
+                    parsed_usages = parse_usage_payload(
+                        request.POST.get('raw_material_usages', '[]')
+                    )
+                    if form.cleaned_data['status'] == 'Completed':
+                        validate_usage_records_for_completion(parsed_usages)
+                    deltas = completed_usage_delta(
+                        None, [], form.cleaned_data['status'], parsed_usages,
+                    )
+                    shortages = negative_inventory_shortages(deltas)
+                    if shortages and not allows_negative(request.POST.get('allow_negative')):
+                        return JsonResponse(shortage_response(shortages), status=409)
                     step = form.save(commit=False)
                     step.experiment = project_experiment
                     step.save()
                     form.save_m2m()
                     sync_legacy_parent(step)
-                    save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
+                    replace_step_usages(step, parsed_usages)
                     Sample.sync_for_step(step, form.cleaned_data['sample_count'])
                     save_step_cells(step, request.POST.get('cells_payload'))
                     write_audit_event(
                         request, 'create', 'step', f'创建 Step {step.full_step}', instance=step,
                         changes={'after': step_snapshot(step)},
                     )
+            except RawMaterialUsageValidationError as exc:
+                error_response = raw_material_save_error_response(request, form, exc)
+                if error_response:
+                    return error_response
             except (ValidationError, IntegrityError) as exc:
                 error_response = cell_save_error_response(request, form, exc)
                 if error_response:
@@ -1589,7 +1598,7 @@ def add_step(request, exp_id, experiment_id):
         'experiment': experiment,
         'project_experiment': project_experiment,
         'form': form,
-        'raw_materials': RawMaterial.objects.filter(is_active=True).order_by('material_code', 'batch_number'),
+        'raw_materials': selectable_raw_materials(),
         'cells': [],
         'cell_test_items': CellTestItem.objects.filter(is_active=True).order_by('name'),
         'is_add': True  # Flag to indicate this is add mode, not edit mode
@@ -1614,13 +1623,26 @@ def edit_step(request, exp_id, experiment_id, step_id):
         if form.is_valid():
             try:
                 with transaction.atomic():
+                    old_status = step.status
+                    old_usages = list(step.raw_material_usages.select_related('raw_material'))
+                    parsed_usages = parse_usage_payload(
+                        request.POST.get('raw_material_usages', '[]'), existing_step=step,
+                    )
+                    if form.cleaned_data['status'] == 'Completed':
+                        validate_usage_records_for_completion(parsed_usages)
+                    deltas = completed_usage_delta(
+                        old_status, old_usages, form.cleaned_data['status'], parsed_usages,
+                    )
+                    shortages = negative_inventory_shortages(deltas)
+                    if shortages and not allows_negative(request.POST.get('allow_negative')):
+                        return JsonResponse(shortage_response(shortages), status=409)
                     step = form.save(commit=False)
                     # Ensure the step is associated with the correct project_experiment
                     step.experiment = project_experiment
                     step.save()
                     form.save_m2m()
                     sync_legacy_parent(step)
-                    save_raw_material_usages(step, request.POST.get('raw_material_usages', '[]'))
+                    replace_step_usages(step, parsed_usages)
                     Sample.sync_for_step(step, form.cleaned_data['sample_count'])
                     save_step_cells(step, request.POST.get('cells_payload'))
                     changes = changed_values(before, step_snapshot(step))
@@ -1628,6 +1650,10 @@ def edit_step(request, exp_id, experiment_id, step_id):
                         request, 'update', 'step', f'修改 Step {step.full_step}', instance=step,
                         changes=changes,
                     )
+            except RawMaterialUsageValidationError as exc:
+                error_response = raw_material_save_error_response(request, form, exc)
+                if error_response:
+                    return error_response
             except (ValidationError, IntegrityError) as exc:
                 error_response = cell_save_error_response(request, form, exc)
                 if error_response:
@@ -1659,7 +1685,7 @@ def edit_step(request, exp_id, experiment_id, step_id):
             'form': form,
             'step': step,
             'project_experiment': project_experiment,
-            'raw_materials': RawMaterial.objects.filter(Q(is_active=True) | Q(step_usages__step=step)).distinct().order_by('material_code', 'batch_number'),
+            'raw_materials': selectable_raw_materials(step),
             'cells': step.cells.select_related('test_item'),
             'cell_test_items': CellTestItem.objects.filter(
                 Q(is_active=True) | Q(cells__step=step)
@@ -1762,7 +1788,14 @@ def update_step_status(request, step_id):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            step = ExperimentStep.objects.get(id=step_id)
+            step = ExperimentStep.objects.select_related(
+                'experiment__project__project__group'
+            ).get(id=step_id)
+            if not user_can_access_step(request.user, step):
+                record_permission_denied(
+                    request, 'step', f'拒绝修改 Step {step.full_step} 状态', instance=step,
+                )
+                return JsonResponse({'success': False, 'error': '无权修改该步骤。'}, status=403)
             new_status = data.get('status', '')
 
             # Validate status
@@ -1772,9 +1805,19 @@ def update_step_status(request, step_id):
 
             before = {'status': step.status, 'completed_on': step.completed_on}
             with transaction.atomic():
+                step = ExperimentStep.objects.select_for_update().get(pk=step.pk)
+                usages = list(step.raw_material_usages.select_related('raw_material'))
+                if new_status == 'Completed':
+                    validate_usage_records_for_completion(usages)
+                deltas = completed_usage_delta(step.status, usages, new_status, usages)
+                shortages = negative_inventory_shortages(deltas)
+                if shortages and not allows_negative(data.get('allow_negative')):
+                    return JsonResponse(shortage_response(shortages), status=409)
                 step.status = new_status
                 if new_status == 'Completed':
                     step.completed_on = timezone.now()
+                else:
+                    step.completed_on = None
                 step.save()
                 after = {'status': step.status, 'completed_on': step.completed_on}
                 write_audit_event(
@@ -1789,6 +1832,8 @@ def update_step_status(request, step_id):
                 response_data['completed_on'] = step.completed_on.strftime('%Y-%m-%d %H:%M:%S')
 
             return JsonResponse(response_data)
+        except ValidationError as exc:
+            return JsonResponse({'success': False, 'error': ' '.join(exc.messages)}, status=400)
         except ExperimentStep.DoesNotExist:
             return JsonResponse({'success': False, 'error': '未找到步骤'})
     return JsonResponse({'success': False, 'error': '无效请求'})
@@ -1811,21 +1856,48 @@ def bulk_update_status(request, exp_id):
                 return JsonResponse({'success': False, 'error': '无效状态'})
 
             # Get all steps and verify they belong to this experiment
-            steps = ExperimentStep.objects.filter(
+            steps = list(ExperimentStep.objects.filter(
                 id__in=step_ids,
                 experiment__project_id=exp_id
-            )
+            ).select_related('experiment__project__project__group'))
 
-            if not steps.exists():
+            if not steps:
                 return JsonResponse({'success': False, 'error': '未找到有效步骤'})
+            if len({step.id for step in steps}) != len({int(step_id) for step_id in step_ids}):
+                return JsonResponse({'success': False, 'error': '包含无效步骤。'}, status=400)
+            if any(not user_can_access_step(request.user, step) for step in steps):
+                record_permission_denied(
+                    request, 'step', '拒绝批量修改 Step 状态',
+                    entity_type='Experiment Steps', object_repr='批量步骤',
+                )
+                return JsonResponse({'success': False, 'error': '无权修改所选步骤。'}, status=403)
 
             before_steps = [{'id': step.id, 'step_code': step.full_step, 'status': step.status} for step in steps]
             with transaction.atomic():
+                locked_steps = list(
+                    ExperimentStep.objects.select_for_update()
+                    .filter(id__in=[step.id for step in steps])
+                    .prefetch_related('raw_material_usages__raw_material')
+                )
+                combined_deltas = {}
+                for step in locked_steps:
+                    usages = list(step.raw_material_usages.all())
+                    if new_status == 'Completed':
+                        validate_usage_records_for_completion(usages)
+                    for material_id, quantity in completed_usage_delta(
+                        step.status, usages, new_status, usages,
+                    ).items():
+                        combined_deltas[material_id] = combined_deltas.get(material_id, Decimal('0')) + quantity
+                shortages = negative_inventory_shortages(combined_deltas)
+                if shortages and not allows_negative(data.get('allow_negative')):
+                    return JsonResponse(shortage_response(shortages), status=409)
                 updated_count = 0
-                for step in steps:
+                for step in locked_steps:
                     step.status = new_status
                     if new_status == 'Completed':
                         step.completed_on = timezone.now()
+                    else:
+                        step.completed_on = None
                     step.save()
                     updated_count += 1
                 write_audit_event(
@@ -1841,6 +1913,8 @@ def bulk_update_status(request, exp_id):
                 'message': f'已将 {updated_count} 个步骤更新为 {STATUS_LABELS_ZH.get(new_status, new_status)}'
             })
 
+        except ValidationError as exc:
+            return JsonResponse({'success': False, 'error': ' '.join(exc.messages)}, status=400)
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
 
@@ -1879,13 +1953,37 @@ def copy_steps(request, exp_id):
             # Get the selected steps
             steps_to_copy = (
                 ExperimentStep.objects
-                .filter(id__in=step_ids)
+                .filter(id__in=step_ids, experiment__project_id=exp_id)
+                .select_related('experiment__project__project__group')
                 .prefetch_related('parents', 'raw_material_usages__raw_material')
                 .order_by('step_number')
             )
 
             if not steps_to_copy:
                 return JsonResponse({'success': False, 'error': '未找到所选步骤'})
+            steps_to_copy = list(steps_to_copy)
+            if len({step.id for step in steps_to_copy}) != len({int(step_id) for step_id in step_ids}):
+                return JsonResponse({'success': False, 'error': '包含无效步骤。'}, status=400)
+            if any(not user_can_access_step(request.user, step) for step in steps_to_copy):
+                return JsonResponse({'success': False, 'error': '无权复制所选步骤。'}, status=403)
+            invalid_batches = sorted({
+                usage.raw_material.batch_number
+                for step in steps_to_copy
+                for usage in step.raw_material_usages.all()
+                if (
+                    not inventory_ready(usage.raw_material)
+                    or not usage.raw_material.is_active
+                    or usage.quantity is None
+                    or usage.quantity <= 0
+                    or (usage.unit or '').strip() != (usage.raw_material.total_unit or '').strip()
+                )
+            })
+            if invalid_batches:
+                return JsonResponse({
+                    'success': False,
+                    'error': '以下原材料库存资料不完整、已停用或用量单位不一致，不能复制：'
+                             + '、'.join(invalid_batches),
+                }, status=400)
 
             copied_count = 0
 
@@ -2132,6 +2230,9 @@ def raw_material_list(request):
     page_number = request.GET.get('page', 1)
     paginator = Paginator(raw_material_list, 20)
     page_obj = paginator.get_page(page_number)
+    page_obj.object_list = attach_inventory_summaries(page_obj.object_list)
+    for material in page_obj.object_list:
+        material.can_edit = user_can_edit_raw_material(request.user, material)
 
     return render(request, 'experiment_flow/raw_material_list.html', {
         'raw_material_list': page_obj,
@@ -2142,19 +2243,23 @@ def raw_material_list(request):
 @login_required
 def raw_material_detail(request, raw_material_id):
     raw_material = get_object_or_404(RawMaterial, id=raw_material_id)
+    totals = inventory_totals([raw_material.id]).get(raw_material.id)
+    inventory = inventory_summary(raw_material, totals)
     usages = raw_material.step_usages.select_related(
         'step__experiment__project',
         'raw_material'
     ).order_by('-updated_on')
     return render(request, 'experiment_flow/raw_material_detail.html', {
         'raw_material': raw_material,
-        'usages': usages
+        'usages': usages,
+        'inventory': inventory,
+        'can_edit': user_can_edit_raw_material(request.user, raw_material),
     })
 
 @login_required
 def add_raw_material(request):
     if request.method == 'POST':
-        form = RawMaterialForm(request.POST)
+        form = RawMaterialForm(request.POST, user=request.user)
         if form.is_valid():
             with transaction.atomic():
                 material = form.save()
@@ -2166,7 +2271,7 @@ def add_raw_material(request):
                 )
             return redirect('raw_material_list')
     else:
-        form = RawMaterialForm()
+        form = RawMaterialForm(user=request.user)
 
     return render(request, 'experiment_flow/add_raw_material.html', {
         'form': form
@@ -2175,12 +2280,24 @@ def add_raw_material(request):
 @login_required
 def edit_raw_material(request, raw_material_id):
     raw_material = get_object_or_404(RawMaterial, id=raw_material_id)
+    if not user_can_edit_raw_material(request.user, raw_material):
+        record_permission_denied(
+            request, 'raw_material', f'拒绝修改原材料 {raw_material.batch_number}',
+            instance=raw_material,
+        )
+        return JsonResponse({'success': False, 'error': '只有负责人或管理员可以修改该原材料。'}, status=403)
 
     if request.method == 'POST':
         before = model_snapshot(raw_material, RAW_MATERIAL_FIELDS)
-        form = RawMaterialForm(request.POST, instance=raw_material)
+        form = RawMaterialForm(request.POST, instance=raw_material, user=request.user)
         if form.is_valid():
             with transaction.atomic():
+                proposed_total = form.cleaned_data['total_quantity']
+                shortages = negative_inventory_shortages(
+                    total_overrides={raw_material.id: proposed_total},
+                )
+                if shortages and not allows_negative(request.POST.get('allow_negative')):
+                    return JsonResponse(shortage_response(shortages), status=409)
                 raw_material = form.save()
                 write_audit_event(
                     request, 'update', 'raw_material', f'修改原材料 {raw_material.batch_number}',
@@ -2189,7 +2306,7 @@ def edit_raw_material(request, raw_material_id):
                 )
             return redirect('raw_material_detail', raw_material_id=raw_material_id)
     else:
-        form = RawMaterialForm(instance=raw_material)
+        form = RawMaterialForm(instance=raw_material, user=request.user)
 
     return render(request, 'experiment_flow/edit_raw_material.html', {
         'form': form,
@@ -2198,7 +2315,9 @@ def edit_raw_material(request, raw_material_id):
 
 @login_required
 def get_raw_materials(request):
-    raw_materials = RawMaterial.objects.filter(is_active=True).select_related('owner').order_by('material_code', 'batch_number')
+    raw_materials = attach_inventory_summaries(
+        RawMaterial.objects.filter(is_active=True).select_related('owner').order_by('material_code', 'batch_number')
+    )
     data = []
     for material in raw_materials:
         data.append({
@@ -2213,7 +2332,16 @@ def get_raw_materials(request):
             'supplier': material.supplier or '',
             'location': material.location or '',
             'owner': material.owner.get_full_name() if material.owner and material.owner.get_full_name() else (material.owner.username if material.owner else ''),
-            'label': material.batch_number,
+            'completed_quantity': str(material.completed_quantity),
+            'remaining_quantity': str(material.remaining_quantity) if material.remaining_quantity is not None else '',
+            'planned_quantity': str(material.planned_quantity),
+            'projected_remaining_quantity': str(material.projected_remaining_quantity) if material.projected_remaining_quantity is not None else '',
+            'inventory_state': material.inventory_state,
+            'inventory_ready': material.inventory_ready,
+            'label': (
+                f'{material.batch_number} · 剩余 {material.remaining_quantity:g} {material.total_unit}'
+                if material.inventory_ready else f'{material.batch_number} · 库存未知'
+            ),
         })
     return JsonResponse({'raw_materials': data})
 

@@ -469,7 +469,7 @@ class ViewTests(TestCase):
             step=step1,
             raw_material=self.raw_material,
             quantity="3.0000",
-            unit="ml"
+            unit="g"
         )
         
         # Create target project_experiment
@@ -489,7 +489,7 @@ class ViewTests(TestCase):
         copied_step = ExperimentStep.objects.get(experiment=experiment2, step_name="AA", step_description="Source")
         copied_usage = StepRawMaterialUsage.objects.get(step=copied_step)
         self.assertEqual(copied_usage.raw_material, self.raw_material)
-        self.assertEqual(copied_usage.unit, "ml")
+        self.assertEqual(copied_usage.unit, "g")
 
     def test_raw_material_views_and_search(self):
         self.client.login(username="user1", password="password")

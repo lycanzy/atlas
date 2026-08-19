@@ -92,6 +92,7 @@ class FullAuditTests(TestCase):
         self.client.login(username='auditor', password='old-password')
         material = RawMaterial.objects.create(
             material_code='RM', received_date=date(2026, 7, 1), owner=self.user,
+            total_quantity='100', total_unit='g',
         )
         parent = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment)
         self.client.post(reverse('add_step', args=[self.project.id, self.experiment.id]), {

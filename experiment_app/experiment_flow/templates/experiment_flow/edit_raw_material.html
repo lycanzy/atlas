@@ -24,7 +24,7 @@
 
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <form method="post">
+                    <form method="post" id="rawMaterialEditForm">
                         {% csrf_token %}
 
                         <div class="mb-4">
@@ -64,7 +64,7 @@
                                     {% if form.material_type.errors %}<div class="text-danger">{{ form.material_type.errors }}</div>{% endif %}
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">总量</label>
+                                    <label class="form-label fw-bold">总量与固定单位 <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         {{ form.total_quantity }}
                                         {{ form.total_unit }}
@@ -170,6 +170,44 @@ $(document).ready(function() {
 
     $('#id_material_code, #id_received_date').on('input change', updateBatchPreview);
     updateBatchPreview();
+
+    $('#rawMaterialEditForm').on('submit', async function(event) {
+        event.preventDefault();
+        const form = this;
+        const submit = async (allowNegative) => {
+            const data = new FormData(form);
+            if (allowNegative) data.set('allow_negative', '1');
+            const response = await fetch(form.action || window.location.href, {
+                method: 'POST',
+                body: data,
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            });
+            const contentType = response.headers.get('content-type') || '';
+            if (response.redirected) {
+                window.location.href = response.url;
+                return;
+            }
+            if (response.status === 409 && contentType.includes('application/json')) {
+                const result = await response.json();
+                const details = (result.shortages || []).map(item =>
+                    `${item.batch_number}：操作后 ${item.remaining_after} ${item.unit}（缺口 ${item.shortage} ${item.unit}）`
+                ).join('\n');
+                if (window.confirm(`该修改将产生负库存：\n${details}\n\n仍要保存吗？`)) {
+                    await submit(true);
+                }
+                return;
+            }
+            if (contentType.includes('application/json')) {
+                const result = await response.json();
+                window.alert(result.error || '保存失败。');
+                return;
+            }
+            document.open();
+            document.write(await response.text());
+            document.close();
+        };
+        await submit(false);
+    });
 });
 </script>
 {% endblock %}

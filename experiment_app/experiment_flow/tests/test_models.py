@@ -336,6 +336,8 @@ class ModelTests(TestCase):
             material_code="RM002",
             received_date=date(2026, 6, 20),
             material_name="Binder",
+            total_quantity="100.0000",
+            total_unit="g",
             owner=self.user
         )
 
