@@ -67,6 +67,10 @@
     }
     .status-active { background: #d4edda; color: #155724; }
     .status-inactive { background: #f8d7da; color: #721c24; }
+    .inventory-normal { background: #d4edda; color: #155724; }
+    .inventory-low { background: #fff3cd; color: #856404; }
+    .inventory-critical { background: #f8d7da; color: #721c24; }
+    .inventory-unknown { background: #e2e3e5; color: #495057; }
     .pagination-controls {
         display: flex;
         justify-content: center;
@@ -107,6 +111,9 @@
                     <th>批次</th>
                     <th>种类</th>
                     <th>总量</th>
+                    <th>已使用</th>
+                    <th>剩余</th>
+                    <th>计划 / 预计剩余</th>
                     <th>负责人</th>
                     <th>位置</th>
                     <th>状态</th>
@@ -132,9 +139,29 @@
                     <td>
                         {% if raw_material.total_quantity is not None %}
                             {{ raw_material.total_quantity|floatformat:"-4" }} {{ raw_material.total_unit|default:"" }}
-                        {% else %}
-                            —
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if raw_material.inventory_ready %}
+                            {{ raw_material.completed_quantity|floatformat:"-4" }} {{ raw_material.total_unit }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if raw_material.inventory_ready %}
+                            <strong>{{ raw_material.remaining_quantity|floatformat:"-4" }} {{ raw_material.total_unit }}</strong><br>
                         {% endif %}
+                        <span class="status-badge inventory-{{ raw_material.inventory_state }}">
+                            {% if raw_material.inventory_state == 'normal' %}正常
+                            {% elif raw_material.inventory_state == 'low' %}低库存
+                            {% elif raw_material.inventory_state == 'critical' %}库存不足
+                            {% else %}库存未知{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        {% if raw_material.inventory_ready %}
+                            {{ raw_material.planned_quantity|floatformat:"-4" }} / {{ raw_material.projected_remaining_quantity|floatformat:"-4" }} {{ raw_material.total_unit }}
+                            {% if raw_material.projected_remaining_quantity < 0 %}<br><span class="badge bg-warning text-dark">计划需求超出库存</span>{% endif %}
+                        {% else %}—{% endif %}
                     </td>
                     <td>
                         {% if raw_material.owner %}
@@ -156,14 +183,14 @@
                         <a href="{% url 'raw_material_detail' raw_material.id %}" class="btn btn-sm btn-info" title="查看详情">
                             <i class="bi bi-eye"></i>
                         </a>
-                        <a href="{% url 'edit_raw_material' raw_material.id %}" class="btn btn-sm btn-warning" title="编辑">
+                        {% if raw_material.can_edit %}<a href="{% url 'edit_raw_material' raw_material.id %}" class="btn btn-sm btn-warning" title="编辑">
                             <i class="bi bi-pencil"></i>
-                        </a>
+                        </a>{% endif %}
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center text-muted">未找到原材料</td>
+                    <td colspan="11" class="text-center text-muted">未找到原材料</td>
                 </tr>
                 {% endfor %}
             </tbody>

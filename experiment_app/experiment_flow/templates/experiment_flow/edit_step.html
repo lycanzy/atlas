@@ -536,7 +536,7 @@
             <tr>
               <th style="width: 42%;">原材料</th>
               <th style="width: 16%;">用量</th>
-              <th style="width: 14%;">单位</th>
+              <th style="width: 14%;">固定单位</th>
               <th style="width: 18%;">备注</th>
               <th style="width: 10%; text-align: center;">
                 <button type="button" class="btn btn-xs btn-success" id="add-raw-material-btn" style="font-size: 0.7rem; padding: 0.1rem 0.3rem;">
@@ -552,14 +552,14 @@
                 <select class="form-select form-select-sm raw-material-select">
                   <option value="">选择原材料...</option>
                   {% for raw_material in raw_materials %}
-                    <option value="{{ raw_material.id }}" {% if raw_material.id == usage.raw_material.id %}selected{% endif %}>
-                      {{ raw_material.batch_number }}
+                    <option value="{{ raw_material.id }}" data-unit="{{ raw_material.total_unit|default:'' }}" {% if raw_material.id == usage.raw_material.id %}selected{% endif %}>
+                      {{ raw_material.batch_number }}{% if raw_material.total_quantity is None or not raw_material.total_unit %} · 库存未知{% endif %}
                     </option>
                   {% endfor %}
                 </select>
               </td>
-              <td><input type="number" step="0.0001" class="form-control form-control-sm raw-material-quantity" value="{{ usage.quantity|default:'' }}"></td>
-              <td><input type="text" class="form-control form-control-sm raw-material-unit" value="{{ usage.unit|default:'' }}"></td>
+              <td><input type="number" min="0.0001" step="0.0001" class="form-control form-control-sm raw-material-quantity" value="{{ usage.quantity|default:'' }}" required></td>
+              <td><input type="text" class="form-control form-control-sm raw-material-unit" value="{{ usage.unit|default:'' }}" readonly></td>
               <td><input type="text" class="form-control form-control-sm raw-material-notes" value="{{ usage.notes|default:'' }}"></td>
               <td class="text-center">
                 <button type="button" class="btn btn-sm btn-danger remove-raw-material-btn" title="移除" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">

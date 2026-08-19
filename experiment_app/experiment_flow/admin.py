@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from .models import Cell, CellTestItem, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
+from .forms import RawMaterialForm
 
 # Base admin class with custom CSS
 class BaseModelAdmin(admin.ModelAdmin):
@@ -162,6 +163,7 @@ class EquipmentAdmin(BaseModelAdmin):
 
 @admin.register(RawMaterial)
 class RawMaterialAdmin(BaseModelAdmin):
+    form = RawMaterialForm
     list_display = ("material_code", "batch_number", "received_date", "material_name", "material_type", "total_quantity", "total_unit", "owner", "location", "is_active", "created_on")
     list_filter = ("is_active", "material_type", "owner")
     search_fields = ("material_code", "batch_number", "material_name", "material_type", "description", "supplier", "location")

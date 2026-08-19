@@ -447,9 +447,14 @@ class RawMaterialForm(forms.ModelForm):
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['owner'].queryset = User.objects.all().order_by('first_name', 'last_name', 'username')
+        self.user = user
+        if user and not (user.is_staff or user.is_superuser):
+            self.fields['owner'].queryset = User.objects.filter(pk=user.pk)
+            self.fields['owner'].initial = user
+        else:
+            self.fields['owner'].queryset = User.objects.all().order_by('first_name', 'last_name', 'username')
         self.fields['owner'].label_from_instance = lambda obj: obj.get_full_name() if obj.get_full_name() else obj.username
         self.fields['received_date'].required = True
         self.fields['received_date'].input_formats = ['%Y-%m-%d']
@@ -466,6 +471,34 @@ class RawMaterialForm(forms.ModelForm):
             ('', '--- 请选择原材料种类 ---'),
             *((name, name) for name in type_names),
         ]
+
+    def clean_total_unit(self):
+        return (self.cleaned_data.get('total_unit') or '').strip() or None
+
+    def clean_owner(self):
+        owner = self.cleaned_data.get('owner')
+        if self.user and not (self.user.is_staff or self.user.is_superuser) and owner != self.user:
+            raise forms.ValidationError('普通用户只能将自己设为原材料负责人。')
+        return owner
+
+    def clean(self):
+        cleaned = super().clean()
+        unit = cleaned.get('total_unit')
+        if cleaned.get('is_active'):
+            if cleaned.get('total_quantity') is None:
+                self.add_error('total_quantity', '启用中的原材料必须填写批次总量。')
+            if not unit:
+                self.add_error('total_unit', '启用中的原材料必须填写固定库存单位。')
+        if self.instance.pk and unit and self.instance.total_unit:
+            if unit != self.instance.total_unit and self.instance.step_usages.exists():
+                self.add_error('total_unit', '该批次已有实验用量，固定单位不能修改。')
+        if self.instance.pk and unit and not self.instance.total_unit:
+            conflicting_units = self.instance.step_usages.exclude(
+                Q(unit__isnull=True) | Q(unit='') | Q(unit=unit)
+            ).exists()
+            if conflicting_units:
+                self.add_error('total_unit', '历史用量存在不同单位，请先由管理员整理数据。')
+        return cleaned
 
 
 class CustomPasswordChangeForm(PasswordChangeForm):

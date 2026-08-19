@@ -1206,6 +1206,28 @@ function collectCellPayload(form) {
     };
 }
 
+function negativeInventoryMessage(data) {
+    return (data.shortages || []).map(item =>
+        `${item.batch_number}：操作后 ${item.remaining_after} ${item.unit}（缺口 ${item.shortage} ${item.unit}）`
+    ).join('\n');
+}
+
+function confirmNegativeInventory(form, data) {
+    if (!data.requires_confirmation) return false;
+    const details = negativeInventoryMessage(data);
+    if (!window.confirm(`该操作将产生负库存：\n${details}\n\n仍要继续吗？`)) return true;
+    let input = form.querySelector('input[name="allow_negative"]');
+    if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'allow_negative';
+        form.appendChild(input);
+    }
+    input.value = '1';
+    form.requestSubmit();
+    return true;
+}
+
 document.addEventListener('change', function(e) {
     if (!e.target.matches('.edit-step-form #id_status')) {
         return;
@@ -1290,6 +1312,7 @@ document.addEventListener('submit', function(e) {
         const cellsPayload = collectCellPayload(e.target);
         if (!cellsPayload) return;
         const formData = new FormData(e.target);
+        e.target.querySelector('input[name="allow_negative"]')?.remove();
         formData.append('raw_material_usages', JSON.stringify(collectRawMaterialUsages(e.target)));
         formData.append('cells_payload', JSON.stringify(cellsPayload));
 
@@ -1315,6 +1338,8 @@ document.addEventListener('submit', function(e) {
                 } else {
                     location.reload();
                 }
+            } else if (confirmNegativeInventory(e.target, data)) {
+                return;
             } else if (data.errors) {
                 // Handle form errors - display each error
                 let errorMessages = [];
@@ -1415,6 +1440,7 @@ document.addEventListener('submit', function(e) {
         const cellsPayload = collectCellPayload(e.target);
         if (!cellsPayload) return;
         const formData = new FormData(e.target);
+        e.target.querySelector('input[name="allow_negative"]')?.remove();
         formData.append('raw_material_usages', JSON.stringify(collectRawMaterialUsages(e.target)));
         formData.append('cells_payload', JSON.stringify(cellsPayload));
 
@@ -1440,6 +1466,8 @@ document.addEventListener('submit', function(e) {
                 } else {
                     location.reload();
                 }
+            } else if (confirmNegativeInventory(e.target, data)) {
+                return;
             } else if (data.errors) {
                 // Handle form errors - display each error
                 let errorMessages = [];
@@ -1486,15 +1514,15 @@ document.addEventListener('change', function(e) {
             return;
         }
 
-        // Send AJAX request to update status
-        fetch(`/update_step_status/${stepId}/`, {
+        const updateStatus = (allowNegative = false) => fetch(`/update_step_status/${stepId}/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
             body: JSON.stringify({
-                status: newStatus
+                status: newStatus,
+                allow_negative: allowNegative
             })
         })
         .then(res => res.json())
@@ -1502,6 +1530,12 @@ document.addEventListener('change', function(e) {
             if (data.success) {
                 // Update the data-current-status attribute
                 dropdown.setAttribute('data-current-status', newStatus);
+            } else if (data.requires_confirmation) {
+                const details = negativeInventoryMessage(data);
+                if (window.confirm(`完成该步骤将产生负库存：\n${details}\n\n仍要继续吗？`)) {
+                    return updateStatus(true);
+                }
+                dropdown.value = oldStatus;
             } else {
 	                showToast('错误', '状态更新失败：' + (data.error || '未知错误'), 'danger');
                 // Revert to old status on error
@@ -1514,6 +1548,7 @@ document.addEventListener('change', function(e) {
             // Revert to old status on error
             dropdown.value = oldStatus;
         });
+        updateStatus();
     }
 });
 
@@ -1742,7 +1777,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Send bulk update request
             const expId = {{ experiment.id }};
 
-            fetch(`/experiment/${expId}/bulk_update_status/`, {
+            const updateStatuses = (allowNegative = false) => fetch(`/experiment/${expId}/bulk_update_status/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1750,7 +1785,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     step_ids: stepIds,
-                    status: newStatus
+                    status: newStatus,
+                    allow_negative: allowNegative
                 })
             })
             .then(res => res.json())
@@ -1769,6 +1805,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     checkedSteps.forEach(cb => cb.checked = false);
                     // Update button visibility
                     updateCopyButtonVisibility(experimentId);
+                } else if (data.requires_confirmation) {
+                    const details = negativeInventoryMessage(data);
+                    if (window.confirm(`批量完成将产生负库存：\n${details}\n\n仍要继续吗？`)) {
+                        return updateStatuses(true);
+                    }
                 } else {
 	                showToast('错误', data.error || '状态更新失败', 'danger');
                 }
@@ -1777,6 +1818,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error:', err);
 	            showToast('网络错误', '状态更新失败：' + err, 'danger');
             });
+            updateStatuses();
         });
     });
 });
@@ -1804,10 +1846,10 @@ document.addEventListener('click', function(e) {
                 </select>
             </td>
             <td>
-                <input type="number" step="0.0001" class="form-control form-control-sm raw-material-quantity">
+                <input type="number" min="0.0001" step="0.0001" class="form-control form-control-sm raw-material-quantity" required>
             </td>
             <td>
-                <input type="text" class="form-control form-control-sm raw-material-unit">
+                <input type="text" class="form-control form-control-sm raw-material-unit" readonly>
             </td>
             <td>
                 <input type="text" class="form-control form-control-sm raw-material-notes">
@@ -1859,9 +1901,14 @@ async function initializeRawMaterialSelects(modal) {
         }
 
         if (select.find('option').length <= 1) {
-            rawMaterials.forEach(material => {
+            rawMaterials.filter(material => material.inventory_ready).forEach(material => {
                 select.append(new Option(material.label, material.id, false, String(material.id) === String(selectedValue)));
             });
+        }
+
+        const selectedMaterial = rawMaterials.find(material => String(material.id) === String(selectedValue));
+        if (selectedMaterial && select.find(`option[value="${selectedValue}"]`).length) {
+            select.find(`option[value="${selectedValue}"]`).text(selectedMaterial.label);
         }
 
         select.select2({
@@ -1873,6 +1920,14 @@ async function initializeRawMaterialSelects(modal) {
         });
     });
 }
+
+document.addEventListener('change', function(e) {
+    if (!e.target.classList.contains('raw-material-select')) return;
+    const row = e.target.closest('.raw-material-row');
+    const material = (rawMaterialsCache || []).find(item => String(item.id) === String(e.target.value));
+    const unitInput = row?.querySelector('.raw-material-unit');
+    if (unitInput) unitInput.value = material?.total_unit || '';
+});
 
 function collectRawMaterialUsages(form) {
     const usages = [];
