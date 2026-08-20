@@ -215,6 +215,14 @@ class ExperimentStep(models.Model):
     step_description = models.TextField(blank=True, null=True)
     started_on = models.DateTimeField(auto_now_add=True, null=True)
     completed_on = models.DateTimeField(blank=True, null=True)
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='owned_experiment_steps',
+        help_text='Optional person responsible for this step',
+    )
     tool = models.ForeignKey('Equipment', on_delete=models.SET_NULL, blank=True, null=True, related_name='steps', help_text="Equipment/tool used for this step")
     recipe = models.CharField(max_length=20, blank=True, null=True)
 

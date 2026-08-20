@@ -296,6 +296,14 @@
             </div>
         </div>
     </div>
+
+    {% if messages %}
+    <div id="serverMessages" class="d-none" aria-hidden="true">
+        {% for message in messages %}
+        <span data-message="{{ message }}" data-tags="{{ message.tags }}"></span>
+        {% endfor %}
+    </div>
+    {% endif %}
     
     <div class="navbar">
         <a href="{% url 'index' %}" class="brand-link" aria-label="返回主界面">Atlas</a>
@@ -646,7 +654,46 @@
             delay: 5000
         });
         toast.show();
+        return toast;
     }
+
+    function showServerMessages() {
+        const messageElements = Array.from(document.querySelectorAll('#serverMessages [data-message]'));
+        let currentIndex = 0;
+
+        const showNextMessage = function() {
+            if (currentIndex >= messageElements.length) return;
+
+            const messageElement = messageElements[currentIndex];
+            const tags = (messageElement.dataset.tags || '').split(/\s+/);
+            let title = '通知';
+            let type = 'info';
+
+            if (tags.includes('error')) {
+                title = '操作未完成';
+                type = 'danger';
+            } else if (tags.includes('warning')) {
+                title = '请注意';
+                type = 'warning';
+            } else if (tags.includes('success')) {
+                title = '操作成功';
+                type = 'success';
+            }
+
+            currentIndex += 1;
+            const toast = showToast(title, messageElement.dataset.message || '', type);
+            document.getElementById('liveToast').addEventListener(
+                'hidden.bs.toast',
+                showNextMessage,
+                { once: true }
+            );
+            return toast;
+        };
+
+        showNextMessage();
+    }
+
+    showServerMessages();
 
     const addExperimentModalBtn = document.getElementById('addExperimentModalBtn');
     const addExperimentModalEl = document.getElementById('addExperimentModal');

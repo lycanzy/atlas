@@ -1,20 +1,105 @@
 {% extends "experiment_flow/base.html" %}
+{% load static %}
 
 {% block content %}
-<h2>新增实验</h2>
+<style>
+.copy-description-panel { background: #f8fafc; border: 1px solid #e0e7f0; border-radius: .85rem; padding: .85rem; }
+.copy-source-list { background: #fff; border: 1px solid #d9e1ec; border-radius: .75rem; box-shadow: 0 .75rem 1.75rem rgba(15, 23, 42, .1); max-height: 260px; overflow-y: auto; }
+.copy-source-option { background: transparent; border: 0; color: #172033; display: block; padding: .65rem .75rem; text-align: left; width: 100%; }
+.copy-source-option:hover, .copy-source-option:focus { background: #eef5ff; outline: none; }
+.copy-source-option + .copy-source-option { border-top: 1px solid #edf0f5; }
+.copy-source-meta, .copy-source-description { color: #667085; display: block; font-size: .8rem; margin-top: .15rem; }
+.copy-source-description { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.copy-source-selected { background: #fff; border: 1px solid #cbd8ea; border-radius: .75rem; padding: .75rem; }
+.copy-source-selected .copy-source-description { display: -webkit-box; margin-bottom: .65rem; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.copied-source-note { background: #edf9f3; border-radius: .65rem; color: #277454; font-size: .82rem; padding: .65rem .75rem; }
+</style>
+<div class="mx-auto" style="max-width: 620px;">
+<h2 class="mb-3">新增实验</h2>
 {% if error %}
-<div style="background-color: #ffebee; color: #c62828; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">
+<div class="alert alert-danger">
     {{ error }}
 </div>
 {% endif %}
-<form method="post" action="{% url 'add_project_experiment' experiment.id %}">
+<form method="post" action="{% url 'add_project_experiment' experiment.id %}" class="card border-0 shadow-sm">
     {% csrf_token %}
-    <div style="margin-bottom: 1rem;">
-        <label for="name" style="display:block; margin-bottom:0.5rem;">实验代码（仅 2 个英文字母）：</label>
-        <input type="text" name="experiment_code" required maxlength="2" pattern="[A-Za-z]{2}"
-               style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;"
-               title="请输入 2 个英文字母">
+    <div class="card-body p-4">
+        <div class="mb-3">
+            <label for="experimentCode" class="form-label fw-semibold">实验代码 <span class="text-danger">*</span></label>
+            <select class="form-select" id="experimentCode" name="experiment_code" required>
+                <option value="">请选择可用代码</option>
+                {% for code in available_experiment_codes %}
+                <option value="{{ code }}" {% if submitted_experiment_code|upper == code %}selected{% endif %}>{{ code }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="d-flex align-items-center justify-content-between gap-3 mb-2">
+            <label for="experimentDescription" class="form-label fw-semibold mb-0">实验描述 <span class="text-danger">*</span></label>
+            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#copyDescriptionBlock">
+                <i class="bi bi-copy me-1"></i>复制已有实验
+            </button>
+        </div>
+        <textarea class="form-control" id="experimentDescription" name="experiment_description" rows="5" required
+                  placeholder="说明实验目的、关键变量或需要验证的问题">{{ submitted_experiment_description|default:'' }}</textarea>
+        <input type="hidden" id="descriptionSourceIdStandalone" name="description_source_id">
+        <div class="copied-source-note d-none mt-2" id="copiedDescriptionSourceStandalone"></div>
+        <div class="collapse mt-3" id="copyDescriptionBlock">
+            <div class="copy-description-panel">
+                <label class="form-label small fw-semibold" for="descriptionSourceStandalone">搜索要复制的实验</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="bi bi-search" aria-hidden="true"></i></span>
+                    <input type="search" class="form-control" id="descriptionSourceStandalone"
+                           placeholder="输入至少 2 个字符搜索" autocomplete="off">
+                </div>
+                <div class="form-text mb-2" id="descriptionSourceStatusStandalone" aria-live="polite"></div>
+                <div class="copy-source-list d-none" id="descriptionSourceListStandalone" role="listbox"></div>
+                <button type="button" class="btn btn-sm btn-link w-100 d-none" id="descriptionSourceLoadMoreStandalone">加载更多</button>
+                <div class="copy-source-selected d-none mt-2" id="descriptionSourceSelectedStandalone">
+                    <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+                        <strong class="font-monospace" id="descriptionSourceSelectedCodeStandalone"></strong>
+                        <span class="small text-muted" id="descriptionSourceSelectedMetaStandalone"></span>
+                    </div>
+                    <div class="copy-source-description" id="descriptionSourceSelectedPreviewStandalone"></div>
+                    <button type="button" class="btn btn-sm btn-primary" id="copySelectedDescriptionStandalone">选择并复制</button>
+                </div>
+                <div class="form-text">创建时会复制所有步骤、原材料用量和谱系关系；不会复制电芯、样品或完成状态。</div>
+            </div>
+        </div>
     </div>
-    <button type="submit" style="background-color:#007bff; color:#fff; padding:0.5rem 1rem; border:none; border-radius:4px; cursor:pointer;">添加实验</button>
+    <div class="card-footer bg-white border-0 px-4 pb-4 text-end">
+        <a class="btn btn-light" href="{% url 'experiment_detail' experiment.id %}">取消</a>
+        <button type="submit" class="btn btn-primary">创建实验</button>
+    </div>
 </form>
+</div>
+<script src="{% static 'js/experiment-description-source-picker.js' %}"></script>
+<script>
+(function () {
+    const copyBlock = document.getElementById('copyDescriptionBlock');
+    const sourceNote = document.getElementById('copiedDescriptionSourceStandalone');
+    window.initExperimentDescriptionSourcePicker({
+        searchInputId: 'descriptionSourceStandalone',
+        resultListId: 'descriptionSourceListStandalone',
+        statusId: 'descriptionSourceStatusStandalone',
+        loadMoreId: 'descriptionSourceLoadMoreStandalone',
+        selectedCardId: 'descriptionSourceSelectedStandalone',
+        selectedCodeId: 'descriptionSourceSelectedCodeStandalone',
+        selectedMetaId: 'descriptionSourceSelectedMetaStandalone',
+        selectedPreviewId: 'descriptionSourceSelectedPreviewStandalone',
+        copyButtonId: 'copySelectedDescriptionStandalone',
+        descriptionInputId: 'experimentDescription',
+        sourceIdInputId: 'descriptionSourceIdStandalone',
+        searchUrl: '{% url "search_experiment_description_sources" experiment.id %}',
+        detailUrlTemplate: '{% url "get_experiment_description_source" experiment.id 999999 %}'.replace('999999', '__SOURCE_ID__'),
+        closePanel: function () {
+            bootstrap.Collapse.getOrCreateInstance(copyBlock, {toggle: false}).hide();
+        },
+        onCopied: function (source) {
+            sourceNote.textContent = `已选择 ${source.code} · 创建时复制 ${source.step_count} 个步骤及谱系关系`;
+            sourceNote.classList.remove('d-none');
+            bootstrap.Collapse.getOrCreateInstance(copyBlock, {toggle: false}).hide();
+        }
+    });
+})();
+</script>
 {% endblock %}

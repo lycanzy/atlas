@@ -75,6 +75,7 @@ def step_snapshot(step):
         'description': step.step_description or '',
         'parents': list(step.parents.order_by('full_step').values_list('full_step', flat=True)),
         'status': step.status,
+        'owner': step.owner.username if step.owner else '',
         'completed_on': _safe_value(step.completed_on),
         'equipment': step.tool.equipment_id if step.tool else '',
         'recipe': step.recipe or '',

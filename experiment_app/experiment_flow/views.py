@@ -4,7 +4,8 @@ from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Q
+from django.db.models import Case, Count, IntegerField, Prefetch, Q, Value, When
+from django.db.models.functions import Trim
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -971,6 +972,164 @@ def get_available_experiment_codes(experiment):
     return available_codes
 
 
+def accessible_description_sources(user):
+    """Return permission-scoped Experiments that have a reusable description."""
+    return (
+        Experiment.objects
+        .filter(project__in=get_experiments_for_user(user))
+        .exclude(experiment_description__isnull=True)
+        .annotate(trimmed_description=Trim('experiment_description'))
+        .exclude(trimmed_description='')
+        .select_related('project')
+    )
+
+
+def description_source_for_user(user, source_id):
+    """Resolve one reusable description without materializing every source."""
+    try:
+        source_id = int(source_id)
+    except (TypeError, ValueError):
+        return None
+    return accessible_description_sources(user).filter(id=source_id).first()
+
+
+def copy_all_steps_to_experiment(source_experiment, target_experiment):
+    """Copy an experiment's process definition while leaving physical outputs behind."""
+    source_steps = list(
+        source_experiment.steps
+        .select_related('owner', 'tool')
+        .prefetch_related('parents', 'raw_material_usages__raw_material')
+        .order_by('step_name', 'step_number', 'id')
+    )
+    invalid_batches = sorted({
+        usage.raw_material.batch_number
+        for step in source_steps
+        for usage in step.raw_material_usages.all()
+        if (
+            not inventory_ready(usage.raw_material)
+            or not usage.raw_material.is_active
+            or usage.quantity is None
+            or usage.quantity <= 0
+            or (usage.unit or '').strip() != (usage.raw_material.total_unit or '').strip()
+        )
+    })
+    if invalid_batches:
+        raise ValidationError(
+            '以下原材料库存资料不完整、已停用或用量单位不一致，不能复制：'
+            + '、'.join(invalid_batches)
+        )
+
+    original_to_copy = {}
+    for source_step in source_steps:
+        copied_step = ExperimentStep.objects.create(
+            step_name=source_step.step_name,
+            step_number=source_step.step_number,
+            step_description=source_step.step_description,
+            experiment=target_experiment,
+            parent=None,
+            owner=source_step.owner,
+            tool=source_step.tool,
+            recipe=source_step.recipe,
+            notes=source_step.notes,
+            status='Planned',
+            completed_on=None,
+        )
+        for usage in source_step.raw_material_usages.all():
+            StepRawMaterialUsage.objects.create(
+                step=copied_step,
+                raw_material=usage.raw_material,
+                quantity=usage.quantity,
+                unit=usage.unit,
+                notes=usage.notes,
+            )
+        original_to_copy[source_step.id] = copied_step
+
+    for source_step in source_steps:
+        copied_step = original_to_copy[source_step.id]
+        copied_parents = [
+            original_to_copy.get(parent.id, parent)
+            for parent in source_step.parents.all()
+        ]
+        if not copied_parents and source_step.parent:
+            copied_parents = [original_to_copy.get(source_step.parent_id, source_step.parent)]
+        copied_step.parents.set(copied_parents)
+        sync_legacy_parent(copied_step)
+
+    return list(original_to_copy.values())
+
+
+@login_required
+def search_experiment_description_sources(request, exp_id):
+    """Search reusable descriptions in small, permission-scoped pages."""
+    current_project = get_object_or_404(Project, id=exp_id)
+    if not user_can_access_experiment(request.user, current_project):
+        return JsonResponse({'error': '你没有权限访问该项目。'}, status=403)
+
+    query = (request.GET.get('q') or '').strip()
+    if len(query) < 2:
+        return JsonResponse({'results': [], 'pagination': {'more': False}})
+
+    try:
+        page_number = max(int(request.GET.get('page', 1)), 1)
+    except (TypeError, ValueError):
+        page_number = 1
+
+    sources = (
+        accessible_description_sources(request.user)
+        .filter(
+            Q(full_experiment_code__icontains=query)
+            | Q(project__exp_name__icontains=query)
+            | Q(experiment_description__icontains=query)
+        )
+        .annotate(
+            current_project_order=Case(
+                When(project_id=current_project.id, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            ),
+            step_count=Count('steps', distinct=True),
+        )
+        .order_by('current_project_order', 'full_experiment_code', 'id')
+    )
+    page = Paginator(sources, 20).get_page(page_number)
+    results = []
+    for source in page.object_list:
+        preview = ' '.join(source.experiment_description.split())
+        if len(preview) > 100:
+            preview = f'{preview[:100].rstrip()}…'
+        results.append({
+            'id': source.id,
+            'code': source.full_experiment_code,
+            'project_code': source.project.exp_name,
+            'preview': preview,
+            'is_current_project': source.project_id == current_project.id,
+            'step_count': source.step_count,
+        })
+    return JsonResponse({
+        'results': results,
+        'pagination': {'more': page.has_next()},
+    })
+
+
+@login_required
+def get_experiment_description_source(request, exp_id, source_id):
+    """Return the full description only after a source has been selected."""
+    current_project = get_object_or_404(Project, id=exp_id)
+    if not user_can_access_experiment(request.user, current_project):
+        return JsonResponse({'error': '你没有权限访问该项目。'}, status=403)
+    source = description_source_for_user(request.user, source_id)
+    if not source:
+        return JsonResponse({'error': '复制来源不可用或你没有访问权限。'}, status=404)
+    return JsonResponse({
+        'id': source.id,
+        'code': source.full_experiment_code,
+        'project_code': source.project.exp_name,
+        'description': source.experiment_description,
+        'is_current_project': source.project_id == current_project.id,
+        'step_count': source.steps.count(),
+    })
+
+
 def user_can_access_experiment(user, experiment):
     if user.is_staff or user.is_superuser:
         return True
@@ -1287,10 +1446,15 @@ def experiment_detail(request, exp_id):
         record_permission_denied(request, 'project', f'拒绝访问项目 {experiment.exp_name}', instance=experiment)
         messages.error(request, '你没有权限查看该实验。')
         return redirect('index')
+    detail_steps = (
+        ExperimentStep.objects
+        .annotate(sample_total=Count('samples'))
+        .prefetch_related('cells__test_item')
+    )
     project_experiments = (
         Experiment.objects
         .filter(project=experiment)
-        .prefetch_related('steps__cells__test_item')
+        .prefetch_related(Prefetch('steps', queryset=detail_steps))
         .order_by('created_on')
     )
     available_experiment_codes = get_available_experiment_codes(experiment)
@@ -1460,50 +1624,92 @@ def add_project_experiment(request, exp_id):
                 return redirect('index')
 
         if request.method == 'POST':
-            experiment_code = request.POST.get('experiment_code')
-            if experiment_code:
-                try:
-                    new_experiment = Experiment(experiment_code=experiment_code, project=experiment)
-                    with transaction.atomic():
-                        new_experiment.save()
-                        write_audit_event(
-                            request, 'create', 'experiment', f'创建 Experiment {new_experiment}',
-                            instance=new_experiment,
-                            changes={'experiment_code': {'before': None, 'after': new_experiment.experiment_code},
-                                     'project_code': {'before': None, 'after': experiment.exp_name}},
-                        )
+            try:
+                experiment_code = (request.POST.get('experiment_code') or '').strip().upper()
+                experiment_description = (request.POST.get('experiment_description') or '').strip()
+                description_source_id = (request.POST.get('description_source_id') or '').strip()
 
-                    # Return JSON for AJAX requests
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        return JsonResponse({
-                            'success': True,
-                            'experiment_id': new_experiment.id,
-                            'experiment_code': new_experiment.full_experiment_code
-                        })
+                if not experiment_description:
+                    raise ValidationError('实验描述为必填项。')
+                if experiment_code not in get_available_experiment_codes(experiment):
+                    raise ValidationError('请选择一个当前可用的实验代码。')
 
-                    return redirect('experiment_detail', exp_id=exp_id)
-                except ValidationError as e:
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        return JsonResponse({
-                            'success': False,
-                            'error': str(e)
-                        })
+                description_source = None
+                if description_source_id:
+                    description_source = description_source_for_user(request.user, description_source_id)
+                    if not description_source:
+                        raise ValidationError('复制来源不可用或你没有访问权限。')
 
-                    search_query = request.GET.get('search', '')
-                    my_experiments = request.GET.get('my_experiments', '')
-                    latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
+                new_experiment = Experiment(
+                    experiment_code=experiment_code,
+                    experiment_description=experiment_description,
+                    project=experiment,
+                )
+                audit_changes = {
+                    'experiment_code': {'before': None, 'after': experiment_code},
+                    'project_code': {'before': None, 'after': experiment.exp_name},
+                    'description': {'before': None, 'after': experiment_description},
+                }
+                if description_source:
+                    audit_changes['description_source_id'] = {
+                        'before': None,
+                        'after': description_source.id,
+                    }
+                    audit_changes['description_source_code'] = {
+                        'before': None,
+                        'after': description_source.full_experiment_code,
+                    }
 
-                    page_number = request.GET.get('page', 1)
-                    paginator = Paginator(latest_exp, 10)
-                    page_obj = paginator.get_page(page_number)
+                with transaction.atomic():
+                    new_experiment.save()
+                    copied_steps = []
+                    if description_source:
+                        copied_steps = copy_all_steps_to_experiment(description_source, new_experiment)
+                        audit_changes['copied_step_count'] = {
+                            'before': None,
+                            'after': len(copied_steps),
+                        }
+                        audit_changes['copied_step_ids'] = {
+                            'before': None,
+                            'after': [step.id for step in copied_steps],
+                        }
+                    write_audit_event(
+                        request, 'create', 'experiment', f'创建 Experiment {new_experiment}',
+                        instance=new_experiment,
+                        changes=audit_changes,
+                    )
 
-                    return render(request, 'experiment_flow/add_project_experiment.html', {
-                        'experiment': experiment,
-                        'experiments': page_obj,
-                        'page_obj': page_obj,
-                        'search_query': search_query,
-                        'error': str(e)
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'experiment_id': new_experiment.id,
+                        'experiment_code': new_experiment.full_experiment_code,
+                        'copied_step_count': len(copied_steps),
                     })
+                return redirect('experiment_detail', exp_id=exp_id)
+            except ValidationError as e:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': False,
+                        'error': ' '.join(e.messages),
+                    }, status=400)
+
+                search_query = request.GET.get('search', '')
+                my_experiments = request.GET.get('my_experiments', '')
+                latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
+                page_number = request.GET.get('page', 1)
+                paginator = Paginator(latest_exp, 10)
+                page_obj = paginator.get_page(page_number)
+                return render(request, 'experiment_flow/add_project_experiment.html', {
+                    'experiment': experiment,
+                    'experiments': page_obj,
+                    'page_obj': page_obj,
+                    'search_query': search_query,
+                    'available_experiment_codes': get_available_experiment_codes(experiment),
+                    'submitted_experiment_code': request.POST.get('experiment_code', ''),
+                    'submitted_experiment_description': request.POST.get('experiment_description', ''),
+                    'error': ' '.join(e.messages),
+                })
 
         # For GET requests or rendering the form
         search_query = request.GET.get('search', '')
@@ -1518,7 +1724,8 @@ def add_project_experiment(request, exp_id):
             'experiment': experiment,
             'experiments': page_obj,
             'page_obj': page_obj,
-            'search_query': search_query
+            'search_query': search_query,
+            'available_experiment_codes': get_available_experiment_codes(experiment),
         })
     except Project.DoesNotExist:
         return HttpResponse('未找到实验', status=404)
@@ -2022,6 +2229,7 @@ def copy_steps(request, exp_id):
                     step_description=original_step.step_description,
                     experiment=target_experiment,
                     parent=None,  # Parent is assigned after all selected steps are copied.
+                    owner=original_step.owner,
                     tool=original_step.tool,  # Copy equipment/tool used for the step
                     recipe=original_step.recipe,
                     notes=original_step.notes,

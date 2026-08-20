@@ -67,7 +67,7 @@ class ExperimentAdmin(BaseModelAdmin):
 
 @admin.register(ExperimentStep)
 class ExperimentStepAdmin(BaseModelAdmin):
-    list_display = ("step_name", "experiment", "status", "started_on")
+    list_display = ("step_name", "experiment", "owner", "status", "started_on")
 
 
 @admin.register(ExperimentStepLink)

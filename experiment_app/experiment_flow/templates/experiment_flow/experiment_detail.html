@@ -1,4 +1,5 @@
 {% extends "experiment_flow/base.html" %}
+{% load static %}
 
 {% block content %}
 <style>
@@ -154,12 +155,7 @@
     font-size: 1rem;
 }
 
-/* Add Experiment Dropdown Styles */
-.add-experiment-dropdown {
-    position: relative;
-    display: inline-block;
-}
-
+/* Add Experiment modal */
 .add-experiment-btn {
     background: none !important;
     border: none !important;
@@ -174,61 +170,119 @@
     color: #0056b3;
 }
 
-.experiment-dropdown-menu {
-    display: none;
-    position: absolute;
-    right: 0;
-    top: 100%;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    z-index: 1000;
-    min-width: 200px;
-    max-height: 300px;
+.add-experiment-modal .modal-dialog {
+    max-width: 560px;
+}
+
+.add-experiment-modal .modal-content {
+    border: 0;
+    border-radius: 1rem;
+    box-shadow: 0 1.25rem 3rem rgba(15, 23, 42, 0.18);
+    overflow: hidden;
+}
+
+.experiment-code-combobox {
+    position: relative;
+}
+
+.experiment-code-results,
+.copy-source-list {
+    background: #fff;
+    border: 1px solid #d9e1ec;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.75rem 1.75rem rgba(15, 23, 42, 0.1);
+    max-height: 210px;
     overflow-y: auto;
 }
 
-.experiment-dropdown-menu.show {
+.experiment-code-results {
+    display: none;
+    left: 0;
+    margin-top: 0.35rem;
+    padding: 0.35rem;
+    position: absolute;
+    right: 0;
+    z-index: 1080;
+}
+
+.experiment-code-results.show {
     display: block;
 }
 
-.experiment-dropdown-item {
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    transition: background 0.2s;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.experiment-dropdown-item:last-child {
-    border-bottom: none;
-}
-
-.experiment-dropdown-item:hover {
-    background: #f8f9fa;
-}
-
-.experiment-dropdown-search {
-    padding: 0.5rem;
-    border-bottom: 1px solid #ddd;
-    position: sticky;
-    top: 0;
-    background: white;
-}
-
-.experiment-dropdown-search input {
+.experiment-code-option,
+.copy-source-option {
+    background: transparent;
+    border: 0;
+    border-radius: 0.5rem;
+    color: #172033;
+    display: block;
+    padding: 0.55rem 0.7rem;
+    text-align: left;
     width: 100%;
-    padding: 0.4rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 0.85rem;
 }
 
-.no-available-codes {
-    padding: 1rem;
-    text-align: center;
-    color: #6c757d;
-    font-size: 0.9rem;
+.experiment-code-option:hover,
+.experiment-code-option:focus,
+.copy-source-option:hover,
+.copy-source-option:focus {
+    background: #eef5ff;
+    outline: none;
+}
+
+.copy-description-panel {
+    background: #f8fafc;
+    border: 1px solid #e0e7f0;
+    border-radius: 0.85rem;
+    padding: 0.85rem;
+}
+
+.copy-source-option + .copy-source-option {
+    border-top: 1px solid #edf0f5;
+    border-radius: 0;
+}
+
+.copy-source-description {
+    color: #667085;
+    display: block;
+    font-size: 0.8rem;
+    margin-top: 0.15rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.copy-source-meta {
+    color: #667085;
+    display: block;
+    font-size: 0.75rem;
+    margin-top: 0.15rem;
+}
+
+.copy-source-selected {
+    background: #fff;
+    border: 1px solid #cbd8ea;
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+}
+
+.copy-source-selected .copy-source-description {
+    display: -webkit-box;
+    margin-bottom: 0.65rem;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+}
+
+.copied-source-note {
+    background: #edf9f3;
+    border-radius: 0.65rem;
+    color: #277454;
+    font-size: 0.82rem;
+    padding: 0.65rem 0.75rem;
+}
+
+.required-marker {
+    color: #dc3545;
 }
 
 /* Status dropdown styling */
@@ -329,7 +383,9 @@
 .steps-row .table th:nth-child(5),
 .steps-row .table td:nth-child(5) { width: 76px; white-space: nowrap; } /* Cells */
 .steps-row .table th:nth-child(6),
-.steps-row .table td:nth-child(6) { width: 96px; white-space: nowrap; }  /* Actions */
+.steps-row .table td:nth-child(6) { width: 76px; white-space: nowrap; } /* Samples */
+.steps-row .table th:nth-child(7),
+.steps-row .table td:nth-child(7) { width: 96px; white-space: nowrap; }  /* Actions */
 
 .cell-count-btn {
     align-items: center;
@@ -337,6 +393,26 @@
     font-size: 0.75rem;
     gap: 0.25rem;
     padding: 0.15rem 0.4rem;
+}
+
+.sample-count-badge {
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid #d7dee8;
+    border-radius: 0.3rem;
+    color: #536273;
+    cursor: default;
+    display: inline-flex;
+    font-size: 0.75rem;
+    gap: 0.25rem;
+    min-width: 42px;
+    padding: 0.2rem 0.4rem;
+    justify-content: center;
+}
+
+.sample-count-badge .bi {
+    color: #718096;
+    font-size: 0.72rem;
 }
 
 .steps-row .table .step-cells-detail-row > td {
@@ -387,25 +463,10 @@
                 <th style="width:150px;">实验</th>
                 <th style="width:auto;">描述</th>
                 <th style="width:100px; text-align:center;">
-                    <div class="add-experiment-dropdown">
-                        <button class="add-experiment-btn" id="addExperimentBtn" title="新增实验" data-add-experiment-url="{% url 'add_project_experiment' experiment.id %}">
-                            <i class="bi bi-plus-lg"></i>
-                        </button>
-                        <div class="experiment-dropdown-menu" id="experimentDropdownMenu">
-                            <div class="experiment-dropdown-search">
-                                <input type="text" id="experimentCodeSearch" placeholder="搜索实验代码...">
-                            </div>
-                            {% if available_experiment_codes %}
-                                <div id="experimentCodeList">
-                                    {% for code in available_experiment_codes %}
-                                        <div class="experiment-dropdown-item" data-code="{{ code }}">{{ code }}</div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <div class="no-available-codes">所有实验代码均已使用</div>
-                            {% endif %}
-                        </div>
-                    </div>
+                    <button type="button" class="add-experiment-btn" id="addExperimentBtn" title="新增实验"
+                            data-bs-toggle="modal" data-bs-target="#addProjectExperimentModal">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
                 </th>
             </tr>
         </thead>
@@ -472,6 +533,7 @@
                                 <th>状态</th>
                                 <th>描述</th>
                                 <th>电芯</th>
+                                <th>样品</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
@@ -499,6 +561,15 @@
                                     </button>
                                 </td>
                                 <td class="text-center">
+                                    <span class="sample-count-badge"
+                                          data-step-sample-count="{{ step.sample_total }}"
+                                          aria-label="{{ step.full_step }} 样品数量：{{ step.sample_total }}"
+                                          title="样品数量">
+                                        <i class="bi bi-collection" aria-hidden="true"></i>
+                                        <span>{{ step.sample_total }}</span>
+                                    </span>
+                                </td>
+                                <td class="text-center">
                                     <div class="table-action-group">
                                         <button type="button" class="btn-no-style edit-step-btn"
                                                 data-step-id="{{ step.id }}" data-experiment-id="{{ project_experiment.id }}" data-exp-id="{{ experiment.id }}">
@@ -517,7 +588,7 @@
                                 </td>
                             </tr>
                             <tr id="step-cells-{{ step.id }}" class="step-cells-detail-row" style="display:none;">
-                                <td colspan="6">
+                                <td colspan="7">
                                     <div class="step-cells-detail-panel">
                                         {% if step_cells %}
                                             {% regroup step_cells by package_number as package_groups %}
@@ -545,7 +616,7 @@
                             {% endwith %}
                             {% empty %}
                             <tr>
-                                <td colspan="6" class="text-muted">暂无步骤</td>
+                                <td colspan="7" class="text-muted">暂无步骤</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -559,6 +630,88 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
+
+<!-- Add Experiment Modal -->
+<div class="modal fade add-experiment-modal" id="addProjectExperimentModal" tabindex="-1"
+     aria-labelledby="addProjectExperimentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" id="addProjectExperimentForm"
+              action="{% url 'add_project_experiment' experiment.id %}" method="post" novalidate>
+            {% csrf_token %}
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <h5 class="modal-title" id="addProjectExperimentModalLabel">新增实验</h5>
+                    <p class="text-muted small mb-0 mt-1">创建前请确认实验代码并填写描述。</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body pt-4">
+                <div id="addProjectExperimentError" class="alert alert-danger d-none" role="alert"></div>
+
+                <div class="mb-3 experiment-code-combobox">
+                    <label for="experimentCodeInput" class="form-label fw-semibold">
+                        实验代码 <span class="required-marker" aria-hidden="true">*</span>
+                    </label>
+                    <input type="text" class="form-control" id="experimentCodeInput" name="experiment_code"
+                           maxlength="2" autocomplete="off" aria-autocomplete="list"
+                           aria-controls="experimentCodeResults" aria-expanded="false"
+                           placeholder="输入至少 1 个字母搜索" required>
+                    <div class="form-text">结果只会在输入后显示；请选择当前项目中未使用的两字母代码。</div>
+                    <div class="experiment-code-results" id="experimentCodeResults" role="listbox">
+                        {% for code in available_experiment_codes %}
+                        <button type="button" class="experiment-code-option" role="option" data-code="{{ code }}">{{ code }}</button>
+                        {% empty %}
+                        <div class="text-muted small p-2">所有实验代码均已使用</div>
+                        {% endfor %}
+                        <div class="text-muted small p-2 d-none" id="experimentCodeNoResults">未找到匹配的可用代码</div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between gap-3 mb-2">
+                    <label for="experimentDescriptionInput" class="form-label fw-semibold mb-0">
+                        实验描述 <span class="required-marker" aria-hidden="true">*</span>
+                    </label>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="toggleDescriptionCopy">
+                        <i class="bi bi-copy me-1"></i>复制已有实验
+                    </button>
+                </div>
+                <textarea class="form-control" id="experimentDescriptionInput" name="experiment_description"
+                          rows="5" placeholder="说明实验目的、关键变量或需要验证的问题" required></textarea>
+                <div class="form-text">复制后的描述仍可编辑；创建时会一并复制所有步骤、原材料用量和谱系关系。</div>
+                <input type="hidden" id="descriptionSourceId" name="description_source_id" value="">
+                <div class="copied-source-note d-none mt-2" id="copiedDescriptionSource"></div>
+
+                <div class="copy-description-panel d-none mt-3" id="descriptionCopyPanel">
+                    <label for="descriptionSourceSearch" class="form-label small fw-semibold">搜索要复制的实验</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="bi bi-search" aria-hidden="true"></i></span>
+                        <input type="search" class="form-control" id="descriptionSourceSearch"
+                               placeholder="输入至少 2 个字符搜索" autocomplete="off">
+                    </div>
+                    <div class="form-text mb-2" id="descriptionSourceStatus" aria-live="polite"></div>
+                    <div class="copy-source-list d-none" id="descriptionSourceList" role="listbox"></div>
+                    <button type="button" class="btn btn-sm btn-link w-100 d-none" id="descriptionSourceLoadMore">加载更多</button>
+                    <div class="copy-source-selected d-none mt-2" id="descriptionSourceSelected">
+                        <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+                            <strong class="font-monospace" id="descriptionSourceSelectedCode"></strong>
+                            <span class="small text-muted" id="descriptionSourceSelectedMeta"></span>
+                        </div>
+                        <div class="copy-source-description" id="descriptionSourceSelectedPreview"></div>
+                        <button type="button" class="btn btn-sm btn-primary" id="copySelectedDescription">选择并复制</button>
+                    </div>
+                    <div class="form-text mt-2">不会复制电芯、样品或完成状态。</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+                <button type="submit" class="btn btn-primary" id="createProjectExperimentBtn" disabled>
+                    <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true"></span>
+                    创建实验
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Genealogy Modal -->
@@ -661,6 +814,7 @@
     </div>
 </div>
 
+<script src="{% static 'js/experiment-description-source-picker.js' %}"></script>
 <script>
 // CSRF helper
 function getCookie(name) {
@@ -678,93 +832,158 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// Add Experiment dropdown is initialized early so unrelated page scripts cannot break it.
-(function initAddExperimentDropdown() {
-    const addExperimentBtn = document.getElementById('addExperimentBtn');
-    const experimentDropdownMenu = document.getElementById('experimentDropdownMenu');
-    const experimentCodeSearch = document.getElementById('experimentCodeSearch');
-    const experimentCodeList = document.getElementById('experimentCodeList');
+// Add Experiment modal: searchable code, required description, and copy helper.
+(function initAddProjectExperimentModal() {
+    const modalElement = document.getElementById('addProjectExperimentModal');
+    const form = document.getElementById('addProjectExperimentForm');
+    const codeInput = document.getElementById('experimentCodeInput');
+    const codeResults = document.getElementById('experimentCodeResults');
+    const codeOptions = Array.from(document.querySelectorAll('.experiment-code-option'));
+    const codeNoResults = document.getElementById('experimentCodeNoResults');
+    const descriptionInput = document.getElementById('experimentDescriptionInput');
+    const sourceIdInput = document.getElementById('descriptionSourceId');
+    const sourceNote = document.getElementById('copiedDescriptionSource');
+    const copyToggle = document.getElementById('toggleDescriptionCopy');
+    const copyPanel = document.getElementById('descriptionCopyPanel');
+    const sourceSearch = document.getElementById('descriptionSourceSearch');
+    const sourceList = document.getElementById('descriptionSourceList');
+    const submitButton = document.getElementById('createProjectExperimentBtn');
+    const submitSpinner = submitButton?.querySelector('.spinner-border');
+    const errorBox = document.getElementById('addProjectExperimentError');
+    const availableCodes = new Set(codeOptions.map(option => option.dataset.code));
 
-    if (!addExperimentBtn || !experimentDropdownMenu) {
-        return;
+    if (!modalElement || !form || !codeInput || !descriptionInput || !submitButton) return;
+
+    function hideCodeResults() {
+        codeResults.classList.remove('show');
+        codeInput.setAttribute('aria-expanded', 'false');
     }
 
-    function positionDropdown() {
-        const rect = addExperimentBtn.getBoundingClientRect();
-        experimentDropdownMenu.style.position = 'fixed';
-        experimentDropdownMenu.style.top = `${rect.bottom + 6}px`;
-        experimentDropdownMenu.style.right = 'auto';
-        experimentDropdownMenu.style.left = `${Math.max(12, rect.right - experimentDropdownMenu.offsetWidth)}px`;
-        experimentDropdownMenu.style.zIndex = '2000';
-    }
-
-    function closeDropdown() {
-        experimentDropdownMenu.classList.remove('show');
-    }
-
-    addExperimentBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        experimentDropdownMenu.classList.toggle('show');
-        if (experimentDropdownMenu.classList.contains('show')) {
-            positionDropdown();
-            if (experimentCodeSearch) {
-                experimentCodeSearch.focus();
-            }
-        }
-    });
-
-    document.addEventListener('click', function(e) {
-        if (!experimentDropdownMenu.contains(e.target) && !addExperimentBtn.contains(e.target)) {
-            closeDropdown();
-        }
-    });
-
-    window.addEventListener('resize', closeDropdown);
-    window.addEventListener('scroll', closeDropdown, true);
-
-    if (experimentCodeSearch && experimentCodeList) {
-        experimentCodeSearch.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            experimentCodeList.querySelectorAll('.experiment-dropdown-item').forEach(function(item) {
-                const code = item.getAttribute('data-code').toLowerCase();
-                item.style.display = code.includes(searchTerm) ? 'block' : 'none';
-            });
+    function filterCodes() {
+        const query = codeInput.value.trim().toUpperCase();
+        let visibleCount = 0;
+        codeOptions.forEach(option => {
+            const visible = query.length >= 1 && option.dataset.code.includes(query);
+            option.classList.toggle('d-none', !visible);
+            if (visible) visibleCount += 1;
         });
+        if (codeNoResults) codeNoResults.classList.toggle('d-none', query.length < 1 || visibleCount > 0);
+        const shouldOpen = query.length >= 1;
+        codeResults.classList.toggle('show', shouldOpen);
+        codeInput.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
     }
 
-    if (experimentCodeList) {
-        experimentCodeList.addEventListener('click', function(e) {
-            const item = e.target.closest('.experiment-dropdown-item');
-            if (!item) {
-                return;
-            }
-            const experimentCode = item.getAttribute('data-code');
-            fetch(addExperimentBtn.dataset.addExperimentUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: new URLSearchParams({ experiment_code: experimentCode }).toString()
+    function updateSubmitState() {
+        const validCode = availableCodes.has(codeInput.value.trim().toUpperCase());
+        const validDescription = descriptionInput.value.trim().length > 0;
+        submitButton.disabled = !(validCode && validDescription);
+    }
+
+    function showError(message) {
+        errorBox.textContent = message;
+        errorBox.classList.remove('d-none');
+    }
+
+    function clearError() {
+        errorBox.textContent = '';
+        errorBox.classList.add('d-none');
+    }
+
+    const descriptionPicker = window.initExperimentDescriptionSourcePicker({
+        searchInputId: 'descriptionSourceSearch',
+        resultListId: 'descriptionSourceList',
+        statusId: 'descriptionSourceStatus',
+        loadMoreId: 'descriptionSourceLoadMore',
+        selectedCardId: 'descriptionSourceSelected',
+        selectedCodeId: 'descriptionSourceSelectedCode',
+        selectedMetaId: 'descriptionSourceSelectedMeta',
+        selectedPreviewId: 'descriptionSourceSelectedPreview',
+        copyButtonId: 'copySelectedDescription',
+        descriptionInputId: 'experimentDescriptionInput',
+        sourceIdInputId: 'descriptionSourceId',
+        searchUrl: '{% url "search_experiment_description_sources" experiment.id %}',
+        detailUrlTemplate: '{% url "get_experiment_description_source" experiment.id 999999 %}'.replace('999999', '__SOURCE_ID__'),
+        closePanel: function () { copyPanel.classList.add('d-none'); },
+        onCopied: function (source) {
+            sourceNote.textContent = `已选择 ${source.code} · 创建时复制 ${source.step_count} 个步骤及谱系关系`;
+            sourceNote.classList.remove('d-none');
+            copyPanel.classList.add('d-none');
+            updateSubmitState();
+        }
+    });
+
+    codeInput.addEventListener('input', function() {
+        codeInput.value = codeInput.value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 2);
+        clearError();
+        filterCodes();
+        updateSubmitState();
+    });
+    codeInput.addEventListener('focus', filterCodes);
+    codeInput.addEventListener('blur', function() {
+        window.setTimeout(hideCodeResults, 120);
+    });
+    codeOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            codeInput.value = option.dataset.code;
+            hideCodeResults();
+            updateSubmitState();
+            descriptionInput.focus();
+        });
+    });
+    descriptionInput.addEventListener('input', function() {
+        clearError();
+        updateSubmitState();
+    });
+    copyToggle.addEventListener('click', function() {
+        copyPanel.classList.toggle('d-none');
+        if (!copyPanel.classList.contains('d-none')) {
+            sourceSearch.focus();
+        }
+    });
+
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        clearError();
+        if (submitButton.disabled) {
+            showError('请选择可用的实验代码并填写实验描述。');
+            return;
+        }
+        submitButton.disabled = true;
+        submitSpinner.classList.remove('d-none');
+        fetch(form.action, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: new FormData(form)
+        })
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.error || '创建失败，请重试。');
+                location.reload();
             })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('添加实验失败：' + (data.error || '未知错误'));
-                    }
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    alert('网络错误：' + err);
-                });
+            .catch(error => {
+                showError(error.message || '网络错误，请稍后重试。');
+                submitSpinner.classList.add('d-none');
+                updateSubmitState();
+            });
+    });
 
-            closeDropdown();
-        });
-    }
+    modalElement.addEventListener('shown.bs.modal', function() {
+        codeInput.focus();
+    });
+    modalElement.addEventListener('hidden.bs.modal', function() {
+        form.reset();
+        sourceIdInput.value = '';
+        sourceNote.classList.add('d-none');
+        copyPanel.classList.add('d-none');
+        descriptionPicker.reset();
+        clearError();
+        hideCodeResults();
+        updateSubmitState();
+    });
+    updateSubmitState();
 })();
 
 // Expand/collapse experiments
@@ -1027,6 +1246,114 @@ function initializeCompletionTimeAutomation(form) {
     }
 }
 
+function initializeParentStepSelect(modalSelector) {
+    const $modal = $(modalSelector);
+    const $select = $modal.find('#id_parents');
+    if (!$select.length) return;
+
+    $select.select2({
+        theme: 'bootstrap-5',
+        dropdownParent: $modal,
+        dropdownCssClass: 'lineage-parent-dropdown',
+        width: '100%',
+        placeholder: '输入步骤编号搜索…',
+        allowClear: true,
+        closeOnSelect: false,
+        minimumInputLength: 1,
+        language: {
+            inputTooShort: function() {
+                return '请输入至少 1 个字符';
+            },
+            noResults: function() {
+                return '未找到匹配的前置步骤';
+            }
+        }
+    });
+
+    const $container = $select.next('.select2-container').addClass('lineage-parent-select2');
+    const $selection = $container.find('.select2-selection--multiple');
+    const $searchField = $container.find('.select2-search__field');
+
+    $searchField.attr({
+        'aria-label': '搜索前置步骤',
+        'autocomplete': 'off'
+    });
+
+    if (!$selection.find('.lineage-parent-search-icon').length) {
+        $selection.append('<i class="bi bi-search lineage-parent-search-icon" aria-hidden="true"></i>');
+    }
+
+    const currentSearchTerm = function() {
+        return ($searchField.val() || '').trim();
+    };
+
+    // Keep the result menu closed until the user has entered a search term.
+    $select.on('select2:opening.lineageParent', function(event) {
+        if (currentSearchTerm().length < 1) {
+            event.preventDefault();
+            window.requestAnimationFrame(function() {
+                $searchField.trigger('focus');
+            });
+        }
+    });
+
+    $searchField.on('input.lineageParent', function() {
+        const select2 = $select.data('select2');
+        if (!select2) return;
+
+        if (currentSearchTerm().length >= 1 && !select2.isOpen()) {
+            $select.select2('open');
+        } else if (currentSearchTerm().length < 1 && select2.isOpen()) {
+            $select.select2('close');
+        }
+    });
+
+    // Clear the completed query so only the selected step chip remains visible.
+    $select.on('select2:select.lineageParent', function() {
+        window.requestAnimationFrame(function() {
+            const select2 = $select.data('select2');
+            $searchField.val('').trigger('input');
+            if (select2 && select2.isOpen()) {
+                $select.select2('close');
+            }
+        });
+    });
+}
+
+function initializeStepOwnerSelect(modalSelector) {
+    const $modal = $(modalSelector);
+    const $select = $modal.find('#id_owner');
+    if (!$select.length || $select.hasClass('select2-hidden-accessible')) return;
+
+    $select.select2({
+        theme: 'bootstrap-5',
+        dropdownParent: $modal,
+        dropdownCssClass: 'search-first-dropdown step-owner-dropdown',
+        width: '100%',
+        placeholder: '输入姓名或用户名搜索…',
+        allowClear: true,
+        minimumInputLength: 1,
+        minimumResultsForSearch: 0,
+        language: {
+            inputTooShort: function() {
+                return '请输入至少 1 个字符后搜索用户';
+            },
+            noResults: function() {
+                return '未找到匹配的用户';
+            }
+        }
+    });
+
+    $select.next('.select2-container').addClass('search-first-select2 step-owner-select2');
+    $select.on('select2:open.stepOwner', function() {
+        $modal.find('.select2-container--open .select2-search__field').last().attr({
+            'aria-label': '搜索步骤负责人',
+            'autocomplete': 'off',
+            'placeholder': '输入姓名或用户名…'
+        });
+    });
+}
+
 function normalizeCellIdentifier(value) {
     return (value || '').trim().toUpperCase();
 }
@@ -1271,18 +1598,8 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
                             allowClear: true
                         });
                     }
-                    if ($('#id_parents').length) {
-                        $('#id_parents').select2({
-                            theme: 'bootstrap-5',
-                            dropdownParent: $('#editStepModal'),
-                            dropdownCssClass: 'lineage-parent-dropdown',
-                            width: '100%',
-                            placeholder: '搜索前置步骤...',
-                            allowClear: true,
-                            closeOnSelect: false
-                        });
-                        $('#id_parents').next('.select2-container').addClass('lineage-parent-select2');
-                    }
+                    initializeParentStepSelect('#editStepModal');
+                    initializeStepOwnerSelect('#editStepModal');
                     initializeRawMaterialSelects($('#editStepModal'));
                 }, 100);
             });
@@ -1298,6 +1615,9 @@ document.getElementById('editStepModal').addEventListener('hidden.bs.modal', fun
     if (typeof $ !== 'undefined') {
         if ($('#editStepModal #id_parents').length && $('#editStepModal #id_parents').hasClass('select2-hidden-accessible')) {
             $('#editStepModal #id_parents').select2('destroy');
+        }
+        if ($('#editStepModal #id_owner').length && $('#editStepModal #id_owner').hasClass('select2-hidden-accessible')) {
+            $('#editStepModal #id_owner').select2('destroy');
         }
         $('#editStepModal .raw-material-select.select2-hidden-accessible').select2('destroy');
     }
@@ -1399,18 +1719,8 @@ document.querySelectorAll('.add-step-btn').forEach(function(btn) {
                             allowClear: true
                         });
                     }
-                    if ($('#id_parents').length) {
-                        $('#id_parents').select2({
-                            theme: 'bootstrap-5',
-                            dropdownParent: $('#addStepModal'),
-                            dropdownCssClass: 'lineage-parent-dropdown',
-                            width: '100%',
-                            placeholder: '搜索前置步骤...',
-                            allowClear: true,
-                            closeOnSelect: false
-                        });
-                        $('#id_parents').next('.select2-container').addClass('lineage-parent-select2');
-                    }
+                    initializeParentStepSelect('#addStepModal');
+                    initializeStepOwnerSelect('#addStepModal');
                     initializeRawMaterialSelects($('#addStepModal'));
                 }, 100);
             });
@@ -1426,6 +1736,9 @@ document.getElementById('addStepModal').addEventListener('hidden.bs.modal', func
     if (typeof $ !== 'undefined') {
         if ($('#addStepModal #id_parents').length && $('#addStepModal #id_parents').hasClass('select2-hidden-accessible')) {
             $('#addStepModal #id_parents').select2('destroy');
+        }
+        if ($('#addStepModal #id_owner').length && $('#addStepModal #id_owner').hasClass('select2-hidden-accessible')) {
+            $('#addStepModal #id_owner').select2('destroy');
         }
         $('#addStepModal .raw-material-select.select2-hidden-accessible').select2('destroy');
     }
@@ -1891,10 +2204,12 @@ async function getRawMaterials() {
 
 async function initializeRawMaterialSelects(modal) {
     const rawMaterials = await getRawMaterials();
-    const modalElement = modal && modal.length ? modal : $('.modal.show');
+    const modalElement = modal && modal.length ? modal : $('.modal.show').last();
+    if (!modalElement.length) return;
 
-    $('.raw-material-select').each(function() {
+    modalElement.find('.raw-material-select').each(function() {
         const select = $(this);
+        const dropdownParent = select.closest('.modal');
         const selectedValue = select.val();
         if (select.hasClass('select2-hidden-accessible')) {
             return;
@@ -1913,10 +2228,33 @@ async function initializeRawMaterialSelects(modal) {
 
         select.select2({
             theme: 'bootstrap-5',
-            dropdownParent: modalElement,
+            dropdownParent: dropdownParent,
+            dropdownCssClass: 'search-first-dropdown raw-material-dropdown',
             width: '100%',
-            placeholder: '搜索原材料...',
-            allowClear: true
+            placeholder: '输入批次号或名称搜索…',
+            allowClear: true,
+            minimumInputLength: 1,
+            minimumResultsForSearch: 0,
+            language: {
+                inputTooShort: function() {
+                    return '请输入至少 1 个字符后搜索原材料';
+                },
+                noResults: function() {
+                    return '未找到匹配的原材料';
+                }
+            }
+        });
+
+        select.next('.select2-container').addClass('search-first-select2 raw-material-select2');
+        select.on('select2:open.rawMaterial', function() {
+            const searchField = dropdownParent
+                .find('.select2-container--open .select2-search__field')
+                .last();
+            searchField.attr({
+                'aria-label': '搜索原材料',
+                'autocomplete': 'off',
+                'placeholder': '输入批次号或名称…'
+            });
         });
     });
 }
@@ -1947,6 +2285,84 @@ function collectRawMaterialUsages(form) {
 </script>
 
 <style>
+.search-first-select2 .select2-selection--single {
+    align-items: center;
+    background: #fff !important;
+    border: 1px solid #cfd7e2 !important;
+    border-radius: 0.4rem !important;
+    display: flex !important;
+    min-height: 32px !important;
+    padding: 0.3rem 2rem 0.3rem 0.55rem !important;
+}
+
+.search-first-select2.select2-container--focus .select2-selection--single,
+.search-first-select2.select2-container--open .select2-selection--single {
+    border-color: #2f66d0 !important;
+    box-shadow: 0 0 0 0.14rem rgba(47, 102, 208, 0.12) !important;
+}
+
+.search-first-select2 .select2-selection__rendered {
+    color: #24364f !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.search-first-dropdown {
+    border-color: #cfd7e2 !important;
+    border-radius: 0.4rem !important;
+    box-shadow: 0 12px 26px rgba(31, 41, 51, 0.13);
+    overflow: hidden;
+}
+
+.search-first-dropdown .select2-search--dropdown {
+    background: #f8fafc;
+    border-bottom: 1px solid #e5eaf0;
+    padding: 0.5rem;
+}
+
+.search-first-dropdown .select2-search__field {
+    border: 1px solid #cfd7e2 !important;
+    border-radius: 0.35rem !important;
+    font-size: 0.78rem;
+    outline: 0;
+    padding: 0.4rem 0.5rem !important;
+}
+
+.search-first-dropdown .select2-results__options {
+    max-height: 220px !important;
+    overscroll-behavior: contain;
+    overflow-y: auto !important;
+}
+
+.search-first-dropdown .select2-results__option {
+    color: #24364f;
+    font-size: 0.76rem;
+    line-height: 1.35;
+    min-height: 34px;
+    padding: 0.48rem 0.6rem !important;
+}
+
+.search-first-dropdown .select2-results__option--highlighted {
+    background: #edf4ff !important;
+    color: #1f4f9f !important;
+}
+
+.search-first-dropdown .select2-results__option--selected,
+.search-first-dropdown .select2-results__option[aria-selected="true"] {
+    background: #f4f7fb !important;
+    box-shadow: inset 3px 0 0 #2f66d0;
+    color: #24364f !important;
+    font-weight: 650;
+}
+
+.search-first-dropdown .select2-results__message {
+    color: #6b7785;
+    justify-content: center;
+    min-height: auto;
+    padding: 0.65rem !important;
+}
+
 .steps-dropdown {
     position: absolute;
     top: 100%;

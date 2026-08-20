@@ -223,6 +223,18 @@ class ExperimentStepForm(forms.ModelForm):
         }),
         help_text='可搜索并选择任意实验中的一个或多个历史步骤'
     )
+
+    owner = forms.ModelChoiceField(
+        label='负责人',
+        queryset=User.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={
+            'class': 'form-select step-owner-select',
+            'id': 'id_owner',
+            'data-placeholder': '输入姓名或用户名搜索…',
+        }),
+        help_text='可选；仅可选择当前 Team 成员或管理员',
+    )
     
     # Override tool to use equipment dropdown
     tool = forms.ModelChoiceField(
@@ -239,7 +251,7 @@ class ExperimentStepForm(forms.ModelForm):
     
     class Meta:
         model = ExperimentStep
-        fields = ['step_name', 'parents', 'step_description', 'status', 'completed_on', 'tool', 'recipe', 'notes']
+        fields = ['step_name', 'parents', 'owner', 'step_description', 'status', 'completed_on', 'tool', 'recipe', 'notes']
         widgets = {
             'step_description': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -311,6 +323,29 @@ class ExperimentStepForm(forms.ModelForm):
             self.fields['parents'].queryset = ExperimentStep.objects.all().select_related(
                 'experiment__project'
             ).order_by('experiment__project__exp_name', 'experiment__experiment_code', 'step_name', 'step_number')
+
+        team = getattr(
+            getattr(getattr(experiment, 'project', None), 'project', None),
+            'group',
+            None,
+        )
+        member_ids = UserProfile.objects.filter(
+            research_group=team,
+        ).values_list('user_id', flat=True)
+        owner_query = (
+            Q(id__in=member_ids) | Q(is_staff=True) | Q(is_superuser=True)
+        ) & Q(is_active=True)
+        if self.instance and self.instance.pk and self.instance.owner_id:
+            owner_query |= Q(id=self.instance.owner_id)
+        self.fields['owner'].queryset = User.objects.filter(
+            owner_query,
+        ).distinct().order_by('first_name', 'last_name', 'username')
+        self.fields['owner'].empty_label = '未指定负责人'
+        self.fields['owner'].label_from_instance = lambda user: (
+            f'{user.get_full_name()} · {user.username}'
+            if user.get_full_name().strip()
+            else user.username
+        )
         
         # Populate equipment choices by equipment number so Select2 searches by the visible identifier.
         self.fields['tool'].queryset = Equipment.objects.filter(is_active=True).order_by('equipment_id', 'equipment_name')

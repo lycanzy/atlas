@@ -118,17 +118,213 @@ class ViewTests(TestCase):
         
         # Add project_experiment to Project 1
         response = self.client.post(reverse('add_project_experiment', args=[self.exp1.id]), {
-            'experiment_code': 'BB'
+            'experiment_code': 'BB',
+            'experiment_description': 'Validate the new formulation',
         })
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(Experiment.objects.filter(full_experiment_code="PRA001BB").exists())
+        created = Experiment.objects.get(full_experiment_code="PRA001BB")
+        self.assertEqual(created.experiment_description, 'Validate the new formulation')
         
         # Try to add project_experiment to Project 2
         response = self.client.post(reverse('add_project_experiment', args=[self.exp2.id]), {
-            'experiment_code': 'BB'
+            'experiment_code': 'BB',
+            'experiment_description': 'Unauthorized experiment',
         })
         self.assertEqual(response.status_code, 302) # Redirects to index due to permission
         self.assertFalse(Experiment.objects.filter(full_experiment_code="PRB001BB").exists())
+
+    def test_add_project_experiment_requires_non_blank_description(self):
+        self.client.login(username="user1", password="password")
+
+        response = self.client.post(
+            reverse('add_project_experiment', args=[self.exp1.id]),
+            {'experiment_code': 'BB', 'experiment_description': '   '},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['error'], '实验描述为必填项。')
+        self.assertFalse(Experiment.objects.filter(full_experiment_code='PRA001BB').exists())
+
+    def test_description_source_search_follows_access_and_puts_current_project_first(self):
+        self.experiment1_item.experiment_description = 'Current project source'
+        self.experiment1_item.save()
+        same_group_project = Project.objects.create(
+            exp_name='PRA002', project=self.project1, owner=self.user1,
+        )
+        same_group_source = Experiment.objects.create(
+            experiment_code='AB', project=same_group_project,
+            experiment_description='Same group source',
+        )
+        hidden_source = Experiment.objects.create(
+            experiment_code='AA', project=self.exp2,
+            experiment_description='Other group secret',
+        )
+        Experiment.objects.create(
+            experiment_code='AC', project=same_group_project,
+            experiment_description='   ',
+        )
+        self.client.login(username='user1', password='password')
+
+        detail_response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
+        response = self.client.get(
+            reverse('search_experiment_description_sources', args=[self.exp1.id]),
+            {'q': 'source'},
+        )
+        sources = response.json()['results']
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(sources[0]['id'], self.experiment1_item.id)
+        self.assertIn(same_group_source.id, [source['id'] for source in sources])
+        self.assertNotIn(hidden_source.id, [source['id'] for source in sources])
+        self.assertNotIn('Other group secret', response.content.decode())
+        self.assertNotIn('Same group source', detail_response.content.decode())
+        self.assertNotContains(detail_response, 'experimentDescriptionSources')
+
+    def test_description_source_search_requires_two_characters_and_paginates(self):
+        for index in range(21):
+            project = Project.objects.create(
+                exp_name=f'PRA{index + 100:03d}', project=self.project1, owner=self.user1,
+            )
+            Experiment.objects.create(
+                experiment_code='AA', project=project,
+                experiment_description=f'Shared coating description {index}',
+            )
+        self.client.login(username='user1', password='password')
+        url = reverse('search_experiment_description_sources', args=[self.exp1.id])
+
+        short_response = self.client.get(url, {'q': 'P'})
+        first_page = self.client.get(url, {'q': 'PRA', 'page': 1})
+        second_page = self.client.get(url, {'q': 'PRA', 'page': 2})
+
+        self.assertEqual(short_response.json()['results'], [])
+        self.assertEqual(len(first_page.json()['results']), 20)
+        self.assertTrue(first_page.json()['pagination']['more'])
+        self.assertEqual(len(second_page.json()['results']), 1)
+        self.assertFalse(second_page.json()['pagination']['more'])
+
+    def test_description_source_detail_returns_full_description_after_selection(self):
+        self.experiment1_item.experiment_description = 'Full reusable description'
+        self.experiment1_item.save()
+        hidden_source = Experiment.objects.create(
+            experiment_code='AA', project=self.exp2,
+            experiment_description='Other group secret',
+        )
+        self.client.login(username='user1', password='password')
+
+        response = self.client.get(reverse(
+            'get_experiment_description_source',
+            args=[self.exp1.id, self.experiment1_item.id],
+        ))
+        hidden_response = self.client.get(reverse(
+            'get_experiment_description_source',
+            args=[self.exp1.id, hidden_source.id],
+        ))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['description'], 'Full reusable description')
+        self.assertEqual(hidden_response.status_code, 404)
+
+    def test_add_project_experiment_logs_copy_source_without_persisting_relationship(self):
+        self.experiment1_item.experiment_description = 'Reusable description'
+        self.experiment1_item.save()
+        self.client.login(username='user1', password='password')
+
+        response = self.client.post(
+            reverse('add_project_experiment', args=[self.exp1.id]),
+            {
+                'experiment_code': 'BB',
+                'experiment_description': 'Reusable description, edited',
+                'description_source_id': self.experiment1_item.id,
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        created = Experiment.objects.get(full_experiment_code='PRA001BB')
+        self.assertEqual(created.experiment_description, 'Reusable description, edited')
+        event = AuditLog.objects.filter(
+            category='experiment', action='create', object_id=str(created.id),
+        ).latest('id')
+        self.assertEqual(event.changes['description_source_id']['after'], self.experiment1_item.id)
+        self.assertEqual(event.changes['description_source_code']['after'], 'PRA001AA')
+
+    def test_add_project_experiment_copies_all_steps_genealogy_and_materials(self):
+        self.experiment1_item.experiment_description = 'Reusable process'
+        self.experiment1_item.save()
+        parent_a = ExperimentStep.objects.create(
+            step_name='MX', experiment=self.experiment1_item,
+            step_description='Mix A', owner=self.user1,
+        )
+        parent_b = ExperimentStep.objects.create(
+            step_name='PS', experiment=self.experiment1_item,
+            step_description='Prepare substrate',
+        )
+        child = ExperimentStep.objects.create(
+            step_name='CA', experiment=self.experiment1_item,
+            step_description='Coat', status='Completed', recipe='R-01', notes='Keep dry',
+        )
+        child.parents.set([parent_a, parent_b])
+        StepRawMaterialUsage.objects.create(
+            step=child, raw_material=self.raw_material,
+            quantity='2.0000', unit='g', notes='Process input',
+        )
+        Cell.objects.create(step=child, package_number='PKG-1', barcode='CELL-1')
+        Sample.objects.create(step=child, sample_name='SOURCE-SAMPLE')
+        self.client.login(username='user1', password='password')
+
+        response = self.client.post(
+            reverse('add_project_experiment', args=[self.exp1.id]),
+            {
+                'experiment_code': 'BB',
+                'experiment_description': 'Reusable process, edited',
+                'description_source_id': self.experiment1_item.id,
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['copied_step_count'], 3)
+        copied_experiment = Experiment.objects.get(full_experiment_code='PRA001BB')
+        copied_parent_a = copied_experiment.steps.get(step_name='MX')
+        copied_parent_b = copied_experiment.steps.get(step_name='PS')
+        copied_child = copied_experiment.steps.get(step_name='CA')
+        self.assertEqual(set(copied_child.parents.all()), {copied_parent_a, copied_parent_b})
+        self.assertEqual(copied_child.parent, copied_parent_a)
+        self.assertEqual(copied_child.status, 'Planned')
+        self.assertIsNone(copied_child.completed_on)
+        self.assertEqual(copied_child.recipe, 'R-01')
+        self.assertEqual(copied_child.notes, 'Keep dry')
+        copied_usage = copied_child.raw_material_usages.get()
+        self.assertEqual(copied_usage.raw_material, self.raw_material)
+        self.assertEqual(copied_usage.quantity, Decimal('2.0000'))
+        self.assertEqual(copied_experiment.steps.filter(cells__isnull=False).count(), 0)
+        self.assertEqual(copied_experiment.steps.filter(samples__isnull=False).count(), 0)
+        event = AuditLog.objects.filter(
+            category='experiment', action='create', object_id=str(copied_experiment.id),
+        ).latest('id')
+        self.assertEqual(event.changes['copied_step_count']['after'], 3)
+
+    def test_add_project_experiment_rejects_inaccessible_copy_source(self):
+        hidden_source = Experiment.objects.create(
+            experiment_code='AA', project=self.exp2,
+            experiment_description='Other group secret',
+        )
+        self.client.login(username='user1', password='password')
+
+        response = self.client.post(
+            reverse('add_project_experiment', args=[self.exp1.id]),
+            {
+                'experiment_code': 'BB',
+                'experiment_description': 'Copied text',
+                'description_source_id': hidden_source.id,
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['error'], '复制来源不可用或你没有访问权限。')
+        self.assertFalse(Experiment.objects.filter(full_experiment_code='PRA001BB').exists())
 
     def test_add_step(self):
         self.client.login(username="user1", password="password")
@@ -173,6 +369,22 @@ class ViewTests(TestCase):
         self.assertContains(response, '实验步骤')
         self.assertContains(response, '连续扫码，或每行粘贴一个 Barcode')
         self.assertContains(response, '填写样品数量并保存步骤后，将自动生成样品编号。')
+        self.assertContains(response, '.lineage-parent-select2 .lineage-parent-search-icon')
+        self.assertContains(response, '.lineage-parent-select2 .select2-selection__clear')
+        self.assertContains(response, 'right: 2rem !important;')
+        self.assertNotContains(response, '.select2-selection--multiple::after')
+
+    def test_experiment_detail_configures_raw_material_search_first_dropdown(self):
+        self.client.login(username="user1", password="password")
+
+        response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "modalElement.find('.raw-material-select')")
+        self.assertContains(response, "dropdownCssClass: 'search-first-dropdown raw-material-dropdown'")
+        self.assertContains(response, '请输入至少 1 个字符后搜索原材料')
+        self.assertContains(response, 'max-height: 220px !important;')
+        self.assertContains(response, "$searchField.val('').trigger('input')")
 
     def test_add_step_with_cells(self):
         self.client.login(username="user1", password="password")
@@ -327,12 +539,16 @@ class ViewTests(TestCase):
     def test_cell_details_render_in_experiment_and_genealogy(self):
         step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
         Cell.objects.create(step=step, package_number="PKG-01", barcode="CELL-001")
+        Sample.sync_for_step(step, 2)
         self.client.login(username="user1", password="password")
 
         detail_response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
         self.assertContains(detail_response, '电芯')
         self.assertContains(detail_response, 'PKG-01')
         self.assertContains(detail_response, 'CELL-001')
+        self.assertContains(detail_response, '<th>样品</th>', html=True)
+        self.assertContains(detail_response, 'data-step-sample-count="2"')
+        self.assertContains(detail_response, f'{step.full_step} 样品数量：2')
 
         genealogy_response = self.client.get(reverse('step_genealogy', args=[step.id]))
         self.assertContains(genealogy_response, '当前步骤电芯')
@@ -357,6 +573,57 @@ class ViewTests(TestCase):
         self.assertContains(response, 'CELL-001')
         self.assertContains(response, f'{step.full_step}-01')
         self.assertContains(response, f'{step.full_step}-02')
+
+    def test_step_owner_is_optional_searchable_and_limited_to_project_team(self):
+        teammate = User.objects.create_user(
+            username='team_member', first_name='Team', last_name='Member', password='password',
+        )
+        UserProfile.objects.create(user=teammate, research_group=self.group1)
+        step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        self.client.login(username="user1", password="password")
+
+        form_response = self.client.get(
+            reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, step.id])
+        )
+        self.assertEqual(form_response.status_code, 200)
+        self.assertContains(form_response, 'id="id_owner"')
+        self.assertContains(form_response, '负责人')
+        self.assertContains(form_response, 'Team Member · team_member')
+        self.assertNotContains(form_response, f'value="{self.user2.id}"')
+
+        detail_response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
+        self.assertContains(detail_response, "dropdownCssClass: 'search-first-dropdown step-owner-dropdown'")
+        self.assertContains(detail_response, '请输入至少 1 个字符后搜索用户')
+
+        assign_response = self.client.post(
+            reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, step.id]),
+            {'step_name': 'AA', 'status': 'Planned', 'owner': teammate.id},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(assign_response.status_code, 200)
+        self.assertTrue(assign_response.json()['success'])
+        step.refresh_from_db()
+        self.assertEqual(step.owner, teammate)
+
+        forbidden_response = self.client.post(
+            reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, step.id]),
+            {'step_name': 'AA', 'status': 'Planned', 'owner': self.user2.id},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(forbidden_response.status_code, 200)
+        self.assertFalse(forbidden_response.json()['success'])
+        self.assertIn('owner', forbidden_response.json()['errors'])
+        step.refresh_from_db()
+        self.assertEqual(step.owner, teammate)
+
+        clear_response = self.client.post(
+            reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, step.id]),
+            {'step_name': 'AA', 'status': 'Planned', 'owner': ''},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertTrue(clear_response.json()['success'])
+        step.refresh_from_db()
+        self.assertIsNone(step.owner)
 
     def test_edit_step_renders_existing_completed_time(self):
         completed_on = timezone.make_aware(datetime(2026, 8, 6, 14, 35))
@@ -421,11 +688,24 @@ class ViewTests(TestCase):
         child = ExperimentStep.objects.create(step_name="BB", experiment=self.experiment1_item)
         child.parents.set([parent])
 
-        response = self.client.get(reverse('delete_step', args=[self.exp1.id, self.experiment1_item.id, parent.id]))
+        response = self.client.get(
+            reverse('delete_step', args=[self.exp1.id, self.experiment1_item.id, parent.id]),
+            follow=True,
+        )
 
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f'{reverse("experiment_detail", args=[self.exp1.id])}?expanded_experiment={self.experiment1_item.id}',
+        )
+        self.assertContains(
+            response,
+            '该步骤已有下游关联步骤，无法删除。请先移除下游步骤的前置关系。',
+        )
         self.assertTrue(ExperimentStep.objects.filter(id=parent.id).exists())
         self.assertTrue(ExperimentStep.objects.filter(id=child.id).exists())
+
+        logout_response = self.client.get(reverse('logout'), follow=True)
+        self.assertNotContains(logout_response, '该步骤已有下游关联步骤，无法删除。')
 
     def test_delete_steps_blocks_step_with_legacy_downstream_child(self):
         self.client.login(username="user1", password="password")

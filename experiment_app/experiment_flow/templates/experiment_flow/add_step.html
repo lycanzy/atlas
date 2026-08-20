@@ -278,7 +278,7 @@
     box-shadow: none !important;
     display: flex !important;
     min-height: 32px !important;
-    padding: 0.2rem 2rem 0.2rem 0.35rem !important;
+    padding: 0.2rem 3.35rem 0.2rem 0.35rem !important;
     position: relative;
 }
 
@@ -289,15 +289,29 @@
     box-shadow: 0 0 0 0.14rem rgba(47, 102, 208, 0.12) !important;
 }
 
-.lineage-parent-select2 .select2-selection--multiple::after {
+.lineage-parent-select2 .lineage-parent-search-icon {
     color: #6b7785;
-    content: "⌕";
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     line-height: 1;
+    pointer-events: none;
     position: absolute;
-    right: 0.7rem;
+    right: 0.8rem;
     top: 50%;
     transform: translateY(-50%);
+}
+
+.lineage-parent-select2 .select2-selection__clear {
+    background: transparent !important;
+    border: 0 !important;
+    color: #6b7785 !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0.1rem !important;
+    position: absolute !important;
+    right: 2rem !important;
+    top: 50% !important;
+    transform: translateY(-50%);
+    z-index: 2;
 }
 
 .lineage-parent-select2 .select2-selection__rendered {
@@ -460,11 +474,16 @@
             {% if form.completed_on.errors %}<div class="error-message">{{ form.completed_on.errors.0 }}</div>{% endif %}
           </div>
           <div class="form-group">
+            <label for="id_owner">负责人 <span class="text-muted">（可选）</span></label>
+            {{ form.owner }}
+            {% if form.owner.errors %}<div class="error-message">{{ form.owner.errors.0 }}</div>{% endif %}
+          </div>
+          <div class="form-group">
             <label for="id_tool">设备</label>
             {{ form.tool }}
             {% if form.tool.errors %}<div class="error-message">{{ form.tool.errors.0 }}</div>{% endif %}
           </div>
-          <div class="form-group col-span-2">
+          <div class="form-group">
             <label for="id_recipe">配方</label>
             {{ form.recipe }}
             {% if form.recipe.errors %}<div class="error-message">{{ form.recipe.errors.0 }}</div>{% endif %}
