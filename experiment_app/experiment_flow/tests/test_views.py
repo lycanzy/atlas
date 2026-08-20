@@ -592,7 +592,8 @@ class ViewTests(TestCase):
         self.assertNotContains(form_response, f'value="{self.user2.id}"')
 
         detail_response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
-        self.assertContains(detail_response, "dropdownCssClass: 'search-first-dropdown step-owner-dropdown'")
+        self.assertContains(detail_response, "selector: '#id_owner'")
+        self.assertContains(detail_response, 'maximumSelectionLength: 1')
         self.assertContains(detail_response, '请输入至少 1 个字符后搜索用户')
 
         assign_response = self.client.post(
@@ -624,6 +625,22 @@ class ViewTests(TestCase):
         self.assertTrue(clear_response.json()['success'])
         step.refresh_from_db()
         self.assertIsNone(step.owner)
+
+    def test_step_equipment_uses_single_search_first_interaction(self):
+        self.client.login(username='user1', password='password')
+
+        form_response = self.client.get(
+            reverse('add_step', args=[self.exp1.id, self.experiment1_item.id])
+        )
+        detail_response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
+
+        self.assertEqual(form_response.status_code, 200)
+        self.assertContains(form_response, 'id="id_tool"')
+        self.assertContains(form_response, 'step-equipment-select')
+        self.assertContains(detail_response, "selector: '#id_tool'")
+        self.assertContains(detail_response, '请输入至少 1 个字符后搜索设备')
+        self.assertContains(detail_response, "initializeStepEquipmentSelect('#addStepModal')")
+        self.assertContains(detail_response, "initializeStepEquipmentSelect('#editStepModal')")
 
     def test_edit_step_renders_existing_completed_time(self):
         completed_on = timezone.make_aware(datetime(2026, 8, 6, 14, 35))

@@ -242,9 +242,9 @@ class ExperimentStepForm(forms.ModelForm):
         queryset=Equipment.objects.none(),  # Will be set in __init__
         required=False,
         widget=forms.Select(attrs={
-            'class': 'form-select searchable-select',
+            'class': 'form-select searchable-select step-equipment-select',
             'id': 'id_tool',
-            'data-placeholder': '搜索设备...'
+            'data-placeholder': '输入设备名称或编号搜索…'
         }),
         help_text='从设备数据库中选择设备'
     )

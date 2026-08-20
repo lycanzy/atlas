@@ -1320,37 +1320,102 @@ function initializeParentStepSelect(modalSelector) {
     });
 }
 
-function initializeStepOwnerSelect(modalSelector) {
+function initializeSingleSearchFirstSelect(modalSelector, options) {
     const $modal = $(modalSelector);
-    const $select = $modal.find('#id_owner');
+    const $select = $modal.find(options.selector);
     if (!$select.length || $select.hasClass('select2-hidden-accessible')) return;
 
+    // Render a single-value field with the same inline-search interaction as
+    // the upstream-step picker. Django still receives at most one value.
+    const initialValue = $select.val();
+    $select.find('option[value=""]').remove();
+    $select.prop('multiple', true);
+    $select.val(initialValue ? [initialValue] : []);
     $select.select2({
         theme: 'bootstrap-5',
         dropdownParent: $modal,
-        dropdownCssClass: 'search-first-dropdown step-owner-dropdown',
+        dropdownCssClass: `lineage-parent-dropdown ${options.dropdownClass}`,
         width: '100%',
-        placeholder: '输入姓名或用户名搜索…',
-        allowClear: true,
+        placeholder: options.placeholder,
+        allowClear: false,
+        closeOnSelect: true,
         minimumInputLength: 1,
-        minimumResultsForSearch: 0,
+        maximumSelectionLength: 1,
         language: {
             inputTooShort: function() {
-                return '请输入至少 1 个字符后搜索用户';
+                return options.inputTooShort;
             },
             noResults: function() {
-                return '未找到匹配的用户';
+                return options.noResults;
+            },
+            maximumSelected: function() {
+                return '只能选择一个选项';
             }
         }
     });
 
-    $select.next('.select2-container').addClass('search-first-select2 step-owner-select2');
-    $select.on('select2:open.stepOwner', function() {
-        $modal.find('.select2-container--open .select2-search__field').last().attr({
-            'aria-label': '搜索步骤负责人',
-            'autocomplete': 'off',
-            'placeholder': '输入姓名或用户名…'
+    const $container = $select.next('.select2-container').addClass(`lineage-parent-select2 ${options.containerClass}`);
+    const $selection = $container.find('.select2-selection--multiple');
+    const $searchField = $container.find('.select2-search__field');
+    $searchField.attr({
+        'aria-label': options.ariaLabel,
+        'autocomplete': 'off'
+    });
+    if (!$selection.find('.lineage-parent-search-icon').length) {
+        $selection.append('<i class="bi bi-search lineage-parent-search-icon" aria-hidden="true"></i>');
+    }
+
+    const currentSearchTerm = function() {
+        return ($searchField.val() || '').trim();
+    };
+
+    $select.on('select2:opening.searchFirstSingle', function(event) {
+        if (currentSearchTerm().length < 1) {
+            event.preventDefault();
+            window.requestAnimationFrame(function() {
+                $searchField.trigger('focus');
+            });
+        }
+    });
+    $searchField.on('input.searchFirstSingle', function() {
+        const select2 = $select.data('select2');
+        if (!select2) return;
+        if (currentSearchTerm().length >= 1 && !select2.isOpen()) {
+            $select.select2('open');
+        } else if (currentSearchTerm().length < 1 && select2.isOpen()) {
+            $select.select2('close');
+        }
+    });
+    $select.on('select2:select.searchFirstSingle', function() {
+        window.requestAnimationFrame(function() {
+            const select2 = $select.data('select2');
+            $searchField.val('').trigger('input');
+            if (select2 && select2.isOpen()) $select.select2('close');
         });
+    });
+}
+
+function initializeStepOwnerSelect(modalSelector) {
+    initializeSingleSearchFirstSelect(modalSelector, {
+        selector: '#id_owner',
+        containerClass: 'step-owner-select2',
+        dropdownClass: 'step-owner-dropdown',
+        placeholder: '输入姓名或用户名搜索…',
+        ariaLabel: '搜索步骤负责人',
+        inputTooShort: '请输入至少 1 个字符后搜索用户',
+        noResults: '未找到匹配的用户'
+    });
+}
+
+function initializeStepEquipmentSelect(modalSelector) {
+    initializeSingleSearchFirstSelect(modalSelector, {
+        selector: '#id_tool',
+        containerClass: 'step-equipment-select2',
+        dropdownClass: 'step-equipment-dropdown',
+        placeholder: '输入设备名称或编号搜索…',
+        ariaLabel: '搜索步骤设备',
+        inputTooShort: '请输入至少 1 个字符后搜索设备',
+        noResults: '未找到匹配的设备'
     });
 }
 
@@ -1587,19 +1652,10 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
                 const modal = new bootstrap.Modal(document.getElementById('editStepModal'));
                 modal.show();
 
-                // Initialize Select2 on the tool field after modal content loads
                 setTimeout(async function() {
-                    if ($('#id_tool').length) {
-                        $('#id_tool').select2({
-                            theme: 'bootstrap-5',
-                            dropdownParent: $('#editStepModal'),
-                            width: '100%',
-	                            placeholder: '搜索设备...',
-                            allowClear: true
-                        });
-                    }
                     initializeParentStepSelect('#editStepModal');
                     initializeStepOwnerSelect('#editStepModal');
+                    initializeStepEquipmentSelect('#editStepModal');
                     initializeRawMaterialSelects($('#editStepModal'));
                 }, 100);
             });
@@ -1708,19 +1764,10 @@ document.querySelectorAll('.add-step-btn').forEach(function(btn) {
                 const modal = new bootstrap.Modal(document.getElementById('addStepModal'));
                 modal.show();
 
-                // Initialize Select2 on the tool field after modal content loads
                 setTimeout(async function() {
-                    if ($('#id_tool').length) {
-                        $('#id_tool').select2({
-                            theme: 'bootstrap-5',
-                            dropdownParent: $('#addStepModal'),
-                            width: '100%',
-	                            placeholder: '搜索设备...',
-                            allowClear: true
-                        });
-                    }
                     initializeParentStepSelect('#addStepModal');
                     initializeStepOwnerSelect('#addStepModal');
+                    initializeStepEquipmentSelect('#addStepModal');
                     initializeRawMaterialSelects($('#addStepModal'));
                 }, 100);
             });
