@@ -67,7 +67,7 @@ class FullAuditTests(TestCase):
     def test_raw_material_batch_regeneration_is_explicit(self):
         self.client.login(username='auditor', password='old-password')
         payload = {
-            'material_code': 'rm01', 'received_date': '2026-07-01',
+            'material_code': 'rm01', 'batch_number': 'lot-01', 'received_date': '',
             'material_type': 'Powder', 'material_name': 'Salt', 'owner': self.user.id,
             'total_quantity': '500', 'total_unit': 'g',
             'supplier': 'Vendor', 'location': 'Shelf A', 'description': 'Initial',
@@ -75,23 +75,23 @@ class FullAuditTests(TestCase):
         }
         self.client.post(reverse('add_raw_material'), payload)
         material = RawMaterial.objects.get(material_code='RM01')
-        self.assertEqual(material.batch_number, 'RM01-070126')
+        self.assertEqual(material.batch_number, 'LOT-01')
         created = AuditLog.objects.get(category='raw_material', action='create')
-        self.assertEqual(created.changes['batch_number']['after'], 'RM01-070126')
+        self.assertEqual(created.changes['batch_number']['after'], 'LOT-01')
         self.assertEqual(created.changes['total_quantity']['after'], '500')
 
-        payload.update({'material_code': 'rm02', 'received_date': '2026-07-02', 'supplier': 'Vendor B', 'total_quantity': '450'})
+        payload.update({'material_code': 'rm02', 'batch_number': 'lot-02', 'received_date': '2026-07-02', 'supplier': 'Vendor B', 'total_quantity': '450'})
         self.client.post(reverse('edit_raw_material', args=[material.id]), payload)
         updated = AuditLog.objects.get(category='raw_material', action='update')
-        self.assertEqual(updated.changes['batch_number']['before'], 'RM01-070126')
-        self.assertEqual(updated.changes['batch_number']['after'], 'RM02-070226')
+        self.assertEqual(updated.changes['batch_number']['before'], 'LOT-01')
+        self.assertEqual(updated.changes['batch_number']['after'], 'LOT-02')
         self.assertIn('supplier', updated.changes)
         self.assertEqual(updated.changes['total_quantity'], {'before': '500.0000', 'after': '450'})
 
     def test_step_audit_contains_samples_material_usage_and_parent(self):
         self.client.login(username='auditor', password='old-password')
         material = RawMaterial.objects.create(
-            material_code='RM', received_date=date(2026, 7, 1), owner=self.user,
+            material_code='RM', batch_number='RM-070126', received_date=date(2026, 7, 1), owner=self.user,
             total_quantity='100', total_unit='g',
         )
         parent = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment)

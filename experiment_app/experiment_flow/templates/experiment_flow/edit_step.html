@@ -579,7 +579,7 @@
                   <option value="">选择原材料...</option>
                   {% for raw_material in raw_materials %}
                     <option value="{{ raw_material.id }}" data-unit="{{ raw_material.total_unit|default:'' }}" {% if raw_material.id == usage.raw_material.id %}selected{% endif %}>
-                      {{ raw_material.batch_number }}{% if raw_material.total_quantity is None or not raw_material.total_unit %} · 库存未知{% endif %}
+                      {{ raw_material.material_code }}-{{ raw_material.batch_number }}{% if raw_material.total_quantity is None or not raw_material.total_unit %} · 库存未知{% endif %}
                     </option>
                   {% endfor %}
                 </select>

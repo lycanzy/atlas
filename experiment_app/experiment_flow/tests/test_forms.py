@@ -119,7 +119,8 @@ class FormTests(TestCase):
     def test_raw_material_form_valid(self):
         form = RawMaterialForm(data={
             'material_code': 'RM001',
-            'received_date': '2026-06-19',
+            'batch_number': 'batch-001',
+            'received_date': '',
             'material_type': 'Powder',
             'material_name': '',
             'total_quantity': '2500.5',
@@ -130,11 +131,14 @@ class FormTests(TestCase):
             'is_active': 'on'
         })
         self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data['batch_number'], 'batch-001')
+        self.assertIsNone(form.cleaned_data['received_date'])
         self.assertEqual(form.cleaned_data['total_quantity'], Decimal('2500.5'))
         self.assertEqual(form.cleaned_data['total_unit'], 'g')
 
         invalid_form = RawMaterialForm(data={
             'material_code': 'RM002',
+            'batch_number': 'BATCH-002',
             'received_date': '2026-06-20',
             'material_type': 'Powder',
             'total_quantity': '-1',
@@ -152,6 +156,7 @@ class FormTests(TestCase):
 
         invalid_form = RawMaterialForm(data={
             'material_code': 'RM002',
+            'batch_number': 'BATCH-002',
             'received_date': '2026-06-20',
             'material_type': 'Unmanaged type',
             'owner': self.user.id,
@@ -164,6 +169,7 @@ class FormTests(TestCase):
         RawMaterialType.objects.filter(name='Powder').update(is_active=False)
         material = RawMaterial.objects.create(
             material_code='RM003',
+            batch_number='BATCH-003',
             received_date='2026-06-21',
             material_type='Powder',
             owner=self.user,
@@ -172,3 +178,16 @@ class FormTests(TestCase):
         form = RawMaterialForm(instance=material)
 
         self.assertIn(('Powder', 'Powder'), form.fields['material_type'].choices)
+
+    def test_raw_material_batch_is_required_and_received_date_is_optional(self):
+        form = RawMaterialForm(data={
+            'material_code': 'RM004',
+            'batch_number': '',
+            'received_date': '',
+            'owner': self.user.id,
+            'is_active': 'on',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('batch_number', form.errors)
+        self.assertNotIn('received_date', form.errors)

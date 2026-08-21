@@ -29,7 +29,7 @@ class InventoryTests(TestCase):
         RawMaterialType.objects.create(name='Powder')
         StepNameTemplate.objects.create(step_code='AA', step_label='Mixing')
         self.material = RawMaterial.objects.create(
-            material_code='RM01', received_date=date(2026, 8, 20),
+            material_code='RM01', batch_number='LOT-0820', received_date=date(2026, 8, 20),
             material_type='Powder', total_quantity='10', total_unit='g', owner=self.user,
         )
         self.client.login(username='owner', password='password')
@@ -137,6 +137,7 @@ class InventoryTests(TestCase):
         self.assertEqual(material['remaining_quantity'], '7.0000')
         self.assertEqual(material['inventory_state'], 'normal')
         self.assertTrue(material['inventory_ready'])
+        self.assertEqual(material['label'], 'RM01-LOT-0820 · 剩余 7.0000 g')
 
     def test_only_owner_or_admin_can_edit_material(self):
         self.client.logout()
@@ -149,7 +150,7 @@ class InventoryTests(TestCase):
     def test_lowering_total_below_completed_usage_requires_confirmation(self):
         self.usage('Completed', '8')
         payload = {
-            'material_code': 'RM01', 'received_date': '2026-08-20',
+            'material_code': 'RM01', 'batch_number': 'LOT-0820', 'received_date': '2026-08-20',
             'material_type': 'Powder', 'material_name': '',
             'total_quantity': '5', 'total_unit': 'g', 'owner': self.user.id,
             'supplier': '', 'location': '', 'description': '', 'notes': '',
@@ -171,7 +172,7 @@ class InventoryTests(TestCase):
 
     def test_incomplete_legacy_material_is_inventory_unknown_and_not_selectable(self):
         legacy = RawMaterial.objects.create(
-            material_code='OLD', received_date=date(2026, 8, 19), owner=self.user,
+            material_code='OLD', batch_number='OLD-081926', received_date=date(2026, 8, 19), owner=self.user,
         )
         response = self.client.get(reverse('get_raw_materials'))
         api_material = next(item for item in response.json()['raw_materials'] if item['id'] == legacy.id)

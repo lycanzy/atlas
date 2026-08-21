@@ -306,6 +306,7 @@ class ModelTests(TestCase):
     def test_raw_material_creation_and_unique_batch(self):
         material = RawMaterial.objects.create(
             material_code="rm001",
+            batch_number=" batch-a ",
             received_date=date(2026, 6, 19),
             material_type="Powder",
             total_quantity="2500.0000",
@@ -314,7 +315,7 @@ class ModelTests(TestCase):
         )
 
         self.assertEqual(material.material_code, "RM001")
-        self.assertEqual(material.batch_number, "RM001-061926")
+        self.assertEqual(material.batch_number, "BATCH-A")
         self.assertIsNone(material.material_name)
         self.assertEqual(material.total_quantity, Decimal("2500.0000"))
         self.assertEqual(material.total_unit, "g")
@@ -322,7 +323,7 @@ class ModelTests(TestCase):
 
         duplicate = RawMaterial(
             material_code="RM001",
-            received_date=date(2026, 6, 19),
+            batch_number="batch-a",
             owner=self.user
         )
         with self.assertRaises(ValidationError):
@@ -334,6 +335,7 @@ class ModelTests(TestCase):
         step = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
         material = RawMaterial.objects.create(
             material_code="RM002",
+            batch_number="BATCH-B",
             received_date=date(2026, 6, 20),
             material_name="Binder",
             total_quantity="100.0000",

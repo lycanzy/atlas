@@ -460,12 +460,13 @@ class RawMaterialForm(forms.ModelForm):
     class Meta:
         model = RawMaterial
         fields = [
-            'material_code', 'received_date', 'material_type', 'material_name',
+            'material_code', 'batch_number', 'received_date', 'material_type', 'material_name',
             'description', 'total_quantity', 'total_unit', 'owner', 'supplier',
             'location', 'is_active', 'notes'
         ]
         widgets = {
             'material_code': forms.TextInput(attrs={'class': 'form-control'}),
+            'batch_number': forms.TextInput(attrs={'class': 'form-control'}),
             'received_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
             'material_name': forms.TextInput(attrs={'class': 'form-control'}),
             'total_quantity': forms.NumberInput(attrs={
@@ -491,7 +492,8 @@ class RawMaterialForm(forms.ModelForm):
         else:
             self.fields['owner'].queryset = User.objects.all().order_by('first_name', 'last_name', 'username')
         self.fields['owner'].label_from_instance = lambda obj: obj.get_full_name() if obj.get_full_name() else obj.username
-        self.fields['received_date'].required = True
+        self.fields['batch_number'].required = True
+        self.fields['received_date'].required = False
         self.fields['received_date'].input_formats = ['%Y-%m-%d']
         self.fields['material_name'].required = False
         type_names = list(
