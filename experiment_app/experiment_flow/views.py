@@ -2547,8 +2547,8 @@ def get_raw_materials(request):
             'inventory_state': material.inventory_state,
             'inventory_ready': material.inventory_ready,
             'label': (
-                f'{material.batch_number} · 剩余 {material.remaining_quantity:g} {material.total_unit}'
-                if material.inventory_ready else f'{material.batch_number} · 库存未知'
+                f'{material.material_code}-{material.batch_number} · 剩余 {material.remaining_quantity:g} {material.total_unit}'
+                if material.inventory_ready else f'{material.material_code}-{material.batch_number} · 库存未知'
             ),
         })
     return JsonResponse({'raw_materials': data})

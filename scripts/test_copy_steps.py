@@ -31,6 +31,7 @@ s1 = ExperimentStep.objects.create(step_name='MX', step_number='00', step_descri
 s2 = ExperimentStep.objects.create(step_name='MY', step_number='00', step_description='Original step 2 (child)', experiment=experiment_src, parent=s1, status='Planned')
 raw_material = RawMaterial.objects.create(
     material_code='RMTEST',
+    batch_number='RMTEST-001',
     received_date=date.today(),
     material_name='Test Raw Material',
     owner=user,

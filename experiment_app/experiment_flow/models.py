@@ -670,7 +670,7 @@ class RawMaterial(models.Model):
     """Raw material database for tracking material batches used in steps"""
 
     material_code = models.CharField(max_length=50, help_text="Raw material code")
-    batch_number = models.CharField(max_length=80, blank=True, help_text="Raw material batch number generated from material code and received date")
+    batch_number = models.CharField(max_length=80, help_text="Raw material batch number")
     received_date = models.DateField(blank=True, null=True, help_text="Date this raw material batch was received")
     material_type = models.CharField(max_length=100, blank=True, null=True, help_text="Raw material type/category")
     material_name = models.CharField(max_length=100, blank=True, null=True, help_text="Raw material name")
@@ -696,10 +696,10 @@ class RawMaterial(models.Model):
     def clean(self):
         if self.material_code:
             self.material_code = self.material_code.strip().upper()
-        if self.material_code and self.received_date:
-            self.batch_number = f"{self.material_code}-{self.received_date.strftime('%m%d%y')}"
-        elif self.batch_number:
+        if self.batch_number:
             self.batch_number = self.batch_number.strip().upper()
+        if not self.batch_number:
+            raise ValidationError({'batch_number': '原材料批次不能为空。'})
         if not self.material_name:
             self.material_name = None
 

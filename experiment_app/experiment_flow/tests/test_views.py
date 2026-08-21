@@ -41,6 +41,7 @@ class ViewTests(TestCase):
         RawMaterialType.objects.create(name="Liquid")
         self.raw_material = RawMaterial.objects.create(
             material_code="RM001",
+            batch_number="RM001-061926",
             received_date=date(2026, 6, 19),
             material_type="Powder",
             material_name="Test Powder",
@@ -659,6 +660,29 @@ class ViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="2026-08-06T14:35"')
 
+    def test_edit_step_raw_material_option_shows_and_searches_code_with_batch(self):
+        step = ExperimentStep.objects.create(
+            step_name="AA",
+            experiment=self.experiment1_item,
+        )
+        StepRawMaterialUsage.objects.create(
+            step=step,
+            raw_material=self.raw_material,
+            quantity="1.0000",
+            unit="g",
+        )
+        self.client.login(username="user1", password="password")
+
+        response = self.client.get(
+            reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, step.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'{self.raw_material.material_code}-{self.raw_material.batch_number}',
+        )
+
     def test_add_step_with_multiple_parents(self):
         self.client.login(username="user1", password="password")
 
@@ -803,7 +827,8 @@ class ViewTests(TestCase):
 
         add_response = self.client.post(reverse('add_raw_material'), {
             'material_code': 'RM002',
-            'received_date': '2026-06-20',
+            'batch_number': 'LOT-002',
+            'received_date': '',
             'material_type': 'Liquid',
             'material_name': '',
             'total_quantity': '2000',
@@ -815,12 +840,13 @@ class ViewTests(TestCase):
         })
         self.assertEqual(add_response.status_code, 302)
         self.assertTrue(RawMaterial.objects.filter(
-            material_code="RM002", batch_number="RM002-062026",
+            material_code="RM002", batch_number="LOT-002", received_date__isnull=True,
             material_name__isnull=True, total_quantity="2000", total_unit="mL",
         ).exists())
 
         edit_response = self.client.post(reverse('edit_raw_material', args=[self.raw_material.id]), {
             'material_code': 'RM001',
+            'batch_number': 'LOT-001-REV',
             'received_date': '2026-06-21',
             'material_type': 'Powder',
             'material_name': '',
@@ -833,7 +859,7 @@ class ViewTests(TestCase):
         })
         self.assertEqual(edit_response.status_code, 302)
         self.raw_material.refresh_from_db()
-        self.assertEqual(self.raw_material.batch_number, "RM001-062126")
+        self.assertEqual(self.raw_material.batch_number, "LOT-001-REV")
         self.assertIsNone(self.raw_material.material_name)
         self.assertEqual(self.raw_material.total_quantity, Decimal("750.5000"))
         self.assertEqual(self.raw_material.total_unit, "g")
@@ -970,6 +996,7 @@ class ViewTests(TestCase):
 
         RawMaterial.objects.create(
             material_code='RM-FOIL',
+            batch_number='FOIL-001',
             received_date='2026-07-01',
             material_type='Foil',
             owner=self.user1,

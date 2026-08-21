@@ -2278,7 +2278,7 @@ async function initializeRawMaterialSelects(modal) {
             dropdownParent: dropdownParent,
             dropdownCssClass: 'search-first-dropdown raw-material-dropdown',
             width: '100%',
-            placeholder: '输入批次号或名称搜索…',
+            placeholder: '输入原材料代号或批次搜索…',
             allowClear: true,
             minimumInputLength: 1,
             minimumResultsForSearch: 0,
@@ -2300,7 +2300,7 @@ async function initializeRawMaterialSelects(modal) {
             searchField.attr({
                 'aria-label': '搜索原材料',
                 'autocomplete': 'off',
-                'placeholder': '输入批次号或名称…'
+                'placeholder': '输入原材料代号或批次…'
             });
         });
     });

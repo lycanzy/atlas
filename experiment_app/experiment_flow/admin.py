@@ -167,7 +167,7 @@ class RawMaterialAdmin(BaseModelAdmin):
     list_display = ("material_code", "batch_number", "received_date", "material_name", "material_type", "total_quantity", "total_unit", "owner", "location", "is_active", "created_on")
     list_filter = ("is_active", "material_type", "owner")
     search_fields = ("material_code", "batch_number", "material_name", "material_type", "description", "supplier", "location")
-    readonly_fields = ("batch_number", "created_on", "updated_on")
+    readonly_fields = ("created_on", "updated_on")
     fieldsets = (
         ('Basic Information', {
             'fields': ('material_code', 'received_date', 'batch_number', 'material_type', 'material_name', 'total_quantity', 'total_unit', 'description', 'owner', 'is_active')
