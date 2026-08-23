@@ -729,7 +729,7 @@ class ViewTests(TestCase):
         child = ExperimentStep.objects.create(step_name="BB", experiment=self.experiment1_item)
         child.parents.set([parent])
 
-        response = self.client.get(
+        response = self.client.post(
             reverse('delete_step', args=[self.exp1.id, self.experiment1_item.id, parent.id]),
             follow=True,
         )
@@ -747,6 +747,127 @@ class ViewTests(TestCase):
 
         logout_response = self.client.get(reverse('logout'), follow=True)
         self.assertNotContains(logout_response, '该步骤已有下游关联步骤，无法删除。')
+
+    def test_experiment_detail_renders_accessible_actions_and_delete_counts(self):
+        step = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment1_item)
+        Cell.objects.create(step=step, package_number='PKG-1', barcode='CELL-1')
+        Sample.objects.create(step=step, sample_name='SAMPLE-1')
+        self.client.login(username='user1', password='password')
+
+        response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
+
+        self.assertContains(response, '<span>新增实验</span>', html=True)
+        self.assertContains(response, '<span>新增步骤</span>', html=True)
+        self.assertContains(response, f'aria-label="为 {self.experiment1_item.full_experiment_code} 新增步骤"')
+        self.assertContains(response, f'aria-label="删除实验 {self.experiment1_item.full_experiment_code}"')
+        self.assertContains(response, f'aria-label="编辑步骤 {step.full_step}"')
+        self.assertContains(response, f'aria-label="删除步骤 {step.full_step}"')
+        self.assertContains(response, f'aria-label="查看步骤 {step.full_step} 的谱系"')
+        self.assertContains(response, 'data-step-count="1"')
+        self.assertContains(response, 'data-cell-count="1"')
+        self.assertContains(response, 'data-sample-count="1"')
+        self.assertContains(response, 'id="deleteConfirmModal"')
+        self.assertContains(response, 'id="deleteConfirmForm" method="post"')
+
+    def test_single_delete_endpoints_reject_get(self):
+        step = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment1_item)
+        self.client.login(username='user1', password='password')
+
+        experiment_response = self.client.get(reverse(
+            'delete_project_experiment', args=[self.exp1.id, self.experiment1_item.id],
+        ))
+        step_response = self.client.get(reverse(
+            'delete_step', args=[self.exp1.id, self.experiment1_item.id, step.id],
+        ))
+
+        self.assertEqual(experiment_response.status_code, 405)
+        self.assertEqual(step_response.status_code, 405)
+        self.assertTrue(Experiment.objects.filter(id=self.experiment1_item.id).exists())
+        self.assertTrue(ExperimentStep.objects.filter(id=step.id).exists())
+
+    def test_delete_experiment_post_deletes_scoped_object_and_logs(self):
+        experiment = Experiment.objects.create(experiment_code='BB', project=self.exp1)
+        ExperimentStep.objects.create(step_name='AA', experiment=experiment)
+        self.client.login(username='user1', password='password')
+
+        response = self.client.post(
+            reverse('delete_project_experiment', args=[self.exp1.id, experiment.id]),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse('experiment_detail', args=[self.exp1.id]))
+        self.assertContains(response, f'已删除实验 {experiment.full_experiment_code}。')
+        self.assertFalse(Experiment.objects.filter(id=experiment.id).exists())
+        event = AuditLog.objects.get(category='experiment', action='delete', object_id=str(experiment.id))
+        self.assertEqual(event.request_method, 'POST')
+
+    def test_delete_step_post_deletes_scoped_object_and_reopens_experiment(self):
+        step = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment1_item)
+        self.client.login(username='user1', password='password')
+
+        response = self.client.post(
+            reverse('delete_step', args=[self.exp1.id, self.experiment1_item.id, step.id]),
+            follow=True,
+        )
+
+        detail_url = f'{reverse("experiment_detail", args=[self.exp1.id])}?expanded_experiment={self.experiment1_item.id}'
+        self.assertRedirects(response, detail_url)
+        self.assertContains(response, f'已删除步骤 {step.full_step}。')
+        self.assertFalse(ExperimentStep.objects.filter(id=step.id).exists())
+        event = AuditLog.objects.get(category='step', action='delete', object_id=str(step.id))
+        self.assertEqual(event.request_method, 'POST')
+
+    def test_single_deletes_reject_cross_team_access(self):
+        hidden_experiment = Experiment.objects.create(experiment_code='AA', project=self.exp2)
+        hidden_step = ExperimentStep.objects.create(step_name='AA', experiment=hidden_experiment)
+        self.client.login(username='user1', password='password')
+
+        experiment_response = self.client.post(reverse(
+            'delete_project_experiment', args=[self.exp2.id, hidden_experiment.id],
+        ))
+        step_response = self.client.post(reverse(
+            'delete_step', args=[self.exp2.id, hidden_experiment.id, hidden_step.id],
+        ))
+
+        self.assertEqual(experiment_response.status_code, 403)
+        self.assertEqual(step_response.status_code, 403)
+        self.assertTrue(Experiment.objects.filter(id=hidden_experiment.id).exists())
+        self.assertTrue(ExperimentStep.objects.filter(id=hidden_step.id).exists())
+
+    def test_single_deletes_reject_object_hierarchy_mismatch(self):
+        other_experiment = Experiment.objects.create(experiment_code='AA', project=self.exp2)
+        other_step = ExperimentStep.objects.create(step_name='AA', experiment=other_experiment)
+        local_step = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment1_item)
+        self.client.login(username='user1', password='password')
+
+        experiment_response = self.client.post(reverse(
+            'delete_project_experiment', args=[self.exp1.id, other_experiment.id],
+        ))
+        step_response = self.client.post(reverse(
+            'delete_step', args=[self.exp1.id, self.experiment1_item.id, other_step.id],
+        ))
+        wrong_experiment_response = self.client.post(reverse(
+            'delete_step', args=[self.exp1.id, other_experiment.id, local_step.id],
+        ))
+
+        self.assertEqual(experiment_response.status_code, 404)
+        self.assertEqual(step_response.status_code, 404)
+        self.assertEqual(wrong_experiment_response.status_code, 404)
+        self.assertTrue(Experiment.objects.filter(id=other_experiment.id).exists())
+        self.assertTrue(ExperimentStep.objects.filter(id=other_step.id).exists())
+        self.assertTrue(ExperimentStep.objects.filter(id=local_step.id).exists())
+
+    def test_single_delete_post_requires_csrf_token(self):
+        experiment = Experiment.objects.create(experiment_code='BB', project=self.exp1)
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.login(username='user1', password='password')
+
+        response = csrf_client.post(reverse(
+            'delete_project_experiment', args=[self.exp1.id, experiment.id],
+        ))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Experiment.objects.filter(id=experiment.id).exists())
 
     def test_delete_steps_blocks_step_with_legacy_downstream_child(self):
         self.client.login(username="user1", password="password")

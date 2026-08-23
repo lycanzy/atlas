@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
@@ -9,6 +9,7 @@ from django.db.models.functions import Trim
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 from .models import AuditLog, Cell, CellTestItem, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
 from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm, TeamManagementForm, ProjectManagementForm, ProjectCreateForm, ManagedUserForm, MemberTeamForm, StepTemplateManagementForm, RawMaterialTypeManagementForm, CellTestItemManagementForm
@@ -1454,6 +1455,11 @@ def experiment_detail(request, exp_id):
     project_experiments = (
         Experiment.objects
         .filter(project=experiment)
+        .annotate(
+            delete_step_count=Count('steps', distinct=True),
+            delete_cell_count=Count('steps__cells', distinct=True),
+            delete_sample_count=Count('steps__samples', distinct=True),
+        )
         .prefetch_related(Prefetch('steps', queryset=detail_steps))
         .order_by('created_on')
     )
@@ -1478,10 +1484,21 @@ def experiment_detail(request, exp_id):
     })
 
 @login_required
+@require_POST
 def delete_project_experiment(request, exp_id, experiment_id):
+    experiment = get_object_or_404(Project.objects.select_related('project__group'), id=exp_id)
+    if not user_can_access_experiment(request.user, experiment):
+        record_permission_denied(
+            request, 'experiment', f'拒绝删除项目 {experiment.exp_name} 下的实验',
+            instance=experiment,
+        )
+        return HttpResponseForbidden('你没有权限删除该实验。')
 
-    experiment = Project.objects.get(id=exp_id)
-    project_experiment = Experiment.objects.get(id=experiment_id)
+    project_experiment = get_object_or_404(
+        Experiment.objects.select_related('project'),
+        id=experiment_id,
+        project=experiment,
+    )
     with transaction.atomic():
         snapshot = model_snapshot(project_experiment, ('experiment_code', 'full_experiment_code', 'experiment_description'))
         write_audit_event(
@@ -1490,15 +1507,25 @@ def delete_project_experiment(request, exp_id, experiment_id):
         )
         project_experiment.delete()
 
+    messages.success(request, f'已删除实验 {snapshot["full_experiment_code"]}。')
     return redirect('experiment_detail', exp_id=exp_id)
 
 @login_required
+@require_POST
 def delete_step(request, exp_id, experiment_id, step_id):
+    project = get_object_or_404(Project.objects.select_related('project__group'), id=exp_id)
+    if not user_can_access_experiment(request.user, project):
+        record_permission_denied(
+            request, 'step', f'拒绝删除项目 {project.exp_name} 下的步骤',
+            instance=project,
+        )
+        return HttpResponseForbidden('你没有权限删除该步骤。')
 
-    step = ExperimentStep.objects.get(id=step_id, experiment_id=experiment_id)
+    project_experiment = get_object_or_404(Experiment, id=experiment_id, project=project)
+    step = get_object_or_404(ExperimentStep, id=step_id, experiment=project_experiment)
     if step_has_downstream_steps(step):
         messages.error(request, '该步骤已有下游关联步骤，无法删除。请先移除下游步骤的前置关系。')
-        return redirect(f'/experiment/{exp_id}/?expanded_experiment={experiment_id}')
+        return redirect(f'{reverse("experiment_detail", args=[exp_id])}?expanded_experiment={experiment_id}')
 
     with transaction.atomic():
         snapshot = step_snapshot(step)
@@ -1506,7 +1533,8 @@ def delete_step(request, exp_id, experiment_id, step_id):
                           changes={'snapshot': snapshot})
         step.delete()
 
-    return redirect(f'/experiment/{exp_id}/?expanded_experiment={experiment_id}')
+    messages.success(request, f'已删除步骤 {snapshot["step_code"]}。')
+    return redirect(f'{reverse("experiment_detail", args=[exp_id])}?expanded_experiment={experiment_id}')
 
 @login_required
 def add_experiment(request):

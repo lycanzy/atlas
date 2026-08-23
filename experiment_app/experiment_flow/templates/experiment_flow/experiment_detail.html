@@ -19,6 +19,14 @@
     text-decoration: none;
 }
 
+.btn-no-style:focus-visible,
+.add-experiment-btn:focus-visible,
+.add-step-btn:focus-visible,
+.delete-action-btn:focus-visible {
+    outline: 3px solid rgba(13, 110, 253, 0.35) !important;
+    outline-offset: 2px;
+}
+
 /* Expand/collapse button styling */
 .expand-btn {
     transition: transform 0.2s ease;
@@ -157,17 +165,151 @@
 
 /* Add Experiment modal */
 .add-experiment-btn {
-    background: none !important;
-    border: none !important;
-    padding: 0.25rem 0.5rem;
-    font-size: 1rem;
-    color: #007bff;
+    align-items: center;
+    background: var(--bs-primary) !important;
+    border: 1px solid var(--bs-primary) !important;
+    border-radius: 0.35rem;
+    color: #fff !important;
     cursor: pointer;
+    display: inline-flex;
+    font-size: 0.75rem;
+    font-weight: 600;
+    gap: 0.25rem;
+    height: 30px !important;
+    padding: 0.25rem 0.55rem;
     text-decoration: none;
+    white-space: nowrap;
+    width: auto !important;
 }
 
 .add-experiment-btn:hover {
-    color: #0056b3;
+    background: #0b5ed7 !important;
+    border-color: #0a58ca !important;
+    color: #fff !important;
+}
+
+.add-step-btn {
+    align-items: center;
+    color: #315b83 !important;
+    display: inline-flex;
+    font-size: 0.8rem;
+    gap: 0.25rem;
+    height: 32px !important;
+    padding: 0.3rem 0.45rem;
+    white-space: nowrap;
+    width: auto !important;
+}
+
+.delete-action-btn {
+    align-items: center;
+    border-radius: 0.35rem !important;
+    color: #5f6b78;
+    display: inline-flex;
+    justify-content: center;
+    height: 32px !important;
+    width: 32px !important;
+}
+
+.delete-action-btn:hover {
+    background: #fff1f2 !important;
+    color: #c62828;
+}
+
+.table-action-group {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.2rem;
+    justify-content: center;
+}
+
+.delete-confirm-modal .modal-dialog {
+    max-width: 440px;
+}
+
+.delete-confirm-modal .modal-content {
+    border: 0;
+    border-radius: 0.55rem;
+    box-shadow: 0 1.25rem 3rem rgba(15, 23, 42, 0.22);
+    overflow: hidden;
+}
+
+.delete-confirm-body {
+    padding: 1.15rem 1.25rem 1rem;
+}
+
+.delete-confirm-topline {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.7rem;
+}
+
+.delete-warning-icon {
+    align-items: center;
+    background: #fff1f2;
+    border-radius: 50%;
+    color: #dc3545;
+    display: inline-flex;
+    font-size: 1.25rem;
+    height: 40px;
+    justify-content: center;
+    width: 40px;
+}
+
+.delete-confirm-close {
+    border: 1px solid #d7dee8;
+    border-radius: 0.35rem;
+    box-sizing: border-box;
+    height: 32px;
+    opacity: 0.75;
+    padding: 0.45rem;
+    width: 32px;
+}
+
+.delete-confirm-title {
+    color: #172033;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.35;
+    margin: 0 0 0.55rem;
+}
+
+.delete-confirm-description {
+    color: #536273;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    margin: 0;
+    white-space: pre-line;
+}
+
+.delete-confirm-footer {
+    background: #f8fafc;
+    border-top: 1px solid #e7ebf0;
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: 1fr 1fr;
+    padding: 0.75rem 1.25rem;
+}
+
+.delete-confirm-footer .btn {
+    align-items: center;
+    display: inline-flex;
+    font-size: 0.875rem;
+    font-weight: 600;
+    gap: 0.45rem;
+    height: 42px;
+    justify-content: center;
+}
+
+@media (max-width: 575.98px) {
+    .delete-confirm-modal .modal-dialog {
+        margin: 0.75rem;
+    }
+
+    .delete-confirm-footer {
+        gap: 0.5rem;
+        padding-inline: 1rem;
+    }
 }
 
 .add-experiment-modal .modal-dialog {
@@ -462,10 +604,12 @@
                 <th style="width:50px;"></th>
                 <th style="width:150px;">实验</th>
                 <th style="width:auto;">描述</th>
-                <th style="width:100px; text-align:center;">
+                <th style="width:190px; text-align:center;">
                     <button type="button" class="add-experiment-btn" id="addExperimentBtn" title="新增实验"
+                            aria-label="新增实验"
                             data-bs-toggle="modal" data-bs-target="#addProjectExperimentModal">
-                        <i class="bi bi-plus-lg"></i>
+                        <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                        <span>新增实验</span>
                     </button>
                 </th>
             </tr>
@@ -476,8 +620,9 @@
             <tr>
                 <!-- Expand/collapse button -->
                 <td class="text-center">
-                    <button type="button" class="btn-no-style expand-btn" data-experiment-id="{{ project_experiment.id }}">
-                        <i class="bi bi-chevron-right"></i>
+                    <button type="button" class="btn-no-style expand-btn" data-experiment-id="{{ project_experiment.id }}"
+                            aria-label="展开实验 {{ project_experiment.full_experiment_code }} 的步骤" aria-expanded="false">
+                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
                     </button>
                 </td>
                 <td>{{ project_experiment.full_experiment_code }}</td>
@@ -489,12 +634,22 @@
                         <button type="button" class="btn-no-style add-step-btn"
                                 data-exp-id="{{ experiment.id }}"
                                 data-experiment-id="{{ project_experiment.id }}"
-                                title="新增步骤">
-                            <i class="bi bi-plus-lg"></i>
+                                title="为 {{ project_experiment.full_experiment_code }} 新增步骤"
+                                aria-label="为 {{ project_experiment.full_experiment_code }} 新增步骤">
+                            <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                            <span>新增步骤</span>
                         </button>
-                        <a href="{% url 'delete_project_experiment' experiment.id project_experiment.id %}" class="btn-no-style" title="删除实验">
-                            <i class="bi bi-trash"></i>
-                        </a>
+                        <button type="button" class="btn-no-style delete-action-btn js-delete-trigger"
+                                title="删除实验 {{ project_experiment.full_experiment_code }}"
+                                aria-label="删除实验 {{ project_experiment.full_experiment_code }}"
+                                data-delete-kind="experiment"
+                                data-delete-code="{{ project_experiment.full_experiment_code }}"
+                                data-delete-url="{% url 'delete_project_experiment' experiment.id project_experiment.id %}"
+                                data-step-count="{{ project_experiment.delete_step_count }}"
+                                data-cell-count="{{ project_experiment.delete_cell_count }}"
+                                data-sample-count="{{ project_experiment.delete_sample_count }}">
+                            <i class="bi bi-trash" aria-hidden="true"></i>
+                        </button>
                     </div>
                 </td>
             </tr>
@@ -572,17 +727,25 @@
                                 <td class="text-center">
                                     <div class="table-action-group">
                                         <button type="button" class="btn-no-style edit-step-btn"
+                                                title="编辑步骤 {{ step.full_step }}"
+                                                aria-label="编辑步骤 {{ step.full_step }}"
                                                 data-step-id="{{ step.id }}" data-experiment-id="{{ project_experiment.id }}" data-exp-id="{{ experiment.id }}">
-                                            <i class="bi bi-pencil"></i>
+                                            <i class="bi bi-pencil" aria-hidden="true"></i>
                                         </button>
-                                        <a href="{% url 'delete_step' experiment.id project_experiment.id step.id %}" class="btn-no-style">
-                                            <i class="bi bi-trash"></i>
-                                        </a>
+                                        <button type="button" class="btn-no-style delete-action-btn js-delete-trigger"
+                                                title="删除步骤 {{ step.full_step }}"
+                                                aria-label="删除步骤 {{ step.full_step }}"
+                                                data-delete-kind="step"
+                                                data-delete-code="{{ step.full_step }}"
+                                                data-delete-url="{% url 'delete_step' experiment.id project_experiment.id step.id %}">
+                                            <i class="bi bi-trash" aria-hidden="true"></i>
+                                        </button>
                                         <button type="button"
                                                 class="btn-no-style genealogy-modal-btn"
-                                                title="查看谱系"
+                                                title="查看步骤 {{ step.full_step }} 的谱系"
+                                                aria-label="查看步骤 {{ step.full_step }} 的谱系"
                                                 data-genealogy-url="{% url 'step_genealogy' step.id %}">
-                                            <i class="bi bi-diagram-3"></i>
+                                            <i class="bi bi-diagram-3" aria-hidden="true"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -714,6 +877,37 @@
     </div>
 </div>
 
+<!-- Reusable delete confirmation modal -->
+<div class="modal fade delete-confirm-modal" id="deleteConfirmModal" tabindex="-1"
+     aria-labelledby="deleteConfirmTitle" aria-describedby="deleteConfirmDescription" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" id="deleteConfirmForm" method="post">
+            {% csrf_token %}
+            <div class="delete-confirm-body">
+                <div class="delete-confirm-topline">
+                    <span class="delete-warning-icon" aria-hidden="true">
+                        <i class="bi bi-exclamation-circle"></i>
+                    </span>
+                    <button type="button" class="btn-close delete-confirm-close" data-bs-dismiss="modal"
+                            aria-label="关闭删除确认"></button>
+                </div>
+                <h5 class="delete-confirm-title" id="deleteConfirmTitle"></h5>
+                <p class="delete-confirm-description" id="deleteConfirmDescription"></p>
+            </div>
+            <div class="delete-confirm-footer">
+                <button type="button" class="btn btn-outline-secondary" id="cancelDeleteButton" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                    <span>取消</span>
+                </button>
+                <button type="submit" class="btn btn-danger" id="confirmDeleteButton">
+                    <i class="bi bi-trash" aria-hidden="true"></i>
+                    <span>删除</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Genealogy Modal -->
 <div class="modal fade" id="genealogyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -831,6 +1025,57 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// Shared confirmation flow for experiment and single-step deletion.
+(function initDeleteConfirmation() {
+    const modalElement = document.getElementById('deleteConfirmModal');
+    const form = document.getElementById('deleteConfirmForm');
+    const title = document.getElementById('deleteConfirmTitle');
+    const description = document.getElementById('deleteConfirmDescription');
+    const cancelButton = document.getElementById('cancelDeleteButton');
+    const confirmButton = document.getElementById('confirmDeleteButton');
+    const confirmLabel = confirmButton?.querySelector('span');
+    if (!modalElement || !form || !title || !description || !confirmButton || !confirmLabel) return;
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+    let lastTrigger = null;
+
+    document.querySelectorAll('.js-delete-trigger').forEach(function(trigger) {
+        trigger.addEventListener('click', function() {
+            const kind = trigger.dataset.deleteKind;
+            const code = trigger.dataset.deleteCode;
+            lastTrigger = trigger;
+            form.action = trigger.dataset.deleteUrl;
+            confirmButton.disabled = false;
+
+            if (kind === 'experiment') {
+                title.textContent = `即将删除实验 ${code}`;
+                description.textContent = `删除后将同时移除 ${trigger.dataset.stepCount} 个步骤、${trigger.dataset.cellCount} 个电芯和 ${trigger.dataset.sampleCount} 个样品。\n此操作不可撤销。`;
+                confirmLabel.textContent = '删除实验';
+                confirmButton.setAttribute('aria-label', `确认删除实验 ${code}`);
+            } else {
+                title.textContent = `即将删除步骤 ${code}`;
+                description.textContent = '相关原材料用量、样品和电芯记录将同时被删除。\n此操作不可撤销。';
+                confirmLabel.textContent = '删除步骤';
+                confirmButton.setAttribute('aria-label', `确认删除步骤 ${code}`);
+            }
+            modal.show();
+        });
+    });
+
+    modalElement.addEventListener('shown.bs.modal', function() {
+        cancelButton?.focus();
+    });
+
+    modalElement.addEventListener('hidden.bs.modal', function() {
+        form.removeAttribute('action');
+        if (lastTrigger && document.body.contains(lastTrigger)) lastTrigger.focus();
+    });
+
+    form.addEventListener('submit', function() {
+        confirmButton.disabled = true;
+    });
+})();
 
 // Add Experiment modal: searchable code, required description, and copy helper.
 (function initAddProjectExperimentModal() {
@@ -996,9 +1241,11 @@ document.querySelectorAll('.expand-btn').forEach(function(btn) {
         if (row.style.display === 'none') {
             row.style.display = '';
             icon.className = 'bi bi-chevron-down';
+            btn.setAttribute('aria-expanded', 'true');
         } else {
             row.style.display = 'none';
             icon.className = 'bi bi-chevron-right';
+            btn.setAttribute('aria-expanded', 'false');
         }
     });
 });
@@ -1036,6 +1283,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (row && btn) {
             row.style.display = '';
+            btn.setAttribute('aria-expanded', 'true');
             const icon = btn.querySelector('i');
             if (icon) {
                 icon.className = 'bi bi-chevron-down';
