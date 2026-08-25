@@ -511,7 +511,12 @@
 /* Fix step table layout to prevent cell resizing */
 .steps-row .table {
     table-layout: fixed;
+    min-width: 900px;
     width: 100%;
+}
+
+.step-table-wrap {
+    overflow-x: auto;
 }
 
 .steps-row .table th:nth-child(1),
@@ -519,15 +524,22 @@
 .steps-row .table th:nth-child(2),
 .steps-row .table td:nth-child(2) { width: 160px; white-space: nowrap; } /* Step ID */
 .steps-row .table th:nth-child(3),
-.steps-row .table td:nth-child(3) { width: 116px; white-space: nowrap; } /* Status */
+.steps-row .table td:nth-child(3) { width: 108px; white-space: nowrap; } /* Status */
 .steps-row .table th:nth-child(4),
-.steps-row .table td:nth-child(4) { width: auto; } /* Description gets remaining space */
+.steps-row .table td:nth-child(4) { width: auto; min-width: 220px; } /* Description gets remaining space */
 .steps-row .table th:nth-child(5),
-.steps-row .table td:nth-child(5) { width: 76px; white-space: nowrap; } /* Cells */
+.steps-row .table td:nth-child(5) { width: 94px; white-space: nowrap; } /* Completion date */
 .steps-row .table th:nth-child(6),
-.steps-row .table td:nth-child(6) { width: 76px; white-space: nowrap; } /* Samples */
+.steps-row .table td:nth-child(6) { width: 68px; white-space: nowrap; } /* Cells */
 .steps-row .table th:nth-child(7),
-.steps-row .table td:nth-child(7) { width: 96px; white-space: nowrap; }  /* Actions */
+.steps-row .table td:nth-child(7) { width: 68px; white-space: nowrap; } /* Samples */
+.steps-row .table th:nth-child(8),
+.steps-row .table td:nth-child(8) { width: 92px; white-space: nowrap; }  /* Actions */
+
+.step-completed-date {
+    color: var(--eta-text-muted);
+    font-variant-numeric: tabular-nums;
+}
 
 .cell-count-btn {
     align-items: center;
@@ -678,6 +690,7 @@
                             </button>
                         </div>
                     </div>
+                    <div class="step-table-wrap">
                     <table class="table mb-0">
                         <thead class="table-secondary">
                             <tr>
@@ -687,6 +700,7 @@
                                 <th>步骤编号</th>
                                 <th>状态</th>
                                 <th>描述</th>
+                                <th>完成日期</th>
                                 <th>电芯</th>
                                 <th>样品</th>
                                 <th>操作</th>
@@ -707,6 +721,9 @@
                                 </td>
                                 <td>
                                     <span class="step-desc" data-step-id="{{ step.id }}">{{ step.step_description | default:"无" }}</span>
+                                </td>
+                                <td>
+                                    <span class="step-completed-date" data-step-id="{{ step.id }}">{% if step.status == "Completed" and step.completed_on %}{{ step.completed_on|date:"Y-m-d" }}{% endif %}</span>
                                 </td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-sm btn-outline-secondary cell-count-btn"
@@ -751,7 +768,7 @@
                                 </td>
                             </tr>
                             <tr id="step-cells-{{ step.id }}" class="step-cells-detail-row" style="display:none;">
-                                <td colspan="7">
+                                <td colspan="8">
                                     <div class="step-cells-detail-panel">
                                         {% if step_cells %}
                                             {% regroup step_cells by package_number as package_groups %}
@@ -779,11 +796,12 @@
                             {% endwith %}
                             {% empty %}
                             <tr>
-                                <td colspan="7" class="text-muted">暂无步骤</td>
+                                <td colspan="8" class="text-muted">暂无步骤</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
+                    </div>
                 </td>
             </tr>
             {% empty %}
@@ -2138,6 +2156,10 @@ document.addEventListener('change', function(e) {
             if (data.success) {
                 // Update the data-current-status attribute
                 dropdown.setAttribute('data-current-status', newStatus);
+                const completedDate = document.querySelector(`.step-completed-date[data-step-id="${stepId}"]`);
+                if (completedDate) {
+                    completedDate.textContent = data.completed_date || '';
+                }
             } else if (data.requires_confirmation) {
                 const details = negativeInventoryMessage(data);
                 if (window.confirm(`完成该步骤将产生负库存：\n${details}\n\n仍要继续吗？`)) {
@@ -2407,6 +2429,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (dropdown) {
                             dropdown.value = newStatus;
                             dropdown.setAttribute('data-current-status', newStatus);
+                        }
+                        const completedDate = document.querySelector(`.step-completed-date[data-step-id="${stepId}"]`);
+                        if (completedDate) {
+                            completedDate.textContent = data.completed_dates?.[stepId] || '';
                         }
                     });
                     // Uncheck all checkboxes

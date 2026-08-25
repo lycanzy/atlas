@@ -822,6 +822,9 @@ def get_experiments_for_user(user, search_query='', my_experiments=''):
 
 def get_experiment_overview_stats(experiments_qs):
     experiments = experiments_qs.prefetch_related('experiments__steps')
+    cell_count = Cell.objects.filter(
+        step__experiment__project__in=experiments_qs,
+    ).count()
     total_count = 0
     completed_count = 0
 
@@ -851,6 +854,7 @@ def get_experiment_overview_stats(experiments_qs):
         'total_count': total_count,
         'in_progress_count': in_progress_count,
         'completed_count': completed_count,
+        'cell_count': cell_count,
         'completion_rate': completion_rate,
     }
 
@@ -2065,6 +2069,7 @@ def update_step_status(request, step_id):
             response_data = {'success': True}
             if new_status == 'Completed' and step.completed_on:
                 response_data['completed_on'] = step.completed_on.strftime('%Y-%m-%d %H:%M:%S')
+                response_data['completed_date'] = timezone.localtime(step.completed_on).strftime('%Y-%m-%d')
 
             return JsonResponse(response_data)
         except ValidationError as exc:
@@ -2145,6 +2150,11 @@ def bulk_update_status(request, exp_id):
             return JsonResponse({
                 'success': True,
                 'updated_count': updated_count,
+                'completed_dates': {
+                    str(step.id): timezone.localtime(step.completed_on).strftime('%Y-%m-%d')
+                    for step in locked_steps
+                    if step.completed_on
+                },
                 'message': f'已将 {updated_count} 个步骤更新为 {STATUS_LABELS_ZH.get(new_status, new_status)}'
             })
 

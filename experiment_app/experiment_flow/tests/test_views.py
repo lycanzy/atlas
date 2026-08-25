@@ -72,6 +72,29 @@ class ViewTests(TestCase):
         self.assertContains(response, "PRA001")
         self.assertContains(response, "PRB001")
 
+    def test_index_cell_count_follows_visible_projects(self):
+        group1_step = ExperimentStep.objects.create(
+            step_name="AA", experiment=self.experiment1_item,
+        )
+        group2_experiment = Experiment.objects.create(
+            experiment_code="AA", project=self.exp2,
+        )
+        group2_step = ExperimentStep.objects.create(
+            step_name="AA", experiment=group2_experiment,
+        )
+        Cell.objects.create(step=group1_step, package_number="PKG-1", barcode="CELL-1")
+        Cell.objects.create(step=group1_step, package_number="PKG-1", barcode="CELL-2")
+        Cell.objects.create(step=group2_step, package_number="PKG-2", barcode="CELL-3")
+
+        self.client.login(username="user1", password="password")
+        response = self.client.get(reverse('index'))
+        self.assertEqual(response.context['overview_stats']['cell_count'], 2)
+        self.assertContains(response, "电芯总数")
+
+        self.client.login(username="staff", password="password")
+        response = self.client.get(reverse('index'))
+        self.assertEqual(response.context['overview_stats']['cell_count'], 3)
+
     def test_experiment_detail_permissions(self):
         # User 1 accessing Project 1 -> OK
         self.exp1.exp_description = "Project one description"
@@ -897,10 +920,37 @@ class ViewTests(TestCase):
         response = self.client.post(url, json.dumps(data), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['success'], True)
+        self.assertEqual(response.json()['completed_date'], timezone.localdate().isoformat())
         
         step.refresh_from_db()
         self.assertEqual(step.status, 'Completed')
         self.assertIsNotNone(step.completed_on)
+
+    def test_experiment_detail_displays_completion_date_only_when_present(self):
+        completed_on = timezone.make_aware(datetime(2026, 8, 6, 14, 35))
+        completed_step = ExperimentStep.objects.create(
+            step_name="AA", experiment=self.experiment1_item,
+            status="Completed", completed_on=completed_on,
+        )
+        planned_step = ExperimentStep.objects.create(
+            step_name="BB", experiment=self.experiment1_item,
+            status="Planned", completed_on=completed_on,
+        )
+        self.client.login(username="user1", password="password")
+
+        response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
+
+        self.assertContains(response, "完成日期")
+        self.assertContains(
+            response,
+            f'<span class="step-completed-date" data-step-id="{completed_step.id}">2026-08-06</span>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<span class="step-completed-date" data-step-id="{planned_step.id}"></span>',
+            html=True,
+        )
 
     def test_copy_steps(self):
         self.client.login(username="user1", password="password")
