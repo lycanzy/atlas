@@ -71,6 +71,8 @@ urlpatterns = [
     path('management/cell-test-items/<int:item_id>/delete/', views.delete_cell_test_item, name='delete_cell_test_item'),
     path('api/steps/', views.get_all_steps, name='get_all_steps'),
     path('api/raw_materials/', views.get_raw_materials, name='get_raw_materials'),
+    path('api/linkable-samples/', views.search_linkable_samples, name='search_linkable_samples'),
+    path('api/linkable-samples/filters/', views.sample_link_filter_options, name='sample_link_filter_options'),
     path('api/experiments_with_items/', views.get_experiments_with_items, name='get_experiments_with_items'),
     path('admin/', admin.site.urls),
 ]

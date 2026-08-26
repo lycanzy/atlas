@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Cell, CellTestItem, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
+from .models import Cell, CellSampleLink, CellTestItem, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, Sample, StepNameTemplate, UserProfile, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
 from .forms import RawMaterialForm
 
 # Base admin class with custom CSS
@@ -108,6 +108,13 @@ class CellAdmin(BaseModelAdmin):
     search_fields = ("barcode", "package_number", "test_item__name", "step__full_step")
     list_filter = ("test_item",)
     readonly_fields = ("created_on", "updated_on")
+
+
+@admin.register(CellSampleLink)
+class CellSampleLinkAdmin(BaseModelAdmin):
+    list_display = ("cell", "sample", "created_by", "created_on")
+    search_fields = ("cell__barcode", "sample__sample_name", "sample__step__full_step")
+    readonly_fields = ("created_on",)
 
 
 @admin.register(CellTestItem)

@@ -83,9 +83,20 @@ def step_snapshot(step):
         'sample_count': step.samples.count(),
         'samples': list(step.samples.order_by('sample_number', 'id').values('id', 'sample_number', 'sample_name')),
         'cell_count': step.cells.count(),
-        'cells': list(step.cells.order_by('package_number', 'barcode', 'id').values(
-            'id', 'package_number', 'barcode', 'test_item_id', 'test_item__name',
-        )),
+        'cells': [
+            {
+                'id': cell.id,
+                'package_number': cell.package_number,
+                'barcode': cell.barcode,
+                'test_item_id': cell.test_item_id,
+                'test_item__name': cell.test_item.name if cell.test_item else None,
+                'samples': list(
+                    cell.samples.order_by('sample_name', 'id').values('id', 'sample_name')
+                ),
+            }
+            for cell in step.cells.select_related('test_item').prefetch_related('samples')
+            .order_by('package_number', 'barcode', 'id')
+        ],
         'raw_material_usages': raw_material_usage_snapshot(step),
     }
 

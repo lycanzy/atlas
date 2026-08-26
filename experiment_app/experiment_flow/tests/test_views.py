@@ -5,7 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from django.utils import timezone
 from experiment_flow.models import (
-    AuditLog, Cell, ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, Sample, StepNameTemplate,
+    AuditLog, Cell, CellSampleLink, ResearchGroup, UserProfile, ProjectCategory, Project, Experiment, ExperimentStep, Sample, StepNameTemplate,
     RawMaterial, RawMaterialType, StepRawMaterialUsage
 )
 import json
@@ -469,6 +469,129 @@ class ViewTests(TestCase):
             barcode="CELL-002",
         )
         self.assertEqual(rebound.step, other_step)
+
+    def test_edit_step_links_one_cell_to_samples_from_multiple_steps(self):
+        source_step_1 = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        source_step_2 = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        target_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        sample_1 = Sample.objects.create(step=source_step_1, sample_number=1, sample_name="PRA001AA-AA00-01")
+        sample_2 = Sample.objects.create(step=source_step_2, sample_number=1, sample_name="PRA001AA-BB00-01")
+        cell = Cell.objects.create(step=target_step, package_number="PKG-01", barcode="CELL-LINKED")
+
+        self.client.login(username="user1", password="password")
+        response = self.client.post(
+            reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, target_step.id]),
+            {
+                'step_name': 'AA',
+                'status': 'Planned',
+                'cells_payload': json.dumps({
+                    'records': [{
+                        'id': cell.id,
+                        'package_number': 'PKG-01',
+                        'barcode': 'CELL-LINKED',
+                        'sample_ids': [sample_1.id, sample_2.id],
+                    }],
+                    'deleted_ids': [],
+                }),
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(set(cell.samples.values_list('id', flat=True)), {sample_1.id, sample_2.id})
+        self.assertEqual(
+            set(CellSampleLink.objects.filter(cell=cell).values_list('created_by_id', flat=True)),
+            {self.user1.id},
+        )
+
+    def test_legacy_cell_payload_without_sample_ids_preserves_links(self):
+        source_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        target_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        sample = Sample.objects.create(step=source_step, sample_number=1, sample_name="PRA001AA-AA00-01")
+        cell = Cell.objects.create(step=target_step, package_number="PKG-01", barcode="CELL-LEGACY")
+        CellSampleLink.objects.create(cell=cell, sample=sample, created_by=self.user1)
+
+        self.client.login(username="user1", password="password")
+        response = self.client.post(
+            reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, target_step.id]),
+            {
+                'step_name': 'AA',
+                'status': 'Planned',
+                'cells_payload': json.dumps({
+                    'records': [{
+                        'id': cell.id,
+                        'package_number': 'PKG-02',
+                        'barcode': 'CELL-LEGACY',
+                    }],
+                    'deleted_ids': [],
+                }),
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(cell.samples.values_list('id', flat=True)), [sample.id])
+
+    def test_linkable_sample_search_is_team_scoped_and_cursor_paginated(self):
+        own_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        for number in range(1, 31):
+            Sample.objects.create(
+                step=own_step,
+                sample_number=number,
+                sample_name=f"PRA001AA-AA00-{number:02d}",
+            )
+        group2_experiment = Experiment.objects.create(experiment_code="AA", project=self.exp2)
+        other_step = ExperimentStep.objects.create(step_name="AA", experiment=group2_experiment)
+        Sample.objects.create(
+            step=other_step,
+            sample_number=1,
+            sample_name="PRA-OTHER-TEAM",
+        )
+
+        self.client.login(username="user1", password="password")
+        first = self.client.get(reverse('search_linkable_samples'), {'q': 'PRA'})
+        self.assertEqual(first.status_code, 200)
+        first_data = first.json()
+        self.assertEqual(len(first_data['results']), 25)
+        self.assertTrue(first_data['next_cursor'])
+        self.assertNotIn('PRA-OTHER-TEAM', {item['name'] for item in first_data['results']})
+
+        second = self.client.get(reverse('search_linkable_samples'), {
+            'q': 'PRA',
+            'cursor': first_data['next_cursor'],
+        })
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(len(second.json()['results']), 5)
+        self.assertIsNone(second.json()['next_cursor'])
+
+    def test_other_team_sample_cannot_be_linked(self):
+        target_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        cell = Cell.objects.create(step=target_step, package_number="PKG-01", barcode="CELL-SECURE")
+        group2_experiment = Experiment.objects.create(experiment_code="AA", project=self.exp2)
+        other_step = ExperimentStep.objects.create(step_name="AA", experiment=group2_experiment)
+        foreign_sample = Sample.objects.create(step=other_step, sample_number=1, sample_name="PRB001AA-AA00-01")
+
+        self.client.login(username="user1", password="password")
+        response = self.client.post(
+            reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, target_step.id]),
+            {
+                'step_name': 'AA',
+                'status': 'Planned',
+                'cells_payload': json.dumps({
+                    'records': [{
+                        'id': cell.id,
+                        'package_number': 'PKG-01',
+                        'barcode': 'CELL-SECURE',
+                        'sample_ids': [foreign_sample.id],
+                    }],
+                    'deleted_ids': [],
+                }),
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(cell.samples.exists())
 
     def test_duplicate_cell_barcode_rolls_back_step_edit(self):
         self.client.login(username="user1", password="password")

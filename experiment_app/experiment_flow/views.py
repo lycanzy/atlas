@@ -11,10 +11,12 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.http import require_POST
 from django.contrib import messages
-from .models import AuditLog, Cell, CellTestItem, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
+from .models import AuditLog, Cell, CellSampleLink, CellTestItem, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
 from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm, TeamManagementForm, ProjectManagementForm, ProjectCreateForm, ManagedUserForm, MemberTeamForm, StepTemplateManagementForm, RawMaterialTypeManagementForm, CellTestItemManagementForm
 import json
 import string
+import base64
+import binascii
 from urllib.parse import urlencode
 from functools import wraps
 from datetime import timedelta
@@ -619,7 +621,166 @@ def step_has_downstream_steps(step):
     return step.children.exists() or step.child.exists()
 
 
-def save_step_cells(step, payload_json):
+def accessible_samples_for_user(user):
+    queryset = Sample.objects.filter(step__isnull=False).select_related(
+        'step__experiment__project__project__group',
+    )
+    if user.is_staff or user.is_superuser:
+        return queryset
+    group = getattr(getattr(user, 'profile', None), 'research_group', None)
+    if not group:
+        return queryset.none()
+    return queryset.filter(step__experiment__project__project__group=group)
+
+
+def _decode_sample_cursor(value):
+    if not value:
+        return None
+    try:
+        decoded = base64.urlsafe_b64decode(value.encode('ascii')).decode('utf-8')
+        sample_name, sample_id = decoded.rsplit('\x1f', 1)
+        return sample_name, int(sample_id)
+    except (ValueError, TypeError, UnicodeError, binascii.Error):
+        raise ValidationError('样品搜索游标无效。')
+
+
+def _optional_positive_int(value, label):
+    if value in (None, ''):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(f'{label} 筛选值无效。') from exc
+    if parsed <= 0:
+        raise ValidationError(f'{label} 筛选值无效。')
+    return parsed
+
+
+def _encode_sample_cursor(sample):
+    raw = f'{sample.sample_name}\x1f{sample.id}'.encode('utf-8')
+    return base64.urlsafe_b64encode(raw).decode('ascii')
+
+
+@login_required
+def search_linkable_samples(request):
+    """Return a small, keyset-paginated page of user-visible samples."""
+    query = (request.GET.get('q') or '').strip()
+    try:
+        project_id = _optional_positive_int(request.GET.get('project_id'), 'Project')
+        experiment_id = _optional_positive_int(request.GET.get('experiment_id'), 'Experiment')
+        step_id = _optional_positive_int(request.GET.get('step_id'), 'Step')
+    except ValidationError as exc:
+        return JsonResponse({'error': exc.messages[0]}, status=400)
+    if query and len(query) < 2 and not step_id:
+        return JsonResponse({
+            'results': [], 'next_cursor': None,
+            'hint': '请至少输入 2 个字符。',
+        })
+
+    samples = accessible_samples_for_user(request.user)
+    if query:
+        samples = samples.filter(sample_name__istartswith=query)
+    if project_id:
+        samples = samples.filter(step__experiment__project_id=project_id)
+    if experiment_id:
+        samples = samples.filter(step__experiment_id=experiment_id)
+    if step_id:
+        samples = samples.filter(step_id=step_id)
+    if not query and not any((project_id, experiment_id, step_id)):
+        return JsonResponse({
+            'results': [], 'next_cursor': None,
+            'hint': '输入样品编号，或先选择筛选条件。',
+        })
+
+    try:
+        cursor = _decode_sample_cursor(request.GET.get('cursor'))
+    except ValidationError as exc:
+        return JsonResponse({'error': exc.messages[0]}, status=400)
+    if cursor:
+        cursor_name, cursor_id = cursor
+        samples = samples.filter(
+            Q(sample_name__gt=cursor_name)
+            | Q(sample_name=cursor_name, id__gt=cursor_id)
+        )
+
+    page_size = 25
+    page = list(samples.order_by('sample_name', 'id')[:page_size + 1])
+    has_more = len(page) > page_size
+    page = page[:page_size]
+    step_labels = dict(
+        StepNameTemplate.objects.filter(
+            step_code__in={sample.step.step_name for sample in page},
+        ).values_list('step_code', 'step_label')
+    )
+    return JsonResponse({
+        'results': [
+            {
+                'id': sample.id,
+                'name': sample.sample_name,
+                'step_id': sample.step_id,
+                'step': sample.step.full_step,
+                'step_short': sample.step.full_step_name,
+                'step_label': step_labels.get(sample.step.step_name, ''),
+                'date': sample.created_on.date().isoformat(),
+                'status': STATUS_LABELS_ZH.get(sample.step.status, sample.step.status),
+                'experiment_id': sample.step.experiment_id,
+                'experiment': sample.step.experiment.full_experiment_code,
+                'project_id': sample.step.experiment.project_id,
+                'project': sample.step.experiment.project.exp_name,
+            }
+            for sample in page
+        ],
+        'next_cursor': _encode_sample_cursor(page[-1]) if has_more and page else None,
+        'hint': '',
+    })
+
+
+@login_required
+def sample_link_filter_options(request):
+    """Return lazily-loaded cascading scope options for the sample picker."""
+    kind = request.GET.get('kind')
+    query = (request.GET.get('q') or '').strip()
+    samples = accessible_samples_for_user(request.user)
+    if kind == 'project':
+        values = samples.values(
+            'step__experiment__project_id', 'step__experiment__project__exp_name',
+        )
+        id_key, text_key = 'step__experiment__project_id', 'step__experiment__project__exp_name'
+    elif kind == 'experiment':
+        try:
+            project_id = _optional_positive_int(request.GET.get('project_id'), 'Project')
+        except ValidationError as exc:
+            return JsonResponse({'error': exc.messages[0]}, status=400)
+        if not project_id:
+            return JsonResponse({'results': []})
+        values = samples.filter(step__experiment__project_id=project_id).values(
+            'step__experiment_id', 'step__experiment__full_experiment_code',
+        )
+        id_key, text_key = 'step__experiment_id', 'step__experiment__full_experiment_code'
+    elif kind == 'step':
+        try:
+            experiment_id = _optional_positive_int(request.GET.get('experiment_id'), 'Experiment')
+        except ValidationError as exc:
+            return JsonResponse({'error': exc.messages[0]}, status=400)
+        if not experiment_id:
+            return JsonResponse({'results': []})
+        values = samples.filter(step__experiment_id=experiment_id).values(
+            'step_id', 'step__full_step',
+        )
+        id_key, text_key = 'step_id', 'step__full_step'
+    else:
+        return JsonResponse({'error': '筛选类型无效。'}, status=400)
+
+    if query:
+        values = values.filter(**{f'{text_key}__istartswith': query})
+    options = [
+        {'id': row[id_key], 'text': row[text_key]}
+        for row in values.order_by(text_key).distinct()[:100]
+    ]
+    return JsonResponse({'results': options})
+
+
+def save_step_cells(step, payload_json, actor=None):
     """Apply explicit cell creates, updates, and deletions for one step."""
     if not payload_json:
         return
@@ -675,11 +836,26 @@ def save_step_cells(step, payload_json):
         if barcode in barcodes:
             raise ValidationError(f'Barcode {barcode} 在本次提交中重复。')
         barcodes.add(barcode)
+        sample_ids_present = 'sample_ids' in record
+        raw_sample_ids = record.get('sample_ids', [])
+        if sample_ids_present and not isinstance(raw_sample_ids, list):
+            raise ValidationError('关联样品数据格式无效。')
+        sample_ids = []
+        for raw_sample_id in raw_sample_ids:
+            try:
+                sample_id = int(raw_sample_id)
+            except (TypeError, ValueError) as exc:
+                raise ValidationError('关联样品 ID 无效。') from exc
+            if sample_id <= 0 or sample_id in sample_ids:
+                raise ValidationError('关联样品 ID 重复或无效。')
+            sample_ids.append(sample_id)
         normalized_records.append({
             'id': cell_id,
             'package_number': package_number,
             'barcode': barcode,
             'test_item_id': test_item_id,
+            'sample_ids_present': sample_ids_present,
+            'sample_ids': sample_ids,
         })
 
     requested_test_item_ids = {
@@ -690,6 +866,19 @@ def save_step_cells(step, payload_json):
     )
     if valid_test_item_ids != requested_test_item_ids:
         raise ValidationError('包含不存在的测试项目。')
+
+    requested_sample_ids = {
+        sample_id
+        for record in normalized_records
+        for sample_id in record['sample_ids']
+    }
+    if requested_sample_ids:
+        visible_samples = accessible_samples_for_user(actor) if actor else Sample.objects.all()
+        valid_sample_ids = set(
+            visible_samples.filter(id__in=requested_sample_ids).values_list('id', flat=True)
+        )
+        if valid_sample_ids != requested_sample_ids:
+            raise ValidationError('包含不存在或无权访问的样品。')
 
     normalized_deleted_ids = set()
     for raw_id in deleted_ids:
@@ -730,16 +919,15 @@ def save_step_cells(step, payload_json):
     for record in normalized_records:
         cell_id = record['id']
         if cell_id is None:
-            Cell.objects.create(
+            cell = Cell.objects.create(
                 step=step,
                 package_number=record['package_number'],
                 barcode=record['barcode'],
                 test_item_id=record['test_item_id'],
             )
-            continue
-
-        cell = existing_cells[cell_id]
-        if (
+        else:
+            cell = existing_cells[cell_id]
+        if cell_id is not None and (
             cell.package_number != record['package_number']
             or cell.barcode != record['barcode']
             or cell.test_item_id != record['test_item_id']
@@ -748,6 +936,18 @@ def save_step_cells(step, payload_json):
             cell.barcode = record['barcode']
             cell.test_item_id = record['test_item_id']
             cell.save()
+
+        if record['sample_ids_present']:
+            requested_ids = set(record['sample_ids'])
+            CellSampleLink.objects.filter(cell=cell).exclude(sample_id__in=requested_ids).delete()
+            existing_ids = set(
+                CellSampleLink.objects.filter(cell=cell, sample_id__in=requested_ids)
+                .values_list('sample_id', flat=True)
+            )
+            CellSampleLink.objects.bulk_create([
+                CellSampleLink(cell=cell, sample_id=sample_id, created_by=actor)
+                for sample_id in requested_ids - existing_ids
+            ])
 
 
 def cell_save_error_message(exc):
@@ -1454,7 +1654,7 @@ def experiment_detail(request, exp_id):
     detail_steps = (
         ExperimentStep.objects
         .annotate(sample_total=Count('samples'))
-        .prefetch_related('cells__test_item')
+        .prefetch_related('cells__test_item', 'cells__sample_links__sample__step')
     )
     project_experiments = (
         Experiment.objects
@@ -1800,7 +2000,7 @@ def add_step(request, exp_id, experiment_id):
                     sync_legacy_parent(step)
                     replace_step_usages(step, parsed_usages)
                     Sample.sync_for_step(step, form.cleaned_data['sample_count'])
-                    save_step_cells(step, request.POST.get('cells_payload'))
+                    save_step_cells(step, request.POST.get('cells_payload'), request.user)
                     write_audit_event(
                         request, 'create', 'step', f'创建 Step {step.full_step}', instance=step,
                         changes={'after': step_snapshot(step)},
@@ -1883,7 +2083,7 @@ def edit_step(request, exp_id, experiment_id, step_id):
                     sync_legacy_parent(step)
                     replace_step_usages(step, parsed_usages)
                     Sample.sync_for_step(step, form.cleaned_data['sample_count'])
-                    save_step_cells(step, request.POST.get('cells_payload'))
+                    save_step_cells(step, request.POST.get('cells_payload'), request.user)
                     changes = changed_values(before, step_snapshot(step))
                     write_audit_event(
                         request, 'update', 'step', f'修改 Step {step.full_step}', instance=step,
@@ -1925,7 +2125,9 @@ def edit_step(request, exp_id, experiment_id, step_id):
             'step': step,
             'project_experiment': project_experiment,
             'raw_materials': selectable_raw_materials(step),
-            'cells': step.cells.select_related('test_item'),
+            'cells': step.cells.select_related('test_item').prefetch_related(
+                'sample_links__sample__step',
+            ),
             'cell_test_items': CellTestItem.objects.filter(
                 Q(is_active=True) | Q(cells__step=step)
             ).distinct().order_by('name'),

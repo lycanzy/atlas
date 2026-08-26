@@ -781,7 +781,10 @@
                                                     </div>
                                                     <div class="cell-barcode-list">
                                                         {% for cell in package.list %}
-                                                        <span class="cell-barcode-chip" data-cell-id="{{ cell.id }}">{{ cell.barcode }}{% if cell.test_item %} · {{ cell.test_item.name }}{% endif %}</span>
+                                                        <span class="cell-barcode-chip" data-cell-id="{{ cell.id }}">
+                                                            {{ cell.barcode }}{% if cell.test_item %} · {{ cell.test_item.name }}{% endif %}
+                                                            {% for link in cell.sample_links.all %}<small class="cell-source-sample">← {{ link.sample.sample_name }}</small>{% endfor %}
+                                                        </span>
                                                         {% endfor %}
                                                     </div>
                                                 </div>
@@ -1726,6 +1729,175 @@ function initializeStepEditorTabs(form) {
     sampleCountField.addEventListener('change', updateSampleTabCount);
 }
 
+function linkedSamplesForRow(row) {
+    return Array.from(row?.querySelectorAll('.cell-linked-sample-chip') || []).map(chip => ({
+        id: Number(chip.dataset.sampleId),
+        name: chip.dataset.sampleName || chip.textContent.trim(),
+        step: chip.dataset.sampleStep || ''
+    }));
+}
+
+function setLinkedSamplesForRow(row, samples) {
+    const container = row.querySelector('.cell-linked-samples');
+    if (!container) return;
+    container.replaceChildren();
+    samples.sort((a, b) => a.name.localeCompare(b.name)).forEach(sample => {
+        const chip = document.createElement('span');
+        chip.className = 'cell-linked-sample-chip';
+        chip.dataset.sampleId = String(sample.id);
+        chip.dataset.sampleName = sample.name;
+        chip.dataset.sampleStep = sample.step || '';
+        chip.title = sample.step ? `来自 ${sample.step}` : '';
+        chip.textContent = sample.name;
+        container.appendChild(chip);
+    });
+}
+
+function renderSamplePickerSelection(form) {
+    const picker = form.querySelector('.cell-sample-picker');
+    const selected = form._samplePickerSelection || new Map();
+    const count = picker?.querySelector('.cell-sample-selected-count');
+    const applyButton = picker?.querySelector('.apply-cell-samples-btn');
+    if (!count) return;
+    count.textContent = `${selected.size} 个`;
+    if (applyButton) applyButton.textContent = selected.size ? `应用 ${selected.size} 个样品` : '应用关联';
+    picker.querySelectorAll('.cell-sample-result-checkbox').forEach(checkbox => {
+        checkbox.checked = selected.has(Number(checkbox.value));
+    });
+}
+
+function renderSampleSearchResults(form, results, append = false) {
+    const picker = form.querySelector('.cell-sample-picker');
+    const container = picker?.querySelector('.cell-sample-results');
+    if (!container) return;
+    if (!append) container.replaceChildren();
+    let previousStep = append ? container.lastElementChild?.dataset.step : null;
+    results.forEach(sample => {
+        if (sample.step !== previousStep) {
+            const heading = document.createElement('div');
+            heading.className = 'cell-sample-result-step';
+            heading.dataset.step = sample.step;
+            heading.textContent = sample.step_label ? `${sample.step} · ${sample.step_label}` : sample.step;
+            container.appendChild(heading);
+            previousStep = sample.step;
+        }
+        const label = document.createElement('label');
+        label.className = 'cell-sample-result-row';
+        label.dataset.sample = JSON.stringify(sample);
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'form-check-input cell-sample-result-checkbox';
+        checkbox.value = String(sample.id);
+        checkbox.checked = form._samplePickerSelection?.has(sample.id) || false;
+        const copy = document.createElement('span');
+        copy.className = 'cell-sample-result-copy';
+        const name = document.createElement('strong');
+        name.textContent = sample.name;
+        const meta = document.createElement('small');
+        meta.textContent = `${sample.project} / ${sample.experiment} / ${sample.step_short}`;
+        copy.append(name, meta);
+        const side = document.createElement('span');
+        side.className = 'cell-sample-result-side';
+        const date = document.createElement('small');
+        date.textContent = sample.date;
+        const status = document.createElement('em');
+        status.textContent = sample.status;
+        side.append(date, status);
+        label.append(checkbox, copy, side);
+        container.appendChild(label);
+    });
+}
+
+async function runSampleSearch(form, append = false) {
+    const section = form.querySelector('.cell-editor-section');
+    const picker = form.querySelector('.cell-sample-picker');
+    if (!section || !picker) return;
+    if (form._sampleSearchController) form._sampleSearchController.abort();
+    form._sampleSearchController = new AbortController();
+    const params = new URLSearchParams({
+        q: picker.querySelector('.cell-sample-search-input').value.trim(),
+        project_id: picker.querySelector('.cell-sample-project-filter').value,
+        experiment_id: picker.querySelector('.cell-sample-experiment-filter').value,
+        step_id: picker.querySelector('.cell-sample-step-filter').value
+    });
+    if (append && form._sampleSearchCursor) params.set('cursor', form._sampleSearchCursor);
+    const status = picker.querySelector('.cell-sample-search-status');
+    const loadMore = picker.querySelector('.cell-sample-load-more');
+    status.textContent = '正在搜索…';
+    loadMore.hidden = true;
+    try {
+        const response = await fetch(`${section.dataset.sampleSearchUrl}?${params}`, {
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+            signal: form._sampleSearchController.signal
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '样品搜索失败。');
+        renderSampleSearchResults(form, data.results || [], append);
+        form._sampleSearchCursor = data.next_cursor || null;
+        loadMore.hidden = !form._sampleSearchCursor;
+        status.textContent = data.hint || (data.results?.length ? `本次显示 ${data.results.length} 个样品` : '未找到匹配样品。');
+    } catch (error) {
+        if (error.name !== 'AbortError') status.textContent = error.message;
+    }
+}
+
+async function loadSampleFilterOptions(form, kind, parentId = '') {
+    const section = form.querySelector('.cell-editor-section');
+    const picker = form.querySelector('.cell-sample-picker');
+    const select = picker?.querySelector(`.cell-sample-${kind}-filter`);
+    if (!section || !select) return;
+    const params = new URLSearchParams({kind});
+    if (kind === 'experiment') params.set('project_id', parentId);
+    if (kind === 'step') params.set('experiment_id', parentId);
+    const response = await fetch(`${section.dataset.sampleFilterUrl}?${params}`, {
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const data = await response.json();
+    const label = kind.charAt(0).toUpperCase() + kind.slice(1);
+    select.replaceChildren(new Option(`全部 ${label}`, ''));
+    (data.results || []).forEach(option => select.add(new Option(option.text, option.id)));
+    select.disabled = !data.results?.length;
+}
+
+function closeSamplePicker(form) {
+    const picker = form.querySelector('.cell-sample-picker');
+    const backdrop = form.querySelector('.cell-sample-picker-backdrop');
+    if (!picker || picker.hidden) return;
+    picker.classList.remove('is-open');
+    backdrop.classList.remove('is-open');
+    window.setTimeout(() => {
+        picker.hidden = true;
+        backdrop.hidden = true;
+    }, 180);
+    form._sampleSearchController?.abort();
+    form._samplePickerTrigger?.focus();
+}
+
+function openSamplePicker(form, row, trigger) {
+    const picker = form.querySelector('.cell-sample-picker');
+    const backdrop = form.querySelector('.cell-sample-picker-backdrop');
+    if (!picker || !backdrop) return;
+    form._samplePickerRow = row;
+    form._samplePickerTrigger = trigger;
+    form._samplePickerSelection = new Map(linkedSamplesForRow(row).map(sample => [sample.id, sample]));
+    picker.querySelector('.cell-sample-picker-cell').textContent = `当前 Cell · ${normalizeCellIdentifier(row.querySelector('.cell-row-barcode')?.value) || '未命名'}`;
+    picker.querySelector('.cell-sample-search-input').value = '';
+    picker.querySelector('.cell-sample-results').replaceChildren();
+    form._sampleSearchCursor = null;
+    renderSamplePickerSelection(form);
+    picker.hidden = false;
+    backdrop.hidden = false;
+    requestAnimationFrame(() => {
+        picker.classList.add('is-open');
+        backdrop.classList.add('is-open');
+        picker.querySelector('.cell-sample-search-input').focus();
+    });
+    if (!form._sampleProjectsLoaded) {
+        loadSampleFilterOptions(form, 'project');
+        form._sampleProjectsLoaded = true;
+    }
+}
+
 function createCellEditorRow(form, packageNumber, barcode, testItemId = '', cellId = null) {
     const container = form.querySelector('.cells-editor-container');
     if (!container) return;
@@ -1737,6 +1909,10 @@ function createCellEditorRow(form, packageNumber, barcode, testItemId = '', cell
         <td><input type="text" class="form-control form-control-sm cell-row-package" maxlength="100" aria-label="Package 号"></td>
         <td><input type="text" class="form-control form-control-sm cell-row-barcode" maxlength="100" aria-label="Barcode"></td>
         <td><select class="form-select form-select-sm cell-row-test-item" aria-label="测试项目"></select></td>
+        <td>
+            <div class="cell-linked-samples" aria-label="已关联样品"></div>
+            <button type="button" class="btn btn-link btn-sm link-cell-samples-btn"><i class="bi bi-link-45deg" aria-hidden="true"></i> 关联样品</button>
+        </td>
         <td class="text-center">
             <button type="button" class="btn btn-sm btn-outline-danger remove-cell-row-btn" title="移除电芯">
                 <i class="bi bi-trash"></i>
@@ -1812,12 +1988,50 @@ function initializeCellEditor(form) {
             addCellsToEditor(form);
         }
     });
+    form.querySelector('.cell-sample-search-input')?.addEventListener('input', function() {
+        window.clearTimeout(form._sampleSearchTimer);
+        form._sampleSearchTimer = window.setTimeout(() => runSampleSearch(form), 300);
+    });
+    form.querySelector('.cell-sample-project-filter')?.addEventListener('change', async function() {
+        const experiment = form.querySelector('.cell-sample-experiment-filter');
+        const step = form.querySelector('.cell-sample-step-filter');
+        experiment.replaceChildren(new Option('全部 Experiment', ''));
+        experiment.disabled = true;
+        step.replaceChildren(new Option('全部 Step', ''));
+        step.disabled = true;
+        if (this.value) await loadSampleFilterOptions(form, 'experiment', this.value);
+        runSampleSearch(form);
+    });
+    form.querySelector('.cell-sample-experiment-filter')?.addEventListener('change', async function() {
+        const step = form.querySelector('.cell-sample-step-filter');
+        step.replaceChildren(new Option('全部 Step', ''));
+        step.disabled = true;
+        if (this.value) await loadSampleFilterOptions(form, 'step', this.value);
+        runSampleSearch(form);
+    });
+    form.querySelector('.cell-sample-step-filter')?.addEventListener('change', () => runSampleSearch(form));
+    form.querySelector('.cell-sample-load-more')?.addEventListener('click', () => runSampleSearch(form, true));
+    form.querySelector('.cell-sample-picker-backdrop')?.addEventListener('click', () => closeSamplePicker(form));
+    form.querySelectorAll('.close-cell-sample-picker').forEach(button => button.addEventListener('click', () => closeSamplePicker(form)));
+    form.querySelector('.apply-cell-samples-btn')?.addEventListener('click', function() {
+        if (form._samplePickerRow) setLinkedSamplesForRow(form._samplePickerRow, Array.from(form._samplePickerSelection.values()));
+        closeSamplePicker(form);
+    });
+    form.querySelector('.clear-cell-samples-btn')?.addEventListener('click', function() {
+        form._samplePickerSelection?.clear();
+        renderSamplePickerSelection(form);
+    });
     form.addEventListener('change', function(e) {
         if (e.target.matches('.cell-row-package, .cell-row-barcode, .cell-package-input')) {
             e.target.value = normalizeCellIdentifier(e.target.value);
         }
     });
     form.addEventListener('click', function(e) {
+        const linkButton = e.target.closest('.link-cell-samples-btn');
+        if (linkButton) {
+            openSamplePicker(form, linkButton.closest('.cell-editor-row'), linkButton);
+            return;
+        }
         const removeButton = e.target.closest('.remove-cell-row-btn');
         if (!removeButton) return;
         const row = removeButton.closest('.cell-editor-row');
@@ -1829,6 +2043,17 @@ function initializeCellEditor(form) {
         row?.remove();
         showCellEditorError(form, '');
         updateCellEditorState(form);
+    });
+    form.addEventListener('change', function(e) {
+        const checkbox = e.target.closest('.cell-sample-result-checkbox');
+        if (!checkbox) return;
+        const sample = JSON.parse(checkbox.closest('.cell-sample-result-row').dataset.sample);
+        if (checkbox.checked) form._samplePickerSelection.set(sample.id, sample);
+        else form._samplePickerSelection.delete(sample.id);
+        renderSamplePickerSelection(form);
+    });
+    form.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !form.querySelector('.cell-sample-picker')?.hidden) closeSamplePicker(form);
     });
 }
 
@@ -1854,7 +2079,8 @@ function collectCellPayload(form) {
             id: row.dataset.cellId ? Number(row.dataset.cellId) : null,
             package_number: packageNumber,
             barcode: barcode,
-            test_item_id: testItemId ? Number(testItemId) : null
+            test_item_id: testItemId ? Number(testItemId) : null,
+            sample_ids: linkedSamplesForRow(row).map(sample => sample.id)
         });
     }
     showCellEditorError(form, '');
@@ -1908,7 +2134,10 @@ document.querySelectorAll('.edit-step-btn').forEach(function(btn) {
         const expId = btn.getAttribute('data-exp-id');
         const experimentId = btn.getAttribute('data-experiment-id');
         const stepId = btn.getAttribute('data-step-id');
-        fetch(`/experiment/${expId}/project_experiment/${experimentId}/edit_step/${stepId}/`)
+        fetch(`/experiment/${expId}/project_experiment/${experimentId}/edit_step/${stepId}/`, {
+            cache: 'no-store',
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        })
             .then(response => response.text())
             .then(html => {
                 document.getElementById('editStepModalBody').innerHTML = html;

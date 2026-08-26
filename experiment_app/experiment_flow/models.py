@@ -578,6 +578,12 @@ class Cell(models.Model):
         null=True,
         blank=True,
     )
+    samples = models.ManyToManyField(
+        Sample,
+        through='CellSampleLink',
+        related_name='cells',
+        blank=True,
+    )
     created_on = models.DateTimeField(auto_now_add=True)
     updated_on = models.DateTimeField(auto_now=True)
 
@@ -602,6 +608,33 @@ class Cell(models.Model):
 
     def __str__(self):
         return self.barcode
+
+
+class CellSampleLink(models.Model):
+    """Traceable many-to-many link between a cell and its source samples."""
+
+    cell = models.ForeignKey(Cell, on_delete=models.CASCADE, related_name='sample_links')
+    sample = models.ForeignKey(Sample, on_delete=models.CASCADE, related_name='cell_links')
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name='created_cell_sample_links',
+        null=True,
+        blank=True,
+    )
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['sample__sample_name', 'sample_id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cell', 'sample'],
+                name='unique_cell_sample_link',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.cell} ← {self.sample}"
 
 class Equipment(models.Model):
     """Equipment/Tool database for tracking lab equipment"""
