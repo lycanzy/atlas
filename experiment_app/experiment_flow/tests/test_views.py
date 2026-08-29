@@ -82,18 +82,58 @@ class ViewTests(TestCase):
         group2_step = ExperimentStep.objects.create(
             step_name="AA", experiment=group2_experiment,
         )
-        Cell.objects.create(step=group1_step, package_number="PKG-1", barcode="CELL-1")
-        Cell.objects.create(step=group1_step, package_number="PKG-1", barcode="CELL-2")
-        Cell.objects.create(step=group2_step, package_number="PKG-2", barcode="CELL-3")
+        Cell.objects.create(step=group1_step, test_order_number="PKG-1", barcode="CELL-1")
+        Cell.objects.create(step=group1_step, test_order_number="PKG-1", barcode="CELL-2")
+        Cell.objects.create(step=group2_step, test_order_number="PKG-2", barcode="CELL-3")
 
         self.client.login(username="user1", password="password")
         response = self.client.get(reverse('index'))
-        self.assertEqual(response.context['overview_stats']['cell_count'], 2)
+        self.assertEqual(response.context['overview_stats']['cell_count'], 3)
         self.assertContains(response, "电芯总数")
+        mine_response = self.client.get(reverse('index'), {'overview_scope': 'mine'})
+        self.assertEqual(mine_response.context['overview_stats']['cell_count'], 2)
 
         self.client.login(username="staff", password="password")
         response = self.client.get(reverse('index'))
         self.assertEqual(response.context['overview_stats']['cell_count'], 3)
+
+    def test_overview_scope_switches_between_mine_and_group(self):
+        teammate = User.objects.create_user(username='teammate', password='password')
+        UserProfile.objects.create(user=teammate, research_group=self.group1)
+        teammate_project = Project.objects.create(
+            exp_name='PRA002', project=self.project1, owner=teammate,
+        )
+        teammate_experiment = Experiment.objects.create(
+            experiment_code='AA', project=teammate_project,
+        )
+        ExperimentStep.objects.create(step_name='AA', experiment=teammate_experiment)
+
+        self.client.login(username='user1', password='password')
+        mine = self.client.get(reverse('index'), {'overview_scope': 'mine'})
+        global_scope = self.client.get(reverse('index'), {'overview_scope': 'global'})
+
+        self.assertEqual(mine.context['overview_stats']['total_count'], 1)
+        self.assertEqual(global_scope.context['overview_stats']['total_count'], 3)
+        self.assertEqual(mine.context['overview_stats']['active_experiment_count'], 1)
+        self.assertEqual(global_scope.context['overview_stats']['active_experiment_count'], 2)
+        self.assertEqual(global_scope.context['overview_global_label'], '全部团队')
+        self.assertNotContains(global_scope, 'PRB001')
+
+    def test_overview_rejects_unknown_time_range(self):
+        self.client.login(username='user1', password='password')
+        response = self.client.get(reverse('index'), {'overview_days': '365'})
+        self.assertEqual(response.context['overview_days'], 14)
+        self.assertEqual(len(response.context['growth_chart']['points']), 14)
+
+    def test_changelog_page_requires_login_and_renders_repository_log(self):
+        anonymous = self.client.get(reverse('changelog'))
+        self.assertRedirects(anonymous, f"{reverse('login')}?next={reverse('changelog')}")
+
+        self.client.login(username='user1', password='password')
+        response = self.client.get(reverse('changelog'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '更新日志')
+        self.assertContains(response, '[Unreleased]')
 
     def test_experiment_detail_permissions(self):
         # User 1 accessing Project 1 -> OK
@@ -293,7 +333,7 @@ class ViewTests(TestCase):
             step=child, raw_material=self.raw_material,
             quantity='2.0000', unit='g', notes='Process input',
         )
-        Cell.objects.create(step=child, package_number='PKG-1', barcode='CELL-1')
+        Cell.objects.create(step=child, test_order_number='PKG-1', barcode='CELL-1')
         Sample.objects.create(step=child, sample_name='SOURCE-SAMPLE')
         self.client.login(username='user1', password='password')
 
@@ -419,8 +459,8 @@ class ViewTests(TestCase):
                 'status': 'Planned',
                 'cells_payload': json.dumps({
                     'records': [
-                        {'id': None, 'package_number': ' pkg-01 ', 'barcode': ' cell-001 '},
-                        {'id': None, 'package_number': 'PKG-01', 'barcode': 'CELL-002'},
+                        {'id': None, 'test_order_number': ' pkg-01 ', 'barcode': ' cell-001 '},
+                        {'id': None, 'test_order_number': 'PKG-01', 'barcode': 'CELL-002'},
                     ],
                     'deleted_ids': [],
                 }),
@@ -431,15 +471,15 @@ class ViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         step = ExperimentStep.objects.get(full_step="PRA001AA-AA00")
         self.assertEqual(
-            list(step.cells.values_list('package_number', 'barcode')),
+            list(step.cells.values_list('test_order_number', 'barcode')),
             [('PKG-01', 'CELL-001'), ('PKG-01', 'CELL-002')],
         )
 
     def test_edit_step_reconciles_cells_and_removed_barcode_can_be_reused(self):
         self.client.login(username="user1", password="password")
         step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
-        retained = Cell.objects.create(step=step, package_number="PKG-01", barcode="CELL-001")
-        removed = Cell.objects.create(step=step, package_number="PKG-01", barcode="CELL-002")
+        retained = Cell.objects.create(step=step, test_order_number="PKG-01", barcode="CELL-001")
+        removed = Cell.objects.create(step=step, test_order_number="PKG-01", barcode="CELL-002")
 
         response = self.client.post(
             reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, step.id]),
@@ -448,8 +488,8 @@ class ViewTests(TestCase):
                 'status': 'Planned',
                 'cells_payload': json.dumps({
                     'records': [
-                        {'id': retained.id, 'package_number': 'PKG-02', 'barcode': 'CELL-001A'},
-                        {'id': None, 'package_number': 'PKG-02', 'barcode': 'CELL-003'},
+                        {'id': retained.id, 'test_order_number': 'PKG-02', 'barcode': 'CELL-001A'},
+                        {'id': None, 'test_order_number': 'PKG-02', 'barcode': 'CELL-003'},
                     ],
                     'deleted_ids': [removed.id],
                 }),
@@ -459,13 +499,13 @@ class ViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            list(step.cells.values_list('package_number', 'barcode')),
+            list(step.cells.values_list('test_order_number', 'barcode')),
             [('PKG-02', 'CELL-001A'), ('PKG-02', 'CELL-003')],
         )
         other_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
         rebound = Cell.objects.create(
             step=other_step,
-            package_number="PKG-03",
+            test_order_number="PKG-03",
             barcode="CELL-002",
         )
         self.assertEqual(rebound.step, other_step)
@@ -476,7 +516,7 @@ class ViewTests(TestCase):
         target_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
         sample_1 = Sample.objects.create(step=source_step_1, sample_number=1, sample_name="PRA001AA-AA00-01")
         sample_2 = Sample.objects.create(step=source_step_2, sample_number=1, sample_name="PRA001AA-BB00-01")
-        cell = Cell.objects.create(step=target_step, package_number="PKG-01", barcode="CELL-LINKED")
+        cell = Cell.objects.create(step=target_step, test_order_number="PKG-01", barcode="CELL-LINKED")
 
         self.client.login(username="user1", password="password")
         response = self.client.post(
@@ -487,7 +527,7 @@ class ViewTests(TestCase):
                 'cells_payload': json.dumps({
                     'records': [{
                         'id': cell.id,
-                        'package_number': 'PKG-01',
+                        'test_order_number': 'PKG-01',
                         'barcode': 'CELL-LINKED',
                         'sample_ids': [sample_1.id, sample_2.id],
                     }],
@@ -508,7 +548,7 @@ class ViewTests(TestCase):
         source_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
         target_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
         sample = Sample.objects.create(step=source_step, sample_number=1, sample_name="PRA001AA-AA00-01")
-        cell = Cell.objects.create(step=target_step, package_number="PKG-01", barcode="CELL-LEGACY")
+        cell = Cell.objects.create(step=target_step, test_order_number="PKG-01", barcode="CELL-LEGACY")
         CellSampleLink.objects.create(cell=cell, sample=sample, created_by=self.user1)
 
         self.client.login(username="user1", password="password")
@@ -520,7 +560,7 @@ class ViewTests(TestCase):
                 'cells_payload': json.dumps({
                     'records': [{
                         'id': cell.id,
-                        'package_number': 'PKG-02',
+                        'test_order_number': 'PKG-02',
                         'barcode': 'CELL-LEGACY',
                     }],
                     'deleted_ids': [],
@@ -566,7 +606,7 @@ class ViewTests(TestCase):
 
     def test_other_team_sample_cannot_be_linked(self):
         target_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
-        cell = Cell.objects.create(step=target_step, package_number="PKG-01", barcode="CELL-SECURE")
+        cell = Cell.objects.create(step=target_step, test_order_number="PKG-01", barcode="CELL-SECURE")
         group2_experiment = Experiment.objects.create(experiment_code="AA", project=self.exp2)
         other_step = ExperimentStep.objects.create(step_name="AA", experiment=group2_experiment)
         foreign_sample = Sample.objects.create(step=other_step, sample_number=1, sample_name="PRB001AA-AA00-01")
@@ -580,7 +620,7 @@ class ViewTests(TestCase):
                 'cells_payload': json.dumps({
                     'records': [{
                         'id': cell.id,
-                        'package_number': 'PKG-01',
+                        'test_order_number': 'PKG-01',
                         'barcode': 'CELL-SECURE',
                         'sample_ids': [foreign_sample.id],
                     }],
@@ -600,9 +640,9 @@ class ViewTests(TestCase):
             experiment=self.experiment1_item,
             step_description="Before",
         )
-        existing = Cell.objects.create(step=step, package_number="PKG-01", barcode="CELL-001")
+        existing = Cell.objects.create(step=step, test_order_number="PKG-01", barcode="CELL-001")
         other_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
-        Cell.objects.create(step=other_step, package_number="PKG-02", barcode="DUPLICATE")
+        Cell.objects.create(step=other_step, test_order_number="PKG-02", barcode="DUPLICATE")
 
         response = self.client.post(
             reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, step.id]),
@@ -612,8 +652,8 @@ class ViewTests(TestCase):
                 'status': 'Planned',
                 'cells_payload': json.dumps({
                     'records': [
-                        {'id': existing.id, 'package_number': 'PKG-01', 'barcode': 'CELL-001'},
-                        {'id': None, 'package_number': 'PKG-01', 'barcode': 'DUPLICATE'},
+                        {'id': existing.id, 'test_order_number': 'PKG-01', 'barcode': 'CELL-001'},
+                        {'id': None, 'test_order_number': 'PKG-01', 'barcode': 'DUPLICATE'},
                     ],
                     'deleted_ids': [],
                 }),
@@ -629,7 +669,7 @@ class ViewTests(TestCase):
 
     def test_other_team_cannot_edit_step_cells(self):
         step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
-        cell = Cell.objects.create(step=step, package_number="PKG-01", barcode="CELL-001")
+        cell = Cell.objects.create(step=step, test_order_number="PKG-01", barcode="CELL-001")
         self.client.login(username="user2", password="password")
 
         response = self.client.post(
@@ -652,14 +692,14 @@ class ViewTests(TestCase):
         own_step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
         own_cell = Cell.objects.create(
             step=own_step,
-            package_number="PKG-SHARED",
+            test_order_number="PKG-SHARED",
             barcode="OWN-CELL",
         )
         group2_experiment = Experiment.objects.create(experiment_code="AA", project=self.exp2)
         other_step = ExperimentStep.objects.create(step_name="AA", experiment=group2_experiment)
         Cell.objects.create(
             step=other_step,
-            package_number="PKG-SHARED",
+            test_order_number="PKG-SHARED",
             barcode="OTHER-CELL",
         )
 
@@ -685,7 +725,7 @@ class ViewTests(TestCase):
 
     def test_cell_details_render_in_experiment_and_genealogy(self):
         step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
-        Cell.objects.create(step=step, package_number="PKG-01", barcode="CELL-001")
+        Cell.objects.create(step=step, test_order_number="PKG-01", barcode="CELL-001")
         Sample.sync_for_step(step, 2)
         self.client.login(username="user1", password="password")
 
@@ -704,7 +744,7 @@ class ViewTests(TestCase):
 
     def test_edit_step_renders_step_cell_and_sample_tabs(self):
         step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
-        Cell.objects.create(step=step, package_number="PKG-01", barcode="CELL-001")
+        Cell.objects.create(step=step, test_order_number="PKG-01", barcode="CELL-001")
         Sample.sync_for_step(step, 2)
         self.client.login(username="user1", password="password")
 
@@ -896,7 +936,7 @@ class ViewTests(TestCase):
 
     def test_experiment_detail_renders_accessible_actions_and_delete_counts(self):
         step = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment1_item)
-        Cell.objects.create(step=step, package_number='PKG-1', barcode='CELL-1')
+        Cell.objects.create(step=step, test_order_number='PKG-1', barcode='CELL-1')
         Sample.objects.create(step=step, sample_name='SAMPLE-1')
         self.client.login(username='user1', password='password')
 
@@ -1164,6 +1204,77 @@ class ViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url.split('?')[0], reverse('index'))
 
+    def test_team_owner_can_manage_only_own_team_project_access(self):
+        self.user1.profile.is_team_owner = True
+        self.user1.profile.save(update_fields=['is_team_owner'])
+        self.client.login(username="user1", password="password")
+
+        dashboard = self.client.get(reverse('management_dashboard'))
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertTrue(dashboard.context['access_only'])
+        self.assertContains(dashboard, '项目授权')
+        self.assertContains(dashboard, self.exp1.exp_name)
+        self.assertNotContains(dashboard, self.exp2.exp_name)
+        self.assertNotContains(dashboard, 'data-bs-target="#teams"')
+
+        response = self.client.post(
+            reverse('grant_project_access', args=[self.exp1.id]),
+            {'users': [self.user2.id]},
+        )
+        self.assertRedirects(response, reverse('management_dashboard') + '#permissions')
+        self.assertTrue(self.exp1.authorized_users.filter(id=self.user2.id).exists())
+
+        denied = self.client.post(
+            reverse('grant_project_access', args=[self.exp2.id]),
+            {'users': [self.user1.id]},
+        )
+        self.assertEqual(denied.status_code, 403)
+        self.assertFalse(self.exp2.authorized_users.filter(id=self.user1.id).exists())
+
+    def test_management_team_list_shows_responsible_person(self):
+        self.user1.profile.is_team_owner = True
+        self.user1.profile.save(update_fields=['is_team_owner'])
+        self.client.login(username="staff", password="password")
+
+        response = self.client.get(reverse('management_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<th>负责人</th>', html=True)
+        self.assertContains(response, self.user1.username)
+        self.assertNotContains(response, 'Team Owner')
+
+    def test_explicit_project_grant_adds_cross_team_access(self):
+        self.exp1.authorized_users.add(self.user2)
+        self.client.login(username="user2", password="password")
+
+        dashboard = self.client.get(reverse('index'))
+        self.assertContains(dashboard, self.exp1.exp_name)
+        self.assertContains(dashboard, self.exp2.exp_name)
+        detail = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
+        self.assertEqual(detail.status_code, 200)
+
+    def test_superuser_can_grant_access_to_any_project(self):
+        superuser = User.objects.create_superuser(
+            username='root-manager', password='password', email='root@example.com',
+        )
+        self.client.login(username=superuser.username, password='password')
+
+        response = self.client.post(
+            reverse('grant_project_access', args=[self.exp2.id]),
+            {'users': [self.user1.id]},
+        )
+        self.assertRedirects(response, reverse('management_dashboard') + '#permissions')
+        self.assertTrue(self.exp2.authorized_users.filter(id=self.user1.id).exists())
+
+    def test_staff_without_team_owner_role_cannot_grant_project_access(self):
+        self.client.login(username="staff", password="password")
+        response = self.client.post(
+            reverse('grant_project_access', args=[self.exp1.id]),
+            {'users': [self.user2.id]},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(self.exp1.authorized_users.filter(id=self.user2.id).exists())
+
     def test_management_cells_tab_lists_and_filters_cells_across_teams(self):
         own_step = ExperimentStep.objects.create(
             step_name="AA",
@@ -1171,14 +1282,14 @@ class ViewTests(TestCase):
         )
         own_cell = Cell.objects.create(
             step=own_step,
-            package_number="PKG-MANAGEMENT-A",
+            test_order_number="PKG-MANAGEMENT-A",
             barcode="CELL-MANAGEMENT-A",
         )
         other_experiment = Experiment.objects.create(experiment_code="AA", project=self.exp2)
         other_step = ExperimentStep.objects.create(step_name="AA", experiment=other_experiment)
         Cell.objects.create(
             step=other_step,
-            package_number="PKG-MANAGEMENT-B",
+            test_order_number="PKG-MANAGEMENT-B",
             barcode="CELL-MANAGEMENT-B",
         )
         self.client.login(username="staff", password="password")

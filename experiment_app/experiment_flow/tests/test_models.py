@@ -175,18 +175,18 @@ class ModelTests(TestCase):
 
         first_cell = Cell.objects.create(
             step=first_step,
-            package_number=" pkg-01 ",
+            test_order_number=" pkg-01 ",
             barcode=" cell-001 ",
         )
         second_cell = Cell.objects.create(
             step=second_step,
-            package_number="pkg-01",
+            test_order_number="pkg-01",
             barcode="cell-002",
         )
 
-        self.assertEqual(first_cell.package_number, "PKG-01")
+        self.assertEqual(first_cell.test_order_number, "PKG-01")
         self.assertEqual(first_cell.barcode, "CELL-001")
-        self.assertEqual(second_cell.package_number, "PKG-01")
+        self.assertEqual(second_cell.test_order_number, "PKG-01")
         self.assertEqual(first_cell.step, first_step)
         self.assertEqual(second_cell.step, second_step)
 
@@ -195,12 +195,12 @@ class ModelTests(TestCase):
         project_experiment = Experiment.objects.create(experiment_code="AA", project=exp)
         first_step = ExperimentStep.objects.create(step_name="AA", experiment=project_experiment)
         second_step = ExperimentStep.objects.create(step_name="BB", experiment=project_experiment)
-        Cell.objects.create(step=first_step, package_number="PKG-01", barcode="CELL-001")
+        Cell.objects.create(step=first_step, test_order_number="PKG-01", barcode="CELL-001")
 
         with self.assertRaises(ValidationError):
             Cell.objects.create(
                 step=second_step,
-                package_number="PKG-02",
+                test_order_number="PKG-02",
                 barcode=" cell-001 ",
             )
 

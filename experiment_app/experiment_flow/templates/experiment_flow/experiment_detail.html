@@ -771,12 +771,12 @@
                                 <td colspan="8">
                                     <div class="step-cells-detail-panel">
                                         {% if step_cells %}
-                                            {% regroup step_cells by package_number as package_groups %}
+                                            {% regroup step_cells by test_order_number as package_groups %}
                                             <div class="cell-package-groups">
                                                 {% for package in package_groups %}
                                                 <div class="cell-package-group">
                                                     <div class="cell-package-header">
-                                                        <strong>Package {{ package.grouper }}</strong>
+                                                        <strong>测试单号 {{ package.grouper }}</strong>
                                                         <span class="cell-package-count">{{ package.list|length }} 个电芯</span>
                                                     </div>
                                                     <div class="cell-barcode-list">
@@ -1906,7 +1906,7 @@ function createCellEditorRow(form, packageNumber, barcode, testItemId = '', cell
     row.className = 'cell-editor-row';
     if (cellId) row.dataset.cellId = String(cellId);
     row.innerHTML = `
-        <td><input type="text" class="form-control form-control-sm cell-row-package" maxlength="100" aria-label="Package 号"></td>
+        <td><input type="text" class="form-control form-control-sm cell-row-package" maxlength="100" aria-label="测试单号"></td>
         <td><input type="text" class="form-control form-control-sm cell-row-barcode" maxlength="100" aria-label="Barcode"></td>
         <td><select class="form-select form-select-sm cell-row-test-item" aria-label="测试项目"></select></td>
         <td>
@@ -1937,7 +1937,7 @@ function addCellsToEditor(form) {
         .filter(Boolean);
 
     if (!packageNumber) {
-        showCellEditorError(form, '请先填写 Package 号。');
+        showCellEditorError(form, '请先填写测试单号。');
         packageInput?.focus();
         return;
     }
@@ -2065,7 +2065,7 @@ function collectCellPayload(form) {
         const barcode = normalizeCellIdentifier(row.querySelector('.cell-row-barcode')?.value);
         const testItemId = row.querySelector('.cell-row-test-item')?.value || null;
         if (!packageNumber || !barcode) {
-            showCellEditorError(form, '每个电芯都必须填写 Package 号和 Barcode。');
+            showCellEditorError(form, '每个电芯都必须填写测试单号和 Barcode。');
             return null;
         }
         if (seenBarcodes.has(barcode)) {
@@ -2077,7 +2077,7 @@ function collectCellPayload(form) {
         row.querySelector('.cell-row-barcode').value = barcode;
         records.push({
             id: row.dataset.cellId ? Number(row.dataset.cellId) : null,
-            package_number: packageNumber,
+            test_order_number: packageNumber,
             barcode: barcode,
             test_item_id: testItemId ? Number(testItemId) : null,
             sample_ids: linkedSamplesForRow(row).map(sample => sample.id)

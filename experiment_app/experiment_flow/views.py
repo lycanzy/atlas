@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from .models import AuditLog, Cell, CellSampleLink, CellTestItem, Project, Experiment, ExperimentStep, ExperimentStepLink, ProjectCategory, ResearchGroup, UserProfile, Sample, StepNameTemplate, Equipment, RawMaterial, RawMaterialType, StepRawMaterialUsage
-from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm, TeamManagementForm, ProjectManagementForm, ProjectCreateForm, ManagedUserForm, MemberTeamForm, StepTemplateManagementForm, RawMaterialTypeManagementForm, CellTestItemManagementForm
+from .forms import ExperimentStepForm, ExperimentForm, EquipmentForm, RawMaterialForm, CustomPasswordChangeForm, TeamManagementForm, ProjectManagementForm, ProjectCreateForm, ManagedUserForm, MemberTeamForm, ProjectAccessGrantForm, StepTemplateManagementForm, RawMaterialTypeManagementForm, CellTestItemManagementForm
 import json
 import string
 import base64
@@ -23,6 +23,7 @@ from datetime import timedelta
 from decimal import Decimal
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.conf import settings
 from .audit import (
     EQUIPMENT_FIELDS, RAW_MATERIAL_FIELDS, changed_values, model_snapshot,
     record_audit_event as write_audit_event, record_permission_denied,
@@ -64,6 +65,40 @@ def management_required(view_func):
     return wrapped
 
 
+def is_team_owner(user):
+    return bool(
+        user.is_authenticated
+        and getattr(getattr(user, 'profile', None), 'is_team_owner', False)
+        and getattr(getattr(user, 'profile', None), 'research_group_id', None)
+    )
+
+
+def can_manage_project_access(user, project=None):
+    if user.is_superuser:
+        return True
+    if not is_team_owner(user):
+        return False
+    return bool(
+        project
+        and project.project
+        and project.project.group_id == user.profile.research_group_id
+    )
+
+
+def project_access_management_required(view_func):
+    @wraps(view_func)
+    @login_required
+    def wrapped(request, *args, **kwargs):
+        if request.user.is_staff or request.user.is_superuser or is_team_owner(request.user):
+            return view_func(request, *args, **kwargs)
+        record_permission_denied(
+            request, 'management', '拒绝访问项目授权管理',
+            entity_type='Project Access', object_repr='项目授权',
+        )
+        return redirect('index')
+    return wrapped
+
+
 def record_audit_event(request, action, instance, summary, changes=None, object_repr=None, category=None, **kwargs):
     """Compatibility wrapper for management operations using the audit service."""
     if category is None:
@@ -86,10 +121,32 @@ def insights(request):
     return render(request, 'experiment_flow/insights.html')
 
 
-@management_required
+@project_access_management_required
 def management_dashboard(request):
-    teams = ResearchGroup.objects.prefetch_related('members__user').order_by('group_name')
-    projects = Project.objects.select_related('project__group', 'owner').order_by('-created_on')
+    access_only = is_team_owner(request.user) and not (request.user.is_staff or request.user.is_superuser)
+    if access_only:
+        team_id = request.user.profile.research_group_id
+        projects = Project.objects.filter(project__group_id=team_id).select_related(
+            'project__group', 'owner',
+        ).prefetch_related('authorized_users').order_by('-created_on')
+        return render(request, 'experiment_flow/management_dashboard.html', {
+            'access_only': True,
+            'can_manage_access': True,
+            'managed_projects': projects,
+            'grantable_users': User.objects.filter(
+                is_active=True, is_staff=False, is_superuser=False,
+            ).order_by('username'),
+        })
+    teams = list(
+        ResearchGroup.objects.prefetch_related('members__user').order_by('group_name')
+    )
+    for team in teams:
+        team.responsible_people = [
+            profile.user for profile in team.members.all() if profile.is_team_owner
+        ]
+    projects = Project.objects.select_related('project__group', 'owner').prefetch_related(
+        'authorized_users',
+    ).order_by('-created_on')
     users = User.objects.select_related('profile__research_group').order_by('username')
     step_templates = StepNameTemplate.objects.order_by('category', 'step_code')
     raw_material_types = list(RawMaterialType.objects.order_by('name'))
@@ -105,11 +162,11 @@ def management_dashboard(request):
         material_type.usage_count = material_type_usage_counts.get(material_type.name, 0)
     cells = Cell.objects.select_related(
         'test_item', 'step__experiment__project__project__group',
-    ).order_by('package_number', 'barcode', 'id')
+    ).order_by('test_order_number', 'barcode', 'id')
     cell_q = request.GET.get('cell_q', '').strip()
     if cell_q:
         cells = cells.filter(
-            Q(package_number__icontains=cell_q) |
+            Q(test_order_number__icontains=cell_q) |
             Q(barcode__icontains=cell_q) |
             Q(test_item__name__icontains=cell_q) |
             Q(step__full_step__icontains=cell_q) |
@@ -178,7 +235,40 @@ def management_dashboard(request):
         'step_template_form': StepTemplateManagementForm(),
         'raw_material_type_form': RawMaterialTypeManagementForm(),
         'cell_test_item_form': CellTestItemManagementForm(),
+        'can_manage_access': request.user.is_superuser or is_team_owner(request.user),
+        'grantable_users': User.objects.filter(
+            is_active=True, is_staff=False, is_superuser=False,
+        ).order_by('username'),
     })
+
+
+@project_access_management_required
+@require_POST
+@transaction.atomic
+def grant_project_access(request, project_id):
+    project = get_object_or_404(
+        Project.objects.select_related('project__group').prefetch_related('authorized_users'),
+        id=project_id,
+    )
+    if not can_manage_project_access(request.user, project):
+        record_permission_denied(
+            request, 'project', f'拒绝管理项目 {project.exp_name} 的授权', instance=project,
+        )
+        return HttpResponseForbidden('你没有权限管理这个项目的授权。')
+
+    before = sorted(project.authorized_users.values_list('username', flat=True))
+    form = ProjectAccessGrantForm(request.POST, project=project)
+    if form.is_valid():
+        project.authorized_users.set(form.cleaned_data['users'])
+        after = sorted(project.authorized_users.values_list('username', flat=True))
+        record_audit_event(
+            request, 'update', project, f'更新 Project {project.exp_name} 的访问授权',
+            {'authorized_users': {'before': before, 'after': after}},
+        )
+        messages.success(request, f'{project.exp_name} 的项目权限已更新。')
+    else:
+        messages.error(request, '项目权限更新失败：请选择有效的普通用户。')
+    return management_redirect('permissions')
 
 
 def management_redirect(tab):
@@ -628,9 +718,10 @@ def accessible_samples_for_user(user):
     if user.is_staff or user.is_superuser:
         return queryset
     group = getattr(getattr(user, 'profile', None), 'research_group', None)
-    if not group:
-        return queryset.none()
-    return queryset.filter(step__experiment__project__project__group=group)
+    filters = Q(step__experiment__project__authorized_users=user)
+    if group:
+        filters |= Q(step__experiment__project__project__group=group)
+    return queryset.filter(filters).distinct()
 
 
 def _decode_sample_cursor(value):
@@ -815,7 +906,7 @@ def save_step_cells(step, payload_json, actor=None):
                 raise ValidationError('电芯记录 ID 重复或无效。')
             record_ids.add(cell_id)
 
-        package_number = str(record.get('package_number') or '').strip().upper()
+        test_order_number = str(record.get('test_order_number') or '').strip().upper()
         barcode = str(record.get('barcode') or '').strip().upper()
         raw_test_item_id = record.get('test_item_id')
         if raw_test_item_id in (None, ''):
@@ -827,12 +918,12 @@ def save_step_cells(step, payload_json, actor=None):
                 raise ValidationError('测试项目 ID 无效。') from exc
             if test_item_id <= 0:
                 raise ValidationError('测试项目 ID 无效。')
-        if not package_number:
-            raise ValidationError('每个电芯都必须填写 Package 号。')
+        if not test_order_number:
+            raise ValidationError('每个电芯都必须填写测试单号。')
         if not barcode:
             raise ValidationError('每个电芯都必须填写 Barcode。')
-        if len(package_number) > 100 or len(barcode) > 100:
-            raise ValidationError('Package 号和 Barcode 不能超过 100 个字符。')
+        if len(test_order_number) > 100 or len(barcode) > 100:
+            raise ValidationError('测试单号和 Barcode 不能超过 100 个字符。')
         if barcode in barcodes:
             raise ValidationError(f'Barcode {barcode} 在本次提交中重复。')
         barcodes.add(barcode)
@@ -851,7 +942,7 @@ def save_step_cells(step, payload_json, actor=None):
             sample_ids.append(sample_id)
         normalized_records.append({
             'id': cell_id,
-            'package_number': package_number,
+            'test_order_number': test_order_number,
             'barcode': barcode,
             'test_item_id': test_item_id,
             'sample_ids_present': sample_ids_present,
@@ -921,18 +1012,18 @@ def save_step_cells(step, payload_json, actor=None):
         if cell_id is None:
             cell = Cell.objects.create(
                 step=step,
-                package_number=record['package_number'],
+                test_order_number=record['test_order_number'],
                 barcode=record['barcode'],
                 test_item_id=record['test_item_id'],
             )
         else:
             cell = existing_cells[cell_id]
         if cell_id is not None and (
-            cell.package_number != record['package_number']
+            cell.test_order_number != record['test_order_number']
             or cell.barcode != record['barcode']
             or cell.test_item_id != record['test_item_id']
         ):
-            cell.package_number = record['package_number']
+            cell.test_order_number = record['test_order_number']
             cell.barcode = record['barcode']
             cell.test_item_id = record['test_item_id']
             cell.save()
@@ -996,10 +1087,10 @@ def get_experiments_for_user(user, search_query='', my_experiments=''):
         if profile:
             rg = getattr(profile, 'research_group', None)
 
-        if not rg:
-            return Project.objects.none()
-
-        qs = Project.objects.filter(project__group=rg).order_by('-created_on')
+        filters = Q(authorized_users=user)
+        if rg:
+            filters |= Q(project__group=rg)
+        qs = Project.objects.filter(filters).distinct().order_by('-created_on')
 
     # Filter by owner if requested
     if my_experiments == '1':
@@ -1014,7 +1105,7 @@ def get_experiments_for_user(user, search_query='', my_experiments=''):
             Q(project__group__team_code__icontains=search_query) |
             Q(project__group__group_name__icontains=search_query) |
             Q(experiments__steps__cells__barcode__icontains=search_query) |
-            Q(experiments__steps__cells__package_number__icontains=search_query)
+            Q(experiments__steps__cells__test_order_number__icontains=search_query)
         ).distinct()
 
     return qs
@@ -1022,6 +1113,7 @@ def get_experiments_for_user(user, search_query='', my_experiments=''):
 
 def get_experiment_overview_stats(experiments_qs):
     experiments = experiments_qs.prefetch_related('experiments__steps')
+    visible_experiment_records = Experiment.objects.filter(project__in=experiments_qs)
     cell_count = Cell.objects.filter(
         step__experiment__project__in=experiments_qs,
     ).count()
@@ -1050,12 +1142,25 @@ def get_experiment_overview_stats(experiments_qs):
 
     in_progress_count = total_count - completed_count
     completion_rate = round((completed_count / total_count) * 100) if total_count else 0
+    visible_steps = ExperimentStep.objects.filter(experiment__project__in=experiments_qs)
+    week_start = timezone.localdate() - timedelta(days=timezone.localdate().weekday())
+    completed_steps = visible_steps.filter(status='Completed')
+    cells = Cell.objects.filter(step__experiment__project__in=experiments_qs)
     return {
         'total_count': total_count,
         'in_progress_count': in_progress_count,
+        'experiment_count': visible_experiment_records.count(),
+        'active_experiment_count': visible_experiment_records.filter(
+            Q(steps__status='Planned') | Q(steps__isnull=True)
+        ).distinct().count(),
         'completed_count': completed_count,
         'cell_count': cell_count,
         'completion_rate': completion_rate,
+        'planned_step_count': visible_steps.filter(status='Planned').count(),
+        'unassigned_step_count': visible_steps.filter(status='Planned', owner__isnull=True).count(),
+        'completed_step_count': completed_steps.count(),
+        'completed_this_week_count': completed_steps.filter(completed_on__date__gte=week_start).count(),
+        'unlinked_cell_count': cells.filter(sample_links__isnull=True).count(),
     }
 
 
@@ -1100,7 +1205,46 @@ def get_experiment_growth_chart(project_experiments_qs, days=14):
         'start_label': date_range[0].strftime('%m/%d'),
         'end_label': date_range[-1].strftime('%m/%d'),
         'current_count': total_count,
+        'new_count': sum(daily_counts.values()),
     }
+
+
+def get_dashboard_greeting(user):
+    now = timezone.localtime()
+    if 5 <= now.hour < 12:
+        greeting = '早上好'
+    elif 12 <= now.hour < 18:
+        greeting = '下午好'
+    else:
+        greeting = '晚上好'
+    weekday = '一二三四五六日'[now.weekday()]
+    return {
+        'greeting': greeting,
+        'display_name': user.get_full_name().strip() or user.username,
+        'date_label': now.strftime('%Y年%m月%d日') + f' 星期{weekday}',
+    }
+
+
+def parse_changelog(path):
+    """Parse the small Keep-a-Changelog subset used by this repository."""
+    releases = []
+    current_release = None
+    current_group = None
+    if not path.exists():
+        return releases
+    for raw_line in path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if line.startswith('## '):
+            title = line[3:].strip()
+            current_release = {'title': title, 'groups': []}
+            releases.append(current_release)
+            current_group = None
+        elif line.startswith('### ') and current_release:
+            current_group = {'title': line[4:].strip(), 'items': []}
+            current_release['groups'].append(current_group)
+        elif line.startswith('- ') and current_group:
+            current_group['items'].append(line[2:].strip())
+    return releases
 
 # Authentication views
 def login_view(request):
@@ -1340,10 +1484,11 @@ def user_can_access_experiment(user, experiment):
         return True
     profile = getattr(user, 'profile', None)
     user_group = getattr(profile, 'research_group', None)
+    if not getattr(experiment, 'project', None):
+        return False
     return bool(
-        user_group
-        and getattr(experiment, 'project', None)
-        and experiment.project.group == user_group
+        (user_group and experiment.project.group == user_group)
+        or experiment.authorized_users.filter(id=user.id).exists()
     )
 
 
@@ -1618,15 +1763,30 @@ def index(request):
     my_experiments = request.GET.get('my_experiments', '')
     # Use group-restricted queryset helper
     latest_exp = get_experiments_for_user(request.user, search_query, my_experiments)
-    overview_stats = get_experiment_overview_stats(latest_exp)
+    overview_scope = request.GET.get('overview_scope', 'global')
+    if overview_scope not in {'mine', 'global'}:
+        overview_scope = 'global'
+    try:
+        overview_days = int(request.GET.get('overview_days', 14))
+    except (TypeError, ValueError):
+        overview_days = 14
+    if overview_days not in {14, 30, 90}:
+        overview_days = 14
+
+    # “全局”只提供跨团队的聚合指标，不改变项目列表与详情的访问范围。
+    # 这样普通用户可以了解 Atlas 的整体实验进展，但不能打开其他团队的记录。
+    if overview_scope == 'global':
+        overview_projects = Project.objects.all().order_by('-created_on')
+    else:
+        overview_projects = get_experiments_for_user(request.user, my_experiments='1')
+    overview_stats = get_experiment_overview_stats(overview_projects)
     visible_experiments = (
         Experiment.objects
-        .filter(project__in=latest_exp)
+        .filter(project__in=overview_projects)
         .select_related('project__owner', 'project__project__group')
         .order_by('-created_on')
     )
-    growth_chart = get_experiment_growth_chart(visible_experiments)
-    recent_experiment_updates = visible_experiments[:5]
+    growth_chart = get_experiment_growth_chart(visible_experiments, days=overview_days)
 
     page_number = request.GET.get('page', 1)
     paginator = Paginator(latest_exp, 10)  # 10 experiments per page
@@ -1638,7 +1798,18 @@ def index(request):
         'search_query': search_query,
         'overview_stats': overview_stats,
         'growth_chart': growth_chart,
-        'recent_experiment_updates': recent_experiment_updates,
+        'overview_scope': overview_scope,
+        'overview_days': overview_days,
+        'overview_global_label': '全部团队' if overview_scope == 'global' else '我的项目',
+        **get_dashboard_greeting(request.user),
+    })
+
+
+@login_required
+def changelog(request):
+    changelog_path = settings.BASE_DIR.parent / 'CHANGELOG.md'
+    return render(request, 'experiment_flow/changelog.html', {
+        'releases': parse_changelog(changelog_path),
     })
 
 @login_required
@@ -2802,17 +2973,13 @@ def get_all_steps(request):
     else:
         # Get user's research group
         profile = getattr(request.user, 'profile', None)
-        if not profile:
-            return JsonResponse({'steps': []})
-
         rg = getattr(profile, 'research_group', None)
-        if not rg:
-            return JsonResponse({'steps': []})
-
-        # Get all steps from experiments in the user's research group
-        steps = ExperimentStep.objects.filter(
-            experiment__project__project__group=rg
-        ).select_related('experiment', 'experiment__project').order_by('-started_on')
+        filters = Q(experiment__project__authorized_users=request.user)
+        if rg:
+            filters |= Q(experiment__project__project__group=rg)
+        steps = ExperimentStep.objects.filter(filters).distinct().select_related(
+            'experiment', 'experiment__project',
+        ).order_by('-started_on')
 
     # Format step data
     steps_data = []
@@ -2903,9 +3070,9 @@ def global_search(request):
         return redirect(f'/experiment/{step.experiment.project_id}/?{params}')
 
     cell_matches = visible_cells.filter(
-        Q(package_number__icontains=query) | Q(barcode__icontains=query)
+        Q(test_order_number__icontains=query) | Q(barcode__icontains=query)
     ).order_by(
-        'package_number', 'barcode', 'step__experiment__project__exp_name',
+        'test_order_number', 'barcode', 'step__experiment__project__exp_name',
         'step__experiment__full_experiment_code', 'step__full_step',
     )
     if cell_matches.exists():

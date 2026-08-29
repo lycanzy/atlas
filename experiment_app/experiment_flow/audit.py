@@ -86,7 +86,7 @@ def step_snapshot(step):
         'cells': [
             {
                 'id': cell.id,
-                'package_number': cell.package_number,
+                'test_order_number': cell.test_order_number,
                 'barcode': cell.barcode,
                 'test_item_id': cell.test_item_id,
                 'test_item__name': cell.test_item.name if cell.test_item else None,
@@ -95,7 +95,7 @@ def step_snapshot(step):
                 ),
             }
             for cell in step.cells.select_related('test_item').prefetch_related('samples')
-            .order_by('package_number', 'barcode', 'id')
+            .order_by('test_order_number', 'barcode', 'id')
         ],
         'raw_material_usages': raw_material_usage_snapshot(step),
     }

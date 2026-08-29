@@ -1,0 +1,2 @@
+#!/bin/sh
+exec python3 scripts/update_changelog_for_commit.py "$1"

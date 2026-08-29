@@ -1,112 +1,31 @@
 {% extends "experiment_flow/base.html" %}
-
+{% load static %}
 {% block content %}
-<div class="overview-dashboard">
-    <div class="overview-header">
-        <div>
-            <h2>项目总览</h2>
-        </div>
-        <div class="overview-total">
-            <span>{{ overview_stats.total_count }}</span>
-            <small>全部项目</small>
-        </div>
+<main class="atlas-home">
+  <header class="home-greeting"><div><h1>{{ greeting }}，{{ display_name }}</h1></div><time>{% now 'Y-m-d' as today_iso %}{{ date_label }}</time></header>
+  <section class="overview-section" aria-labelledby="overview-title">
+    <div class="overview-toolbar">
+      <div><h2 id="overview-title">概览</h2><div class="overview-scope" role="group" aria-label="概览数据范围"><a href="?overview_scope=mine&overview_days={{ overview_days }}" class="{% if overview_scope == 'mine' %}active{% endif %}">我的</a><a href="?overview_scope=global&overview_days={{ overview_days }}" class="{% if overview_scope == 'global' %}active{% endif %}">全局</a></div></div>
+      <label class="overview-period"><span class="visually-hidden">趋势时间范围</span><select onchange="window.location.href='?overview_scope={{ overview_scope }}&overview_days=' + this.value"><option value="14" {% if overview_days == 14 %}selected{% endif %}>近 14 天</option><option value="30" {% if overview_days == 30 %}selected{% endif %}>近 30 天</option><option value="90" {% if overview_days == 90 %}selected{% endif %}>近 90 天</option></select></label>
     </div>
-
-    <div class="overview-stats-grid">
-        <section class="overview-stat-card in-progress">
-            <div class="stat-card-icon">
-                <i class="bi bi-activity"></i>
-            </div>
-            <div>
-                <div class="stat-label">正在进行</div>
-                <div class="stat-value">{{ overview_stats.in_progress_count }}</div>
-            </div>
-        </section>
-
-        <section class="overview-stat-card completed">
-            <div class="stat-card-icon">
-                <i class="bi bi-check2-circle"></i>
-            </div>
-            <div>
-                <div class="stat-label">已完成</div>
-                <div class="stat-value">{{ overview_stats.completed_count }}</div>
-            </div>
-        </section>
-
-        <section class="overview-stat-card cells">
-            <div class="stat-card-icon">
-                <i class="bi bi-battery-full"></i>
-            </div>
-            <div>
-                <div class="stat-label">电芯总数</div>
-                <div class="stat-value">{{ overview_stats.cell_count }}</div>
-            </div>
-        </section>
+    <div class="overview-panel">
+      <div class="overview-metrics">
+        <article class="overview-metric"><i class="bi bi-folder2-open"></i><div><strong>{{ overview_stats.active_experiment_count }}</strong><span>进行中实验</span><small>共 {{ overview_stats.experiment_count }} 个实验</small></div></article>
+        <article class="overview-metric teal"><i class="bi bi-clipboard2-check"></i><div><strong>{{ overview_stats.planned_step_count }}</strong><span>计划步骤</span><small>{{ overview_stats.unassigned_step_count }} 个待分配负责人</small></div></article>
+        <article class="overview-metric green"><i class="bi bi-check-circle"></i><div><strong>{{ overview_stats.completed_step_count }}</strong><span>已完成步骤</span><small>本周完成 {{ overview_stats.completed_this_week_count }} 个</small></div></article>
+        <article class="overview-metric"><i class="bi bi-battery-half"></i><div><strong>{{ overview_stats.cell_count }}</strong><span>电芯总数</span><small>{{ overview_stats.unlinked_cell_count }} 个待关联样品</small></div></article>
+      </div>
+      <article class="overview-trend">
+        <div class="trend-heading"><div><span>实验增长趋势</span><strong>{{ growth_chart.current_count }}</strong><small>实验总数</small></div><em>+{{ growth_chart.new_count }} 近 {{ overview_days }} 天</em></div>
+        <div class="overview-chart compact"><svg class="overview-chart-svg" viewBox="0 0 100 44" preserveAspectRatio="none" aria-label="实验累计数量趋势"><polygon class="overview-chart-area" points="{{ growth_chart.area_points_attr }}"></polygon><polyline class="overview-chart-line" points="{{ growth_chart.points_attr }}"></polyline></svg><div class="overview-chart-points">{% for point in growth_chart.points %}<span class="overview-chart-point" style="left:{{ point.x }}%;top:{{ point.y_percent }}%" data-tooltip="{{ point.date_label }} · {{ point.count }} 个" tabindex="0"></span>{% endfor %}</div><div class="overview-chart-axis"><span>{{ growth_chart.start_label }}</span><span>{{ growth_chart.end_label }}</span></div></div>
+      </article>
     </div>
-
-    <div class="overview-lower-grid">
-        <section class="overview-chart-card">
-            <div class="overview-card-header">
-                <div>
-                    <h3>实验增长趋势</h3>
-                    <p>每日累计实验数量</p>
-                </div>
-                <div class="overview-card-metric">
-                    <strong>{{ growth_chart.current_count }}</strong>
-                    <span>实验总数</span>
-                </div>
-            </div>
-            <div class="overview-chart">
-                <svg class="overview-chart-svg" viewBox="0 0 100 44" preserveAspectRatio="none" aria-label="实验累计数量趋势">
-                    <polygon class="overview-chart-area" points="{{ growth_chart.area_points_attr }}"></polygon>
-                    <polyline class="overview-chart-line" points="{{ growth_chart.points_attr }}"></polyline>
-                </svg>
-                <div class="overview-chart-points">
-                    {% for point in growth_chart.points %}
-                        <span class="overview-chart-point" style="left: {{ point.x }}%; top: {{ point.y_percent }}%;" data-tooltip="{{ point.date_label }} · {{ point.count }} 个" tabindex="0" aria-label="{{ point.date_label }} 累计 {{ point.count }} 个实验"></span>
-                    {% endfor %}
-                </div>
-                <div class="overview-chart-axis">
-                    <span>{{ growth_chart.start_label }}</span>
-                    <span>{{ growth_chart.end_label }}</span>
-                </div>
-            </div>
-        </section>
-
-        <section class="overview-updates-card">
-            <div class="overview-card-header">
-                <div>
-                    <h3>最近创建</h3>
-                </div>
-            </div>
-            <div class="overview-update-list">
-                {% for project_experiment in recent_experiment_updates %}
-                    <a class="overview-update-item" href="{% url 'experiment_detail' project_experiment.project.id %}?expanded_experiment={{ project_experiment.id }}">
-                        <span class="update-avatar">{{ project_experiment.project.owner.username|slice:":1"|upper }}</span>
-                        <span class="update-body">
-                            <span class="update-line">
-                                <strong>
-                                    {% if project_experiment.project.owner.first_name and project_experiment.project.owner.last_name %}
-                                        {{ project_experiment.project.owner.first_name }} {{ project_experiment.project.owner.last_name }}
-                                    {% else %}
-                                        {{ project_experiment.project.owner.username }}
-                                    {% endif %}
-                                </strong>
-                                创建了 {{ project_experiment.full_experiment_code }}
-                            </span>
-                            <small>
-                                {{ project_experiment.created_on|date:"m/d/Y" }}
-                                {% if project_experiment.project.project and project_experiment.project.project.group %}
-                                    · {{ project_experiment.project.project.group.group_name }}
-                                {% endif %}
-                            </small>
-                        </span>
-                    </a>
-                {% empty %}
-                    <div class="overview-empty">暂无创建记录</div>
-                {% endfor %}
-            </div>
-        </section>
-    </div>
-</div>
+  </section>
+  <section class="tutorial-section" aria-labelledby="tutorial-title"><h2 id="tutorial-title">精选教程</h2><div class="tutorial-grid">
+    <article class="tutorial-card"><img src="{% static 'app/images/tutorials/atlas-hierarchy.png' %}" alt="实验人员在实验室中使用 Atlas"><div><h3>从项目到实验：理解 Atlas 层级</h3><p><i class="bi bi-clock"></i> 5 分钟 · 快速指南</p></div></article>
+    <article class="tutorial-card"><img src="{% static 'app/images/tutorials/record-experiment.png' %}" alt="记录实验步骤、设备和原材料"><div><h3>记录步骤、设备与原材料</h3><p><i class="bi bi-clock"></i> 8 分钟 · 视频</p></div></article>
+    <article class="tutorial-card"><img src="{% static 'app/images/tutorials/cell-genealogy.png' %}" alt="实验室中的电芯样品"><div><h3>连接样品、电芯与上下游谱系</h3><p><i class="bi bi-clock"></i> 6 分钟 · 快速指南</p></div></article>
+  </div></section>
+  <nav class="help-strip" aria-label="常用帮助"><h2>常用帮助</h2><div><span><i class="bi bi-question-circle"></i>帮助中心</span><span><i class="bi bi-activity"></i>系统状态</span><span><i class="bi bi-chat-left-text"></i>提交反馈</span><a href="{% url 'changelog' %}"><i class="bi bi-file-earmark-text"></i>更新日志</a><span><i class="bi bi-code-slash"></i>API 文档</span></div></nav>
+</main>
 {% endblock %}

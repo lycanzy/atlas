@@ -13,7 +13,7 @@
         <table class="table table-bordered align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th>Package 号</th>
+                    <th>测试单号</th>
                     <th>Barcode</th>
                     <th>步骤</th>
                     <th>Experiment</th>
@@ -24,7 +24,7 @@
             <tbody>
                 {% for cell in cell_results %}
                 <tr>
-                    <td>{{ cell.package_number }}</td>
+                    <td>{{ cell.test_order_number }}</td>
                     <td><code>{{ cell.barcode }}</code></td>
                     <td>{{ cell.step.full_step }}</td>
                     <td>{{ cell.step.experiment.full_experiment_code }}</td>

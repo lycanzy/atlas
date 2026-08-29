@@ -6,8 +6,8 @@
   </div>
   <div class="cell-entry-grid">
     <div class="form-group">
-      <label for="cell-package-input">Package 号 *</label>
-      <input type="text" id="cell-package-input" class="form-control cell-package-input" maxlength="100" autocomplete="off" placeholder="例如 PKG-001">
+      <label for="cell-package-input">测试单号 *</label>
+      <input type="text" id="cell-package-input" class="form-control cell-package-input" maxlength="100" autocomplete="off" placeholder="例如 TEST-001">
     </div>
     <div class="form-group">
       <label for="cell-test-item-input">测试项目</label>
@@ -19,18 +19,17 @@
     <div class="form-group cell-barcode-entry">
       <label for="cell-barcode-input">Barcode *</label>
       <textarea id="cell-barcode-input" class="form-control cell-barcode-input" rows="2" autocomplete="off" placeholder="连续扫码，或每行粘贴一个 Barcode"></textarea>
-      <small>扫码后按 Enter 添加；批量粘贴时每行一个 Barcode。</small>
     </div>
     <button type="button" class="btn btn-sm btn-success add-cells-to-list-btn"><i class="bi bi-plus-lg" aria-hidden="true"></i> 加入列表</button>
   </div>
   <div class="cell-editor-error" role="alert" hidden></div>
   <div class="cell-editor-table-wrap">
     <table class="table table-sm table-bordered cell-editor-table">
-      <thead class="table-light"><tr><th>Package 号</th><th>Barcode</th><th>测试项目</th><th>关联样品</th><th class="text-center">操作</th></tr></thead>
+      <thead class="table-light"><tr><th>测试单号</th><th>Barcode</th><th>测试项目</th><th>关联样品</th><th class="text-center">操作</th></tr></thead>
       <tbody class="cells-editor-container">
         {% for cell in cells %}
         <tr class="cell-editor-row" data-cell-id="{{ cell.id }}">
-          <td><input type="text" class="form-control form-control-sm cell-row-package" maxlength="100" value="{{ cell.package_number }}" aria-label="Package 号"></td>
+          <td><input type="text" class="form-control form-control-sm cell-row-package" maxlength="100" value="{{ cell.test_order_number }}" aria-label="测试单号"></td>
           <td><input type="text" class="form-control form-control-sm cell-row-barcode" maxlength="100" value="{{ cell.barcode }}" aria-label="Barcode"></td>
           <td>
             <select class="form-select form-select-sm cell-row-test-item" aria-label="测试项目">
@@ -51,8 +50,6 @@
     </table>
     <div class="cell-editor-empty text-muted" {% if cells %}hidden{% endif %}>尚未添加电芯。</div>
   </div>
-  <small class="text-muted">一个电芯可关联多个步骤产生的样品；搜索结果按需加载，不会一次读取全部样品。</small>
-
   <div class="cell-sample-picker-backdrop" hidden></div>
   <aside class="cell-sample-picker" role="dialog" aria-modal="true" aria-label="关联来源样品" hidden>
     <div class="cell-sample-picker-header">

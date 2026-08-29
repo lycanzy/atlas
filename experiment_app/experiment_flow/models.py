@@ -39,6 +39,10 @@ class UserProfile(models.Model):
     """Extended user profile linked to research group"""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     research_group = models.ForeignKey(ResearchGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='members')
+    is_team_owner = models.BooleanField(
+        default=False,
+        help_text='May manage project-level access for projects in this user\'s Team.',
+    )
     created_on = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -153,6 +157,12 @@ class Project(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
     project = models.ForeignKey(ProjectCategory, on_delete = models.CASCADE, related_name = 'experiment', null = True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='experiments')
+    authorized_users = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='authorized_projects',
+        help_text='Additional users explicitly granted access to this project.',
+    )
 
     class Meta:
         db_table = "experiment_flow_exp"
@@ -569,7 +579,7 @@ class Cell(models.Model):
         on_delete=models.CASCADE,
         related_name='cells',
     )
-    package_number = models.CharField(max_length=100, db_index=True)
+    test_order_number = models.CharField(max_length=100, db_index=True)
     barcode = models.CharField(max_length=100, unique=True)
     test_item = models.ForeignKey(
         CellTestItem,
@@ -588,15 +598,15 @@ class Cell(models.Model):
     updated_on = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['package_number', 'barcode', 'id']
+        ordering = ['test_order_number', 'barcode', 'id']
 
     def clean(self):
         super().clean()
-        self.package_number = (self.package_number or '').strip().upper()
+        self.test_order_number = (self.test_order_number or '').strip().upper()
         self.barcode = (self.barcode or '').strip().upper()
         errors = {}
-        if not self.package_number:
-            errors['package_number'] = 'Package 号不能为空。'
+        if not self.test_order_number:
+            errors['test_order_number'] = '测试单号不能为空。'
         if not self.barcode:
             errors['barcode'] = 'Barcode 不能为空。'
         if errors:

@@ -79,7 +79,7 @@
             <button onclick="location.href='{% url 'equipment_list' %}'" class="btn btn-primary btn-sm">设备</button>
             <button onclick="location.href='{% url 'raw_material_list' %}'" class="btn btn-primary btn-sm">原材料</button>
             <button onclick="location.href='{% url 'insights' %}'" class="btn btn-primary btn-sm">数据洞察</button>
-            {% if user.is_staff or user.is_superuser %}<button onclick="location.href='{% url 'management_dashboard' %}'" class="btn btn-primary btn-sm">管理</button>{% endif %}
+            {% if user.is_staff or user.is_superuser or user.profile.is_team_owner %}<button onclick="location.href='{% url 'management_dashboard' %}'" class="btn btn-primary btn-sm">管理</button>{% endif %}
             {% if user.is_authenticated %}
                 <div class="dropdown user-menu">
                     <button class="btn btn-outline-light btn-sm dropdown-toggle user-menu-toggle"

@@ -100,7 +100,7 @@ class FullAuditTests(TestCase):
             'parents': [str(parent.id)], 'sample_count': 2,
             'cells_payload': json.dumps({
                 'records': [{
-                    'id': None, 'package_number': 'pkg-01', 'barcode': 'cell-001',
+                    'id': None, 'test_order_number': 'pkg-01', 'barcode': 'cell-001',
                 }],
                 'deleted_ids': [],
             }),
@@ -113,7 +113,7 @@ class FullAuditTests(TestCase):
         self.assertEqual(details['sample_count'], 2)
         self.assertEqual(details['parents'], [parent.full_step])
         self.assertEqual(details['cell_count'], 1)
-        self.assertEqual(details['cells'][0]['package_number'], 'PKG-01')
+        self.assertEqual(details['cells'][0]['test_order_number'], 'PKG-01')
         self.assertEqual(details['cells'][0]['barcode'], 'CELL-001')
         self.assertEqual(details['raw_material_usages'][0]['batch_number'], material.batch_number)
         self.assertEqual(details['raw_material_usages'][0]['quantity'], '2.5000')
@@ -137,10 +137,10 @@ class FullAuditTests(TestCase):
         self.client.login(username='auditor', password='old-password')
         step = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment)
         changed_cell = Cell.objects.create(
-            step=step, package_number='PKG-01', barcode='CELL-001',
+            step=step, test_order_number='PKG-01', barcode='CELL-001',
         )
         removed_cell = Cell.objects.create(
-            step=step, package_number='PKG-01', barcode='CELL-002',
+            step=step, test_order_number='PKG-01', barcode='CELL-002',
         )
         AuditLog.objects.all().delete()
 
@@ -151,7 +151,7 @@ class FullAuditTests(TestCase):
                 'cells_payload': json.dumps({
                     'records': [{
                         'id': changed_cell.id,
-                        'package_number': 'PKG-02',
+                        'test_order_number': 'PKG-02',
                         'barcode': 'CELL-001A',
                     }],
                     'deleted_ids': [removed_cell.id],
@@ -163,7 +163,7 @@ class FullAuditTests(TestCase):
         log = AuditLog.objects.get(category='step', action='update')
         self.assertIn('cells', log.changes)
         self.assertEqual(len(log.changes['cells']['before']), 2)
-        self.assertEqual(log.changes['cells']['after'][0]['package_number'], 'PKG-02')
+        self.assertEqual(log.changes['cells']['after'][0]['test_order_number'], 'PKG-02')
         self.assertEqual(log.changes['cells']['after'][0]['barcode'], 'CELL-001A')
 
     def test_deleted_actor_uses_username_snapshot(self):

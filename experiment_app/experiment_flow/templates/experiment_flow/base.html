@@ -276,7 +276,7 @@
     <!-- Select2 for searchable dropdowns -->
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2.min.css' %}" />
     <link rel="stylesheet" href="{% static 'vendor/select2/css/select2-bootstrap-5-theme.min.css' %}" />
-    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=16" />
+    <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=17" />
     <script src="{% static 'vendor/jquery/jquery-3.7.0.min.js' %}?v=2"></script>
     <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'vendor/select2/js/select2.min.js' %}"></script>
@@ -325,7 +325,7 @@
                     class="btn btn-primary btn-sm"
                     data-url="{% url 'insights' %}"
                     onclick="window.location.href=this.dataset.url;">数据洞察</button>
-            {% if user.is_staff or user.is_superuser %}
+            {% if user.is_staff or user.is_superuser or user.profile.is_team_owner %}
                 <button type="button"
                     class="btn btn-primary btn-sm"
                     data-url="{% url 'management_dashboard' %}"
@@ -377,7 +377,7 @@
                             name="search" 
                             class="search-input" 
                             placeholder=" "
-                            aria-label="搜索项目、实验、步骤、Package 或 Barcode"
+                            aria-label="搜索项目、实验、步骤、测试单号或 Barcode"
                             autocomplete="off"
                             value="{{ search_query|default:'' }}"
                             id="searchInput">

@@ -73,6 +73,10 @@ class ProjectCreateForm(forms.Form):
 
 
 class ManagedUserForm(forms.ModelForm):
+    is_team_owner = forms.BooleanField(
+        label='负责人', required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
     research_group = forms.ModelChoiceField(
         label='所属 Team', queryset=ResearchGroup.objects.none(), required=False,
         empty_label='未分配', widget=forms.Select(attrs={'class': 'form-select'}),
@@ -106,6 +110,9 @@ class ManagedUserForm(forms.ModelForm):
             self.fields['research_group'].initial = getattr(
                 getattr(self.instance, 'profile', None), 'research_group', None
             )
+            self.fields['is_team_owner'].initial = bool(
+                getattr(getattr(self.instance, 'profile', None), 'is_team_owner', False)
+            )
 
     def clean_password(self):
         password = self.cleaned_data.get('password')
@@ -122,8 +129,24 @@ class ManagedUserForm(forms.ModelForm):
             user.save()
             profile, _ = UserProfile.objects.get_or_create(user=user)
             profile.research_group = self.cleaned_data.get('research_group')
-            profile.save(update_fields=['research_group'])
+            profile.is_team_owner = self.cleaned_data.get('is_team_owner', False)
+            profile.save(update_fields=['research_group', 'is_team_owner'])
         return user
+
+
+class ProjectAccessGrantForm(forms.Form):
+    users = forms.ModelMultipleChoiceField(
+        label='授权用户', queryset=User.objects.none(), required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': 8}),
+    )
+
+    def __init__(self, *args, project=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['users'].queryset = User.objects.filter(
+            is_active=True, is_staff=False, is_superuser=False,
+        ).order_by('username')
+        if project is not None:
+            self.fields['users'].initial = project.authorized_users.all()
 
 
 class StepTemplateManagementForm(forms.ModelForm):

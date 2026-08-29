@@ -104,8 +104,8 @@ class SampleAdmin(BaseModelAdmin):
 
 @admin.register(Cell)
 class CellAdmin(BaseModelAdmin):
-    list_display = ("barcode", "package_number", "test_item", "step", "created_on", "updated_on")
-    search_fields = ("barcode", "package_number", "test_item__name", "step__full_step")
+    list_display = ("barcode", "test_order_number", "test_item", "step", "created_on", "updated_on")
+    search_fields = ("barcode", "test_order_number", "test_item__name", "step__full_step")
     list_filter = ("test_item",)
     readonly_fields = ("created_on", "updated_on")
 

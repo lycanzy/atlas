@@ -53,7 +53,7 @@ class CellTestItemTests(TestCase):
 
         step = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment)
         Cell.objects.create(
-            step=step, package_number='PKG-01', barcode='CELL-001', test_item=test_item,
+            step=step, test_order_number='PKG-01', barcode='CELL-001', test_item=test_item,
         )
         self.client.post(reverse('delete_cell_test_item', args=[test_item.id]))
         self.assertTrue(CellTestItem.objects.filter(id=test_item.id).exists())
@@ -70,7 +70,7 @@ class CellTestItemTests(TestCase):
                 'cells_payload': json.dumps({
                     'records': [{
                         'id': None,
-                        'package_number': 'PKG-01',
+                        'test_order_number': 'PKG-01',
                         'barcode': 'CELL-001',
                         'test_item_id': test_item.id,
                     }],
@@ -90,7 +90,7 @@ class CellTestItemTests(TestCase):
                 'cells_payload': json.dumps({
                     'records': [{
                         'id': None,
-                        'package_number': 'PKG-02',
+                        'test_order_number': 'PKG-02',
                         'barcode': 'CELL-002',
                         'test_item_id': 999999,
                     }],
@@ -107,7 +107,7 @@ class CellTestItemTests(TestCase):
         inactive = CellTestItem.objects.create(name='Retired Protocol', is_active=False)
         step = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment)
         Cell.objects.create(
-            step=step, package_number='PKG-01', barcode='CELL-001', test_item=active,
+            step=step, test_order_number='PKG-01', barcode='CELL-001', test_item=active,
         )
 
         self.client.login(username=self.staff.username, password='password')

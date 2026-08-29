@@ -1,3 +1,5 @@
+from django.db.models import Q
+
 from .models import Project
 
 def experiments_for_user(request):
@@ -12,9 +14,9 @@ def experiments_for_user(request):
 
     profile = getattr(user, 'profile', None)
     rg = getattr(profile, 'research_group', None)
-    if not rg:
-        return {'experiments': Project.objects.none(), 'page_obj': None, 'search_query': ''}
-
-    qs = Project.objects.filter(project__group=rg).order_by('-created_on')
+    filters = Q(authorized_users=user)
+    if rg:
+        filters |= Q(project__group=rg)
+    qs = Project.objects.filter(filters).distinct().order_by('-created_on')
     # We return the full queryset here; views can still override via context if needed.
     return {'experiments': qs, 'page_obj': None, 'search_query': ''}

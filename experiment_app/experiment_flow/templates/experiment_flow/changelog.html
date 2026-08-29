@@ -1,0 +1,7 @@
+{% extends "experiment_flow/base.html" %}
+{% block content %}
+<main class="changelog-page">
+  <header><a href="{% url 'index' %}"><i class="bi bi-arrow-left"></i> 返回概览</a><h1>更新日志</h1><p>Atlas 的功能改进、体验优化与问题修复。</p></header>
+  <div class="changelog-list">{% for release in releases %}<article class="changelog-release"><h2>{{ release.title }}</h2>{% for group in release.groups %}<section><h3>{{ group.title }}</h3><ul>{% for item in group.items %}<li>{{ item }}</li>{% endfor %}</ul></section>{% endfor %}</article>{% empty %}<p class="overview-empty">暂无更新记录。</p>{% endfor %}</div>
+</main>
+{% endblock %}
