@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [v0.1.2-alpha] - 2026-09-02
+
 ### 新增
 
 - 推送到 `main` 时，GitHub Actions 会收集本次 push 的提交标题，将非空的 `[Unreleased]` 固化为带日期的下一个补丁版本，并自动创建新的空 `[Unreleased]` 区域；空区域不会显示在更新日志页面上。
@@ -30,5 +32,6 @@
 
 ### 提交记录
 
+- Automate changelog patch releases
 - Make experiment modals draggable and clean QA artifacts
 - Add project access controls and refresh Atlas dashboard
