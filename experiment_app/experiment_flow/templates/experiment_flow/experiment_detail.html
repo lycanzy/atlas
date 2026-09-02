@@ -323,6 +323,25 @@
     overflow: hidden;
 }
 
+@media (hover: hover) and (pointer: fine) {
+    [data-draggable-modal] [data-modal-drag-handle] {
+        cursor: grab;
+    }
+
+    [data-draggable-modal].is-modal-dragging [data-modal-drag-handle] {
+        cursor: grabbing;
+    }
+
+    [data-draggable-modal].is-modal-dragging .modal-dialog {
+        transition: none;
+    }
+
+    [data-draggable-modal].is-modal-dragging,
+    [data-draggable-modal].is-modal-dragging * {
+        user-select: none;
+    }
+}
+
 .experiment-code-combobox {
     position: relative;
 }
@@ -817,13 +836,13 @@
 </div>
 
 <!-- Add Experiment Modal -->
-<div class="modal fade add-experiment-modal" id="addProjectExperimentModal" tabindex="-1"
+<div class="modal fade add-experiment-modal" id="addProjectExperimentModal" tabindex="-1" data-draggable-modal
      aria-labelledby="addProjectExperimentModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <form class="modal-content" id="addProjectExperimentForm"
               action="{% url 'add_project_experiment' experiment.id %}" method="post" novalidate>
             {% csrf_token %}
-            <div class="modal-header border-0 pb-0">
+            <div class="modal-header border-0 pb-0" data-modal-drag-handle>
                 <div>
                     <h5 class="modal-title" id="addProjectExperimentModalLabel">新增实验</h5>
                     <p class="text-muted small mb-0 mt-1">创建前请确认实验代码并填写描述。</p>
@@ -899,13 +918,13 @@
 </div>
 
 <!-- Reusable delete confirmation modal -->
-<div class="modal fade delete-confirm-modal" id="deleteConfirmModal" tabindex="-1"
+<div class="modal fade delete-confirm-modal" id="deleteConfirmModal" tabindex="-1" data-draggable-modal
      aria-labelledby="deleteConfirmTitle" aria-describedby="deleteConfirmDescription" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <form class="modal-content" id="deleteConfirmForm" method="post">
             {% csrf_token %}
             <div class="delete-confirm-body">
-                <div class="delete-confirm-topline">
+                <div class="delete-confirm-topline" data-modal-drag-handle>
                     <span class="delete-warning-icon" aria-hidden="true">
                         <i class="bi bi-exclamation-circle"></i>
                     </span>
@@ -952,10 +971,10 @@
 </div>
 
 <!-- Edit Step Modal -->
-<div class="modal fade" id="editStepModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="editStepModal" tabindex="-1" aria-hidden="true" data-draggable-modal>
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
+            <div class="modal-header bg-primary text-white" data-modal-drag-handle>
                 <h5 class="modal-title">
 	                    <i class="bi bi-pencil-square me-2"></i>编辑实验步骤
                 </h5>
@@ -1007,10 +1026,10 @@
 </div>
 
 <!-- Add Step Modal -->
-<div class="modal fade" id="addStepModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="addStepModal" tabindex="-1" aria-hidden="true" data-draggable-modal>
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header bg-success text-white" data-modal-drag-handle>
                 <h5 class="modal-title">
 	                    <i class="bi bi-plus-square me-2"></i>新增实验步骤
                 </h5>
@@ -1030,6 +1049,7 @@
 </div>
 
 <script src="{% static 'js/experiment-description-source-picker.js' %}"></script>
+<script src="{% static 'js/draggable-modals.js' %}?v=2"></script>
 <script>
 // CSRF helper
 function getCookie(name) {

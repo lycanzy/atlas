@@ -955,6 +955,24 @@ class ViewTests(TestCase):
         self.assertContains(response, 'id="deleteConfirmModal"')
         self.assertContains(response, 'id="deleteConfirmForm" method="post"')
 
+    def test_experiment_detail_enables_dragging_for_selected_modals(self):
+        self.client.login(username='user1', password='password')
+
+        response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
+
+        self.assertContains(response, 'id="addProjectExperimentModal" tabindex="-1" data-draggable-modal')
+        self.assertContains(response, 'id="deleteConfirmModal" tabindex="-1" data-draggable-modal')
+        self.assertContains(
+            response,
+            'id="addStepModal" tabindex="-1" aria-hidden="true" data-draggable-modal',
+        )
+        self.assertContains(
+            response,
+            'id="editStepModal" tabindex="-1" aria-hidden="true" data-draggable-modal',
+        )
+        self.assertContains(response, 'data-modal-drag-handle>', count=4)
+        self.assertContains(response, 'js/draggable-modals.js?v=2')
+
     def test_single_delete_endpoints_reject_get(self):
         step = ExperimentStep.objects.create(step_name='AA', experiment=self.experiment1_item)
         self.client.login(username='user1', password='password')

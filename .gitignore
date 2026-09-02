@@ -2,3 +2,5 @@ experiment_app/db.sqlite3
 experiment_app/.venv/
 *.pyc
 *.swp
+.codex_tmp/
+design-qa.md
