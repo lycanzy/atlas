@@ -1244,7 +1244,10 @@ def parse_changelog(path):
             current_release['groups'].append(current_group)
         elif line.startswith('- ') and current_group:
             current_group['items'].append(line[2:].strip())
-    return releases
+    return [
+        release for release in releases
+        if any(group['items'] for group in release['groups'])
+    ]
 
 # Authentication views
 def login_view(request):
