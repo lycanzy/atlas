@@ -28,5 +28,6 @@
 
 ### 提交记录
 
+- Make experiment modals draggable and clean QA artifacts
 - Add project access controls and refresh Atlas dashboard
 - 启用 commit-msg hook，使未来每个非合并 commit 自动写入本节并随提交暂存。
