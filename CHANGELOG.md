@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [v0.1.3-alpha] - 2026-09-07
+
+### 提交记录
+
+- Add experiment activity dashboard and workflow refinements
+
 ## [v0.1.2-alpha] - 2026-09-02
 
 ### 新增
