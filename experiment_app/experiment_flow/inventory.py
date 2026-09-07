@@ -47,7 +47,7 @@ def inventory_totals(material_ids=None):
             Value(ZERO), output_field=DECIMAL_OUTPUT,
         ),
         planned_quantity=Coalesce(
-            Sum('quantity', filter=Q(step__status='Planned')),
+            Sum('quantity', filter=Q(step__status__in=('Planned', 'InProgress'))),
             Value(ZERO), output_field=DECIMAL_OUTPUT,
         ),
     )

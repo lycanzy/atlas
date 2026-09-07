@@ -190,6 +190,7 @@
                                     </td>
                                     <td>
                                         {% if usage.step.status == 'Completed' %}<span class="badge bg-success">已完成</span>
+                                        {% elif usage.step.status == 'InProgress' %}<span class="badge bg-info text-dark">执行中</span>
                                         {% elif usage.step.status == 'Planned' %}<span class="badge bg-primary">计划中</span>
                                         {% else %}<span class="badge bg-secondary">已取消</span>{% endif %}
                                     </td>

@@ -461,6 +461,12 @@
     border-color: #ffeaa7;
 }
 
+.status-dropdown[data-current-status="InProgress"] {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
 .status-dropdown[data-current-status="Completed"] {
     background-color: #d4edda;
     color: #155724;
@@ -477,6 +483,11 @@
 .status-dropdown option[value="Planned"] {
     background-color: #fff3cd;
     color: #856404;
+}
+
+.status-dropdown option[value="InProgress"] {
+    background-color: #dbeafe;
+    color: #1d4ed8;
 }
 
 .status-dropdown option[value="Completed"] {
@@ -560,7 +571,8 @@
     font-variant-numeric: tabular-nums;
 }
 
-.cell-count-btn {
+.cell-count-btn,
+.sample-count-btn {
     align-items: center;
     display: inline-flex;
     font-size: 0.75rem;
@@ -568,35 +580,53 @@
     padding: 0.15rem 0.4rem;
 }
 
-.sample-count-badge {
-    align-items: center;
-    background: #f8fafc;
-    border: 1px solid #d7dee8;
-    border-radius: 0.3rem;
-    color: #536273;
-    cursor: default;
-    display: inline-flex;
-    font-size: 0.75rem;
-    gap: 0.25rem;
-    min-width: 42px;
-    padding: 0.2rem 0.4rem;
-    justify-content: center;
-}
-
-.sample-count-badge .bi {
-    color: #718096;
-    font-size: 0.72rem;
-}
-
-.steps-row .table .step-cells-detail-row > td {
+.steps-row .table .step-cells-detail-row > td,
+.steps-row .table .step-samples-detail-row > td {
     background: #f8fafc;
     padding: 0.65rem !important;
     width: auto;
 }
 
-.step-cells-detail-panel {
+.step-cells-detail-panel,
+.step-samples-detail-panel {
     border-left: 3px solid var(--eta-accent);
     padding-left: 0.65rem;
+}
+
+.detail-list-header,
+.sample-list-pagination {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+}
+
+.detail-list-header {
+    color: var(--eta-text);
+    font-size: 0.78rem;
+    margin-bottom: 0.55rem;
+}
+
+.sample-name-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.sample-name-chip {
+    background: #fff;
+    border: 1px solid #dbe3ec;
+    border-radius: 999px;
+    color: #334155;
+    font-size: 0.72rem;
+    padding: 0.22rem 0.5rem;
+}
+
+.sample-list-pagination {
+    border-top: 1px solid #e3e9f1;
+    color: var(--eta-text-muted);
+    font-size: 0.72rem;
+    margin-top: 0.65rem;
+    padding-top: 0.55rem;
 }
 
 .project-detail-heading {
@@ -700,6 +730,7 @@
                                 </button>
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item bulk-status-update" href="#" data-experiment-id="{{ project_experiment.id }}" data-status="Planned">标记为计划中</a></li>
+                                    <li><a class="dropdown-item bulk-status-update" href="#" data-experiment-id="{{ project_experiment.id }}" data-status="InProgress">标记为执行中</a></li>
                                     <li><a class="dropdown-item bulk-status-update" href="#" data-experiment-id="{{ project_experiment.id }}" data-status="Completed">标记为已完成</a></li>
                                     <li><a class="dropdown-item bulk-status-update" href="#" data-experiment-id="{{ project_experiment.id }}" data-status="Canceled">标记为已取消</a></li>
                                 </ul>
@@ -734,6 +765,7 @@
                                 <td>
                                     <select class="form-select form-select-sm status-dropdown" data-step-id="{{ step.id }}" data-current-status="{{ step.status }}">
                                         <option value="Planned" {% if step.status == "Planned" %}selected{% endif %}>计划中</option>
+                                        <option value="InProgress" {% if step.status == "InProgress" %}selected{% endif %}>执行中</option>
                                         <option value="Completed" {% if step.status == "Completed" %}selected{% endif %}>已完成</option>
                                         <option value="Canceled" {% if step.status == "Canceled" %}selected{% endif %}>已取消</option>
                                     </select>
@@ -752,13 +784,16 @@
                                     </button>
                                 </td>
                                 <td class="text-center">
-                                    <span class="sample-count-badge"
+                                    <button type="button" class="btn btn-sm btn-outline-secondary sample-count-btn"
+                                          data-step-id="{{ step.id }}"
+                                          data-samples-url="{% url 'step_samples' step.id %}"
                                           data-step-sample-count="{{ step.sample_total }}"
                                           aria-label="{{ step.full_step }} 样品数量：{{ step.sample_total }}"
-                                          title="样品数量">
-                                        <i class="bi bi-collection" aria-hidden="true"></i>
+                                          aria-expanded="false"
+                                          title="查看样品">
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                         <span>{{ step.sample_total }}</span>
-                                    </span>
+                                    </button>
                                 </td>
                                 <td class="text-center">
                                     <div class="table-action-group">
@@ -789,6 +824,10 @@
                             <tr id="step-cells-{{ step.id }}" class="step-cells-detail-row" style="display:none;">
                                 <td colspan="8">
                                     <div class="step-cells-detail-panel">
+                                        <div class="detail-list-header">
+                                            <strong>电芯列表</strong>
+                                            <span>共 {{ step_cells|length }} 个电芯</span>
+                                        </div>
                                         {% if step_cells %}
                                             {% regroup step_cells by test_order_number as package_groups %}
                                             <div class="cell-package-groups">
@@ -812,6 +851,13 @@
                                         {% else %}
                                             <div class="text-muted">暂无电芯。</div>
                                         {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr id="step-samples-{{ step.id }}" class="step-samples-detail-row" style="display:none;">
+                                <td colspan="8">
+                                    <div class="step-samples-detail-panel" data-step-samples-panel="{{ step.id }}">
+                                        <div class="text-muted">正在加载样品…</div>
                                     </div>
                                 </td>
                             </tr>
@@ -1310,6 +1356,113 @@ document.querySelectorAll('.cell-count-btn').forEach(function(button) {
     });
 });
 
+function setStepSamplesExpanded(stepId, expanded) {
+    const detailRow = document.getElementById(`step-samples-${stepId}`);
+    const button = document.querySelector(`.sample-count-btn[data-step-id="${stepId}"]`);
+    if (!detailRow || !button) return;
+    detailRow.style.display = expanded ? '' : 'none';
+    button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    const icon = button.querySelector('i');
+    if (icon) icon.className = expanded ? 'bi bi-chevron-down' : 'bi bi-chevron-right';
+    const panel = detailRow.querySelector('[data-step-samples-panel]');
+    if (expanded && panel && !panel.dataset.loadedPage) loadStepSamples(stepId, 1);
+}
+
+async function loadStepSamples(stepId, page) {
+    const button = document.querySelector(`.sample-count-btn[data-step-id="${stepId}"]`);
+    const panel = document.querySelector(`[data-step-samples-panel="${stepId}"]`);
+    if (!button || !panel) return;
+
+    panel.setAttribute('aria-busy', 'true');
+    panel.replaceChildren(Object.assign(document.createElement('div'), {
+        className: 'text-muted',
+        textContent: '正在加载样品…'
+    }));
+
+    try {
+        const url = new URL(button.dataset.samplesUrl, window.location.origin);
+        url.searchParams.set('page', page);
+        const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '样品加载失败');
+
+        const header = document.createElement('div');
+        header.className = 'detail-list-header';
+        const title = document.createElement('strong');
+        title.textContent = '样品列表';
+        const total = document.createElement('span');
+        total.textContent = `共 ${data.total} 个样品`;
+        header.append(title, total);
+
+        const list = document.createElement('div');
+        list.className = 'sample-name-list';
+        if (data.results.length) {
+            data.results.forEach(sample => {
+                const chip = document.createElement('span');
+                chip.className = 'sample-name-chip';
+                chip.dataset.sampleId = sample.id;
+                chip.textContent = sample.name;
+                list.appendChild(chip);
+            });
+        } else {
+            const empty = document.createElement('div');
+            empty.className = 'text-muted';
+            empty.textContent = '暂无样品。';
+            list.appendChild(empty);
+        }
+
+        panel.replaceChildren(header, list);
+        panel.dataset.loadedPage = data.page;
+
+        if (data.num_pages > 1) {
+            const pagination = document.createElement('div');
+            pagination.className = 'sample-list-pagination';
+            const pageInfo = document.createElement('span');
+            pageInfo.textContent = `第 ${data.page} / ${data.num_pages} 页`;
+            const actions = document.createElement('div');
+            actions.className = 'btn-group btn-group-sm';
+            const previous = document.createElement('button');
+            previous.type = 'button';
+            previous.className = 'btn btn-outline-secondary sample-page-btn';
+            previous.textContent = '上一页';
+            previous.disabled = !data.has_previous;
+            previous.dataset.stepId = stepId;
+            previous.dataset.page = data.page - 1;
+            const next = document.createElement('button');
+            next.type = 'button';
+            next.className = 'btn btn-outline-secondary sample-page-btn';
+            next.textContent = '下一页';
+            next.disabled = !data.has_next;
+            next.dataset.stepId = stepId;
+            next.dataset.page = data.page + 1;
+            actions.append(previous, next);
+            pagination.append(pageInfo, actions);
+            panel.appendChild(pagination);
+        }
+    } catch (error) {
+        panel.replaceChildren(Object.assign(document.createElement('div'), {
+            className: 'text-danger',
+            textContent: error.message || '样品加载失败，请稍后重试。'
+        }));
+    } finally {
+        panel.removeAttribute('aria-busy');
+    }
+}
+
+document.querySelectorAll('.sample-count-btn').forEach(function(button) {
+    button.addEventListener('click', function() {
+        const stepId = button.dataset.stepId;
+        const detailRow = document.getElementById(`step-samples-${stepId}`);
+        setStepSamplesExpanded(stepId, detailRow?.style.display === 'none');
+    });
+});
+
+document.addEventListener('click', function(event) {
+    const pageButton = event.target.closest('.sample-page-btn');
+    if (!pageButton || pageButton.disabled) return;
+    loadStepSamples(pageButton.dataset.stepId, Number(pageButton.dataset.page));
+});
+
 // Auto-expand experiment if expanded_experiment parameter is present in URL
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -1530,9 +1683,17 @@ function formatCurrentDateTimeLocal() {
 
 function initializeCompletionTimeAutomation(form) {
     const statusField = form?.querySelector('#id_status');
-    if (statusField) {
-        statusField.dataset.previousStatus = statusField.value;
-    }
+    const completedOnField = form?.querySelector('#id_completed_on');
+    if (!statusField || !completedOnField) return;
+
+    statusField.dataset.previousStatus = statusField.value;
+    const completeStepWhenTimeIsSet = function() {
+        if (!completedOnField.value || statusField.value === 'Completed') return;
+        statusField.value = 'Completed';
+        statusField.dispatchEvent(new Event('change', {bubbles: true}));
+    };
+    completedOnField.addEventListener('input', completeStepWhenTimeIsSet);
+    completedOnField.addEventListener('change', completeStepWhenTimeIsSet);
 }
 
 function initializeParentStepSelect(modalSelector) {
@@ -2141,8 +2302,10 @@ document.addEventListener('change', function(e) {
     const previousStatus = statusField.dataset.previousStatus || statusField.defaultValue;
     const completedOnField = statusField.form?.querySelector('#id_completed_on');
 
-    if (statusField.value === 'Completed' && previousStatus !== 'Completed' && completedOnField) {
+    if (statusField.value === 'Completed' && previousStatus !== 'Completed' && completedOnField && !completedOnField.value) {
         completedOnField.value = formatCurrentDateTimeLocal();
+    } else if (statusField.value !== 'Completed' && completedOnField) {
+        completedOnField.value = '';
     }
 
     statusField.dataset.previousStatus = statusField.value;

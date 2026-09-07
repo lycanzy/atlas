@@ -731,16 +731,52 @@ class ViewTests(TestCase):
 
         detail_response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
         self.assertContains(detail_response, '电芯')
+        self.assertContains(detail_response, '<strong>电芯列表</strong>', html=True)
+        self.assertContains(detail_response, '<span>共 1 个电芯</span>', html=True)
         self.assertContains(detail_response, 'PKG-01')
         self.assertContains(detail_response, 'CELL-001')
         self.assertContains(detail_response, '<th>样品</th>', html=True)
         self.assertContains(detail_response, 'data-step-sample-count="2"')
+        self.assertContains(detail_response, f'data-samples-url="{reverse("step_samples", args=[step.id])}"')
+        self.assertContains(detail_response, f'id="step-samples-{step.id}"')
         self.assertContains(detail_response, f'{step.full_step} 样品数量：2')
 
         genealogy_response = self.client.get(reverse('step_genealogy', args=[step.id]))
         self.assertContains(genealogy_response, '当前步骤电芯')
         self.assertContains(genealogy_response, 'PKG-01')
         self.assertContains(genealogy_response, 'CELL-001')
+
+    def test_empty_step_cell_panel_still_shows_list_heading(self):
+        step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        self.client.login(username="user1", password="password")
+
+        response = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
+
+        self.assertContains(response, '<strong>电芯列表</strong>', html=True)
+        self.assertContains(response, '<span>共 0 个电芯</span>', html=True)
+        self.assertContains(response, '暂无电芯。')
+
+    def test_step_samples_api_paginates_and_enforces_project_access(self):
+        step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
+        Sample.sync_for_step(step, 30)
+        url = reverse('step_samples', args=[step.id])
+
+        self.client.login(username="user1", password="password")
+        first_page = self.client.get(url)
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(first_page.json()['total'], 30)
+        self.assertEqual(len(first_page.json()['results']), 25)
+        self.assertEqual(first_page.json()['results'][0]['number'], 1)
+        self.assertTrue(first_page.json()['has_next'])
+
+        second_page = self.client.get(url, {'page': 2})
+        self.assertEqual(len(second_page.json()['results']), 5)
+        self.assertEqual(second_page.json()['results'][0]['number'], 26)
+        self.assertTrue(second_page.json()['has_previous'])
+
+        self.client.login(username="user2", password="password")
+        denied = self.client.get(url)
+        self.assertEqual(denied.status_code, 403)
 
     def test_edit_step_renders_step_cell_and_sample_tabs(self):
         step = ExperimentStep.objects.create(step_name="AA", experiment=self.experiment1_item)
@@ -1106,6 +1142,30 @@ class ViewTests(TestCase):
         step.refresh_from_db()
         self.assertEqual(step.status, 'Completed')
         self.assertIsNotNone(step.completed_on)
+
+    def test_ajax_update_status_accepts_in_progress(self):
+        self.client.login(username="user1", password="password")
+        step = ExperimentStep.objects.create(
+            step_name="AA",
+            experiment=self.experiment1_item,
+            status="Completed",
+        )
+
+        response = self.client.post(
+            reverse('update_step_status', args=[step.id]),
+            json.dumps({'status': 'InProgress'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['success'])
+        step.refresh_from_db()
+        self.assertEqual(step.status, 'InProgress')
+        self.assertIsNone(step.completed_on)
+
+        detail = self.client.get(reverse('experiment_detail', args=[self.exp1.id]))
+        self.assertContains(detail, '<option value="InProgress" selected>执行中</option>', html=True)
+        self.assertContains(detail, 'data-status="InProgress">标记为执行中</a>')
 
     def test_experiment_detail_displays_completion_date_only_when_present(self):
         completed_on = timezone.make_aware(datetime(2026, 8, 6, 14, 35))
@@ -1616,3 +1676,28 @@ class ViewTests(TestCase):
 
         self.assertContains(sidebar_response, reverse('insights'))
         self.assertContains(no_sidebar_response, reverse('insights'))
+
+    def test_navigation_shows_only_top_level_features(self):
+        self.client.login(username="staff", password="password")
+
+        sidebar_response = self.client.get(reverse('index'))
+        no_sidebar_response = self.client.get(reverse('equipment_list'))
+
+        for response in (sidebar_response, no_sidebar_response):
+            self.assertContains(response, '>实验</button>')
+            self.assertContains(response, '>表征测试</button>')
+            self.assertContains(response, '>数据洞察</button>')
+            self.assertContains(response, '>管理</button>')
+            self.assertContains(response, '表征测试</button>')
+            self.assertNotContains(response, '>设备</button>')
+            self.assertNotContains(response, '>原材料</button>')
+
+    def test_management_dashboard_links_to_equipment_and_raw_materials(self):
+        self.client.login(username="staff", password="password")
+
+        response = self.client.get(reverse('management_dashboard'))
+
+        self.assertContains(response, reverse('equipment_list'))
+        self.assertContains(response, '设备管理')
+        self.assertContains(response, reverse('raw_material_list'))
+        self.assertContains(response, '原材料管理')

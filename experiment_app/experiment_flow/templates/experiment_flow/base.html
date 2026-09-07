@@ -315,12 +315,9 @@
                     onclick="window.location.href=this.dataset.url;">实验</button>
                 <button type="button"
                     class="btn btn-primary btn-sm"
-                    data-url="{% url 'equipment_list' %}"
-                    onclick="window.location.href=this.dataset.url;">设备</button>
-                <button type="button"
-                    class="btn btn-primary btn-sm"
-                    data-url="{% url 'raw_material_list' %}"
-                    onclick="window.location.href=this.dataset.url;">原材料</button>
+                    disabled
+                    aria-disabled="true"
+                    title="功能建设中">表征测试</button>
                 <button type="button"
                     class="btn btn-primary btn-sm"
                     data-url="{% url 'insights' %}"

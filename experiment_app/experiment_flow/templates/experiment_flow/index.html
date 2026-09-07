@@ -1,6 +1,8 @@
 {% extends "experiment_flow/base.html" %}
 {% load static %}
 {% block content %}
+<link rel="stylesheet" href="{% static 'app/css/activity.css' %}">
+<script src="{% static 'app/js/activity.js' %}" defer></script>
 <main class="atlas-home">
   <header class="home-greeting"><div><h1>{{ greeting }}，{{ display_name }}</h1></div><time>{% now 'Y-m-d' as today_iso %}{{ date_label }}</time></header>
   <section class="overview-section" aria-labelledby="overview-title">
@@ -21,6 +23,7 @@
       </article>
     </div>
   </section>
+  {% include 'experiment_flow/_activity_board.html' %}
   <section class="tutorial-section" aria-labelledby="tutorial-title"><h2 id="tutorial-title">精选教程</h2><div class="tutorial-grid">
     <article class="tutorial-card"><img src="{% static 'app/images/tutorials/atlas-hierarchy.png' %}" alt="实验人员在实验室中使用 Atlas"><div><h3>从项目到实验：理解 Atlas 层级</h3><p><i class="bi bi-clock"></i> 5 分钟 · 快速指南</p></div></article>
     <article class="tutorial-card"><img src="{% static 'app/images/tutorials/record-experiment.png' %}" alt="记录实验步骤、设备和原材料"><div><h3>记录步骤、设备与原材料</h3><p><i class="bi bi-clock"></i> 8 分钟 · 视频</p></div></article>

@@ -26,6 +26,15 @@ class FormTests(TestCase):
         form = ExperimentStepForm(data=form_data, experiment=self.experiment)
         self.assertTrue(form.is_valid())
 
+    def test_step_form_accepts_in_progress_status(self):
+        form = ExperimentStepForm(data={
+            'step_name': 'AA',
+            'status': 'InProgress',
+        }, experiment=self.experiment)
+
+        self.assertTrue(form.is_valid())
+        self.assertIn(('InProgress', '执行中'), form.fields['status'].choices)
+
     def test_completed_step_without_time_uses_current_time(self):
         form = ExperimentStepForm(data={
             'step_name': 'AA',
@@ -41,6 +50,22 @@ class FormTests(TestCase):
 
         self.assertGreaterEqual(step.completed_on, before_save)
         self.assertLessEqual(step.completed_on, after_save)
+
+    def test_completion_time_forces_completed_status(self):
+        completed_on = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
+        form = ExperimentStepForm(data={
+            'step_name': 'AA',
+            'status': 'InProgress',
+            'completed_on': completed_on.strftime('%Y-%m-%dT%H:%M'),
+        }, experiment=self.experiment)
+
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data['status'], 'Completed')
+        step = form.save(commit=False)
+        step.experiment = self.experiment
+        step.save()
+        self.assertEqual(step.status, 'Completed')
+        self.assertEqual(timezone.localtime(step.completed_on), completed_on)
 
     def test_step_form_rejects_more_than_200_samples(self):
         form = ExperimentStepForm(data={

@@ -43,17 +43,18 @@ class InventoryTests(TestCase):
         )
         return step
 
-    def test_inventory_summary_separates_completed_planned_and_canceled(self):
+    def test_inventory_summary_separates_completed_active_and_canceled(self):
         self.usage('Completed', '6', 'AA')
         self.usage('Planned', '2', 'BB')
+        self.usage('InProgress', '1', 'DD')
         self.usage('Canceled', '9', 'CC')
 
         material = attach_inventory_summaries([self.material])[0]
 
         self.assertEqual(material.completed_quantity, Decimal('6'))
-        self.assertEqual(material.planned_quantity, Decimal('2'))
+        self.assertEqual(material.planned_quantity, Decimal('3'))
         self.assertEqual(material.remaining_quantity, Decimal('4'))
-        self.assertEqual(material.projected_remaining_quantity, Decimal('2'))
+        self.assertEqual(material.projected_remaining_quantity, Decimal('1'))
         self.assertEqual(material.inventory_state, 'normal')
 
     def test_status_completion_requires_confirmation_before_negative_inventory(self):

@@ -1,0 +1,58 @@
+<section class="activity-board" id="experiment-activity" aria-labelledby="activity-title" data-activity-board>
+  <header class="activity-header">
+    <div class="activity-identity">
+      <span class="activity-avatar" aria-hidden="true">{% if activity.scope == 'mine' %}{{ activity.initial }}{% else %}<i class="bi bi-people"></i>{% endif %}</span>
+      <h2 id="activity-title" title="{{ activity.scope_label }}">{{ activity.title }}</h2>
+    </div>
+    <dl class="activity-stats">
+      <div><dt>次活动</dt><dd>{{ activity.total }}</dd></div>
+      <div><dt>个参与实验</dt><dd>{{ activity.experiment_count }}</dd></div>
+      <div><dt>个活跃日</dt><dd>{{ activity.active_days }}</dd></div>
+    </dl>
+    <div class="activity-controls">
+      <nav class="activity-scope" aria-label="实验活动范围">
+        <a href="{{ activity.overall_url }}" data-activity-link data-focus="overall" {% if activity.scope == 'overall' %}aria-current="true"{% endif %} title="全部可访问项目">整体</a>
+        <a href="{{ activity.mine_url }}" data-activity-link data-focus="mine" {% if activity.scope == 'mine' %}aria-current="true"{% endif %} title="由我操作的实验与步骤">个人</a>
+      </nav>
+      <label class="activity-year"><span class="visually-hidden">实验活动年份</span>
+        <select data-activity-year data-focus="year" aria-label="实验活动年份">{% for item in activity.years %}<option value="{{ item.url }}" {% if item.year == activity.year %}selected{% endif %}>{{ item.year }}</option>{% endfor %}</select>
+      </label>
+    </div>
+  </header>
+  <div class="activity-calendar" aria-label="{{ activity.year }}年实验活动日历">
+    {% for month in activity.months %}
+    <section class="activity-month" aria-label="{{ month.number }}月">
+      <h3>{{ month.number }}月</h3>
+      <div class="activity-weekdays" aria-hidden="true">{% for day in activity.weekdays %}<span>{{ day }}</span>{% endfor %}</div>
+      <div class="activity-days">
+        {% for day in month.days %}
+          {% if not day %}<span class="activity-day activity-padding" aria-hidden="true"></span>
+          {% elif day.future %}<span class="activity-day activity-future" title="{{ day.label }}" aria-label="{{ day.label }}"></span>
+          {% else %}<a class="activity-day activity-level-{{ day.level }}{% if day.today %} is-today{% endif %}{% if day.selected %} is-selected{% endif %}" href="{{ day.url }}" data-activity-link data-date="{{ day.iso }}" data-focus="{{ day.iso }}" aria-label="{{ day.label }}" {% if day.selected %}aria-current="date"{% endif %} title="{{ day.label }}"><span class="visually-hidden">{{ day.number }}</span></a>{% endif %}
+        {% endfor %}
+      </div>
+      <div class="activity-month-note">{% if month.future %}未到日期{% endif %}</div>
+    </section>
+    {% endfor %}
+  </div>
+  <div class="activity-footer">
+    <div class="activity-legend" aria-label="活动强度：0、1至2、3至5、6至9、10次及以上">
+      <span>活动强度</span><span>低</span><span class="activity-key activity-level-0"></span><span class="activity-key activity-level-1"></span><span class="activity-key activity-level-2"></span><span class="activity-key activity-level-3"></span><span class="activity-key activity-level-4"></span><span>高</span>
+      <span class="activity-key is-selected"></span><span>已选日期</span><span class="activity-key is-today"></span><span>今天</span>
+    </div>
+    <details class="activity-day-detail" {% if activity.page.number > 1 %}open{% endif %}>
+      <summary><span>{{ activity.selected|date:"n月j日" }} · {{ activity.selected_count }} 次活动</span><i class="bi bi-chevron-down" aria-hidden="true"></i></summary>
+      <div class="activity-event-list">
+        {% for event in activity.page %}<a class="activity-event" href="{{ event.url }}"><time datetime="{{ event.when|date:'c' }}">{{ event.when|date:"H:i" }}</time><span>{{ event.label }} <strong>{{ event.code }}</strong></span><span class="activity-actor">{{ event.actor }}</span><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+        {% empty %}<p class="activity-empty">这一天暂无活动记录。</p>{% endfor %}
+        {% if activity.page.has_other_pages %}<nav class="activity-pagination" aria-label="当日活动分页">{% if activity.previous_url %}<a href="{{ activity.previous_url }}" data-activity-link data-focus="previous">上一页</a>{% endif %}<span>{{ activity.page.number }} / {{ activity.page.paginator.num_pages }}</span>{% if activity.next_url %}<a href="{{ activity.next_url }}" data-activity-link data-focus="next">下一页</a>{% endif %}</nav>{% endif %}
+      </div>
+    </details>
+  </div>
+  <div class="activity-recent">
+    <h3>最近参与的实验</h3>
+    {% for experiment in activity.recent %}<a class="activity-recent-row" href="{{ experiment.url }}"><strong>{{ experiment.code }}</strong><span>{{ experiment.description }}</span><time datetime="{{ experiment.when|date:'c' }}">{{ experiment.when|date:"n月j日 H:i" }}</time><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+    {% empty %}<p class="activity-empty">该年度暂无可见活动记录。</p>{% endfor %}
+  </div>
+  <p class="activity-feedback visually-hidden" role="status" aria-live="polite"></p>
+</section>

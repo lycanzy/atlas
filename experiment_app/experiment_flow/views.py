@@ -35,10 +35,12 @@ from .inventory import (
     parse_usage_payload, replace_step_usages, shortage_response,
     validate_usage_records_for_completion, RawMaterialUsageValidationError,
 )
+from .activity import get_activity_board
 
 
 STATUS_LABELS_ZH = {
     'Planned': '计划中',
+    'InProgress': '执行中',
     'Completed': '已完成',
     'Canceled': '已取消',
 }
@@ -724,6 +726,35 @@ def accessible_samples_for_user(user):
     return queryset.filter(filters).distinct()
 
 
+@login_required
+def step_samples(request, step_id):
+    """Return one small page of samples for an accessible experiment step."""
+    step = get_object_or_404(
+        ExperimentStep.objects.select_related('experiment__project__project__group'),
+        id=step_id,
+    )
+    if not user_can_access_step(request.user, step):
+        return JsonResponse({'error': '你没有权限查看该步骤的样品。'}, status=403)
+
+    samples = Sample.objects.filter(step=step).order_by('sample_number', 'id')
+    page_obj = Paginator(samples, 25).get_page(request.GET.get('page', 1))
+    return JsonResponse({
+        'results': [
+            {
+                'id': sample.id,
+                'name': sample.sample_name,
+                'number': sample.sample_number,
+            }
+            for sample in page_obj.object_list
+        ],
+        'total': page_obj.paginator.count,
+        'page': page_obj.number,
+        'num_pages': page_obj.paginator.num_pages,
+        'has_previous': page_obj.has_previous(),
+        'has_next': page_obj.has_next(),
+    })
+
+
 def _decode_sample_cursor(value):
     if not value:
         return None
@@ -1151,7 +1182,7 @@ def get_experiment_overview_stats(experiments_qs):
         'in_progress_count': in_progress_count,
         'experiment_count': visible_experiment_records.count(),
         'active_experiment_count': visible_experiment_records.filter(
-            Q(steps__status='Planned') | Q(steps__isnull=True)
+            Q(steps__status__in=('Planned', 'InProgress')) | Q(steps__isnull=True)
         ).distinct().count(),
         'completed_count': completed_count,
         'cell_count': cell_count,
@@ -1761,7 +1792,9 @@ def build_genealogy_graph(step, upstream_steps, downstream_tree, user=None):
 
 @login_required
 def index(request):
-
+    activity_board = get_activity_board(request, get_experiments_for_user(request.user))
+    if request.GET.get('activity_fragment') == '1':
+        return render(request, 'experiment_flow/_activity_board.html', {'activity': activity_board})
     search_query = request.GET.get('search', '')
     my_experiments = request.GET.get('my_experiments', '')
     # Use group-restricted queryset helper
@@ -1796,6 +1829,7 @@ def index(request):
     page_obj = paginator.get_page(page_number)
 
     return render(request, 'experiment_flow/index.html', {
+        'activity': activity_board,
         'experiments': page_obj,
         'page_obj': page_obj,
         'search_query': search_query,
@@ -2414,7 +2448,7 @@ def update_step_status(request, step_id):
             new_status = data.get('status', '')
 
             # Validate status
-            valid_statuses = ['Planned', 'Completed', 'Canceled']
+            valid_statuses = {value for value, _label in ExperimentStep.STATUS_CHOICES}
             if new_status not in valid_statuses:
                 return JsonResponse({'success': False, 'error': '无效状态'})
 
@@ -2467,7 +2501,7 @@ def bulk_update_status(request, exp_id):
                 return JsonResponse({'success': False, 'error': '未选择步骤'})
 
             # Validate status
-            valid_statuses = ['Planned', 'Completed', 'Canceled']
+            valid_statuses = {value for value, _label in ExperimentStep.STATUS_CHOICES}
             if new_status not in valid_statuses:
                 return JsonResponse({'success': False, 'error': '无效状态'})
 

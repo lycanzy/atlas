@@ -304,6 +304,7 @@ class ExperimentStepForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['status'].choices = [
             ('Planned', '计划中'),
+            ('InProgress', '执行中'),
             ('Completed', '已完成'),
             ('Canceled', '已取消'),
         ]
@@ -418,6 +419,13 @@ class ExperimentStepForm(forms.ModelForm):
                     f'为保留实验追溯记录，样品数量不能低于当前的 {current_count}。'
                 )
         return sample_count
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('completed_on'):
+            cleaned_data['status'] = 'Completed'
+        return cleaned_data
+
 class EquipmentForm(forms.ModelForm):
     # Override owner to use a searchable select
     owner = forms.ModelChoiceField(

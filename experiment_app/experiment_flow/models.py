@@ -215,6 +215,7 @@ class ExperimentStep(models.Model):
 
     STATUS_CHOICES = [
         ("Planned", "Planned"),
+        ("InProgress", "In Progress"),
         ("Canceled", "Canceled"),
         ("Completed", "Completed"),
     ]
