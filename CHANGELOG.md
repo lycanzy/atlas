@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [v0.1.4-alpha] - 2026-09-23
+
+### 提交记录
+
+- Add sample image viewer, cell active material mass, and reliable project numbering
+
 ## [v0.1.3-alpha] - 2026-09-07
 
 ### 提交记录
