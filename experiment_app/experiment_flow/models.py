@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db.models.signals import m2m_changed, post_save
@@ -126,10 +126,16 @@ class ProjectCategory(models.Model):
 
     def generate_experiment_name(self):
         # Business naming: team code (e.g. PCA) + sequence => project code (e.g. PCA001).
-        exp_count = self.experiment.count()
-        number = str(exp_count + 1).zfill(3)
         team_code = self.group.team_code if self.group and self.group.team_code else self.project_code
-        return f"{team_code}{number}"
+        pattern = re.compile(rf"{re.escape(str(team_code))}([0-9]+)")
+        # Include legacy categories sharing the prefix; compare numeric suffixes,
+        # so 1000 sorts after 999. Deleted trailing numbers may be reused.
+        numbers = (
+            int(match.group(1))
+            for name in Project.objects.filter(exp_name__startswith=team_code).values_list('exp_name', flat=True)
+            if (match := pattern.fullmatch(name))
+        )
+        return f"{team_code}{max(numbers, default=0) + 1:03d}"
 
     def clean(self):
         if self.project_code:
@@ -152,7 +158,7 @@ class ProjectCategory(models.Model):
 class Project(models.Model):
     """Generated project record, such as AFE001."""
 
-    exp_name = models.CharField(max_length = 30)
+    exp_name = models.CharField(max_length = 30, unique=True)
     exp_description = models.TextField(blank = True, null = True)
     created_on = models.DateTimeField(auto_now_add=True)
     project = models.ForeignKey(ProjectCategory, on_delete = models.CASCADE, related_name = 'experiment', null = True)
@@ -168,6 +174,28 @@ class Project(models.Model):
         db_table = "experiment_flow_exp"
         verbose_name = "Project"
         verbose_name_plural = "Projects"
+
+    @classmethod
+    def create_for_team(cls, *, team, owner, exp_description=None):
+        with transaction.atomic():
+            # Acquire a write lock before reading the maximum. Unlike
+            # select_for_update(), this also serializes SQLite writers.
+            ResearchGroup.objects.filter(pk=team.pk).update(team_code=models.F('team_code'))
+            team = ResearchGroup.objects.get(pk=team.pk)
+            if not team.team_code:
+                raise ValidationError('请先在后台为该 Team 设置 3 位 Team Code。')
+            category = ProjectCategory.objects.filter(group=team).order_by('id').first()
+            if category is None:
+                category = ProjectCategory.objects.create(
+                    group=team, project_name=team.group_name, project_code=team.team_code,
+                )
+            elif category.project_code != team.team_code:
+                category.project_code = team.team_code
+                category.save(update_fields=['project_code'])
+            return cls.objects.create(
+                exp_name=category.generate_experiment_name(),
+                project=category, owner=owner, exp_description=exp_description,
+            )
 
     def __str__(self):
         return str(self.exp_name) if self.exp_name else "未命名项目"
@@ -582,6 +610,10 @@ class Cell(models.Model):
     )
     test_order_number = models.CharField(max_length=100, db_index=True)
     barcode = models.CharField(max_length=100, unique=True)
+    active_material_mass_g = models.DecimalField(
+        "活性物质量 (g)", max_digits=14, decimal_places=6,
+        null=True, blank=True, validators=[MinValueValidator(Decimal("0.000001"))],
+    )
     test_item = models.ForeignKey(
         CellTestItem,
         on_delete=models.PROTECT,

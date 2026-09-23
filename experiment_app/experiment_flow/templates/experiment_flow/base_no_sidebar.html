@@ -69,7 +69,7 @@
     <link rel="stylesheet" href="{% static 'app/css/app.css' %}?v=8" />
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
     <!-- Navigation Bar -->
     <div class="navbar">
         <a href="{% url 'index' %}" class="brand-link" aria-label="返回主界面">Atlas</a>
@@ -78,6 +78,7 @@
             <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">实验</button>
             <button type="button" class="btn btn-primary btn-sm" disabled aria-disabled="true" title="功能建设中">表征测试</button>
             <button onclick="location.href='{% url 'insights' %}'" class="btn btn-primary btn-sm">数据洞察</button>
+            <a href="{% url 'image_gallery' %}" class="btn btn-primary btn-sm">图像数据</a>
             {% if user.is_staff or user.is_superuser or user.profile.is_team_owner %}<button onclick="location.href='{% url 'management_dashboard' %}'" class="btn btn-primary btn-sm">管理</button>{% endif %}
             {% if user.is_authenticated %}
                 <div class="dropdown user-menu">
@@ -111,7 +112,7 @@
     </div>
 
     <!-- Main Content (No Sidebar) -->
-    <div class="container">
+    <div class="{% block content_container_class %}container{% endblock %}">
         {% block content %}{% endblock %}
     </div>
 

@@ -134,6 +134,12 @@ print(STATIC_DIRS)
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 print(STATIC_ROOT)
 MEDIA_ROOT =  BASE_DIR / 'images'
+
+# Local image viewer: override on other hosts with ATLAS_IMAGE_DATA_ROOT.
+IMAGE_DATA_ROOT = os.environ.get(
+    'ATLAS_IMAGE_DATA_ROOT',
+    str(Path.home() / 'Desktop' / 'Atlas Image Data') if DEBUG else '',
+)
 # Removed non-existent directory from STATICFILES_DIRS
 # App-specific static files are automatically collected from each app's static/ folder
 

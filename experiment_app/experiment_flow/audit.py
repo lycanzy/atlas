@@ -88,6 +88,7 @@ def step_snapshot(step):
                 'id': cell.id,
                 'test_order_number': cell.test_order_number,
                 'barcode': cell.barcode,
+                'active_material_mass_g': str(cell.active_material_mass_g) if cell.active_material_mass_g is not None else None,
                 'test_item_id': cell.test_item_id,
                 'test_item__name': cell.test_item.name if cell.test_item else None,
                 'samples': list(

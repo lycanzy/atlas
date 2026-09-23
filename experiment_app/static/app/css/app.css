@@ -1050,7 +1050,7 @@ a {
 
 table.table.cell-editor-table {
     table-layout: auto;
-    min-width: 980px;
+    min-width: 1130px;
 }
 
 table.table.cell-editor-table th:nth-child(1),
@@ -1065,22 +1065,27 @@ table.table.cell-editor-table td:nth-child(2) {
     width: 22%;
 }
 
-table.table.cell-editor-table th:nth-child(3),
-table.table.cell-editor-table td:nth-child(3) {
+table.table.cell-editor-table th:nth-child(4),
+table.table.cell-editor-table td:nth-child(4) {
     min-width: 165px;
     width: 19%;
 }
 
-table.table.cell-editor-table th:nth-child(4),
-table.table.cell-editor-table td:nth-child(4) {
+table.table.cell-editor-table th:nth-child(5),
+table.table.cell-editor-table td:nth-child(5) {
     min-width: 300px;
     width: 34%;
 }
 
-table.table.cell-editor-table th:nth-child(5),
-table.table.cell-editor-table td:nth-child(5) {
+table.table.cell-editor-table th:nth-child(6),
+table.table.cell-editor-table td:nth-child(6) {
     min-width: 64px;
     width: 64px;
+}
+
+table.table.cell-editor-table th:nth-child(3),
+table.table.cell-editor-table td:nth-child(3) {
+    min-width: 150px;
 }
 
 .cell-editor-table th:last-child,

@@ -1,0 +1,58 @@
+{% extends 'experiment_flow/image_viewer_base.html' %}
+{% load static %}
+{% block content %}
+<main id="main-content" class="iv-gallery" tabindex="-1">
+    <h1>Image Data Viewer</h1>
+    <form class="iv-search" method="get" action="{% url 'image_gallery' %}" role="search">
+        <input id="sample-id" name="sample_id" value="{{ query }}" aria-label="搜索样品编号前缀" placeholder="输入样品编号或前缀，例如 PCA" autocomplete="off" spellcheck="false" maxlength="54">
+        <button type="submit">搜索</button>
+    </form>
+    {% if not searched %}
+    <section class="iv-empty">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <h2>搜索样品图像</h2>
+        <p>输入样品编号或前缀，点击搜索后显示匹配的图片。</p>
+    </section>
+    {% elif images %}
+    <div class="iv-results" role="status">
+        <span>“{{ query }}” 的匹配结果 · {{ sample_count }} 个样品 · {{ page_obj.paginator.count }} 张图片</span>
+        <span>每页最多 {{ page_size }} 张 · 当前 {{ page_obj.start_index }}–{{ page_obj.end_index }} 张</span>
+    </div>
+    {% regroup images by sample_id as sample_groups %}
+    {% for group in sample_groups %}
+    <section class="iv-sample-group" aria-label="{{ group.grouper }} 的图片">
+        <div class="iv-summary">
+            <div><strong>{{ group.grouper }}</strong><span class="iv-count">本页 {{ group.list|length }} 张图片</span></div>
+            <span class="iv-path">相对目录 {{ group.grouper }}/</span>
+        </div>
+        <div class="iv-grid">
+            {% for image in group.list %}
+            <a id="image-{{ image.sample_id }}-{{ image.number }}" class="iv-tile" href="{% url 'image_detail' image.sample_id image.number %}?{{ search_query }}" aria-label="查看 {{ image.filename }}，{{ image.sample_id }}">
+                <div class="iv-thumbnail">
+                    <img src="{{ image.url }}" alt="{{ image.filename }} 图像" width="1200" height="900" loading="lazy">
+                    <span class="iv-enlarge" aria-hidden="true"><i class="bi bi-arrows-angle-expand"></i></span>
+                </div>
+                <span class="iv-filename">{{ image.filename }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+    <nav class="iv-pagination" aria-label="图片结果分页">
+        {% if page_obj.has_previous %}<a href="?{{ search_query }}&amp;page={{ page_obj.previous_page_number }}">上一页</a>{% else %}<span aria-disabled="true">上一页</span>{% endif %}
+        <span class="iv-page-number" aria-current="page">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+        {% if page_obj.has_next %}<a href="?{{ search_query }}&amp;page={{ page_obj.next_page_number }}">下一页</a>{% else %}<span aria-disabled="true">下一页</span>{% endif %}
+    </nav>
+    {% else %}
+    <section class="iv-empty" aria-live="polite">
+        <i class="bi bi-images" aria-hidden="true"></i>
+        <h2>{% if directory_error %}图片目录暂不可用{% else %}没有匹配的图片{% endif %}</h2>
+        <p>{% if directory_error %}{{ directory_error }}{% else %}可输入编号前缀（例如 PCA）。仅显示你有权限查看的样品目录中的图片。{% endif %}</p>
+        <a href="{% url 'image_gallery' %}">重新搜索</a>
+    </section>
+    {% endif %}
+    {% if searched %}
+    <footer class="iv-gallery-footer"><span>点击图片进入详情页</span><span>读取本地目录 · DEMO_ 开头的文件为生成示意图片</span></footer>
+    {% endif %}
+</main>
+{% endblock %}

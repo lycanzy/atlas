@@ -431,7 +431,7 @@ class ViewTests(TestCase):
         self.assertContains(response, 'data-bs-target="#step-cells-pane"')
         self.assertContains(response, 'data-bs-target="#step-samples-pane"')
         self.assertContains(response, '实验步骤')
-        self.assertContains(response, '连续扫码，或每行粘贴一个 Barcode')
+        self.assertContains(response, '每行一个 Barcode，或粘贴 Barcode + 活性物质量两列')
         self.assertContains(response, '填写样品数量并保存步骤后，将自动生成样品编号。')
         self.assertContains(response, '.lineage-parent-select2 .lineage-parent-search-icon')
         self.assertContains(response, '.lineage-parent-select2 .select2-selection__clear')

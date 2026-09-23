@@ -2079,7 +2079,7 @@ function openSamplePicker(form, row, trigger) {
     }
 }
 
-function createCellEditorRow(form, packageNumber, barcode, testItemId = '', cellId = null) {
+function createCellEditorRow(form, packageNumber, barcode, testItemId = '', cellId = null, mass = '') {
     const container = form.querySelector('.cells-editor-container');
     if (!container) return;
 
@@ -2089,6 +2089,7 @@ function createCellEditorRow(form, packageNumber, barcode, testItemId = '', cell
     row.innerHTML = `
         <td><input type="text" class="form-control form-control-sm cell-row-package" maxlength="100" aria-label="测试单号"></td>
         <td><input type="text" class="form-control form-control-sm cell-row-barcode" maxlength="100" aria-label="Barcode"></td>
+        <td><input type="text" inputmode="decimal" class="form-control form-control-sm cell-row-mass" aria-label="活性物质量 (g)" placeholder="未记录"></td>
         <td><select class="form-select form-select-sm cell-row-test-item" aria-label="测试项目"></select></td>
         <td>
             <div class="cell-linked-samples" aria-label="已关联样品"></div>
@@ -2101,6 +2102,7 @@ function createCellEditorRow(form, packageNumber, barcode, testItemId = '', cell
         </td>`;
     row.querySelector('.cell-row-package').value = packageNumber;
     row.querySelector('.cell-row-barcode').value = barcode;
+    row.querySelector('.cell-row-mass').value = mass;
     row.querySelector('.cell-row-test-item').innerHTML = form.querySelector('.cell-test-item-input')?.innerHTML || '<option value="">未指定</option>';
     row.querySelector('.cell-row-test-item').value = String(testItemId || '');
     container.appendChild(row);
@@ -2112,10 +2114,12 @@ function addCellsToEditor(form) {
     const barcodeInput = form.querySelector('.cell-barcode-input');
     const testItemId = form.querySelector('.cell-test-item-input')?.value || '';
     const packageNumber = normalizeCellIdentifier(packageInput?.value);
-    const scannedBarcodes = (barcodeInput?.value || '')
-        .split(/\r?\n/)
-        .map(normalizeCellIdentifier)
-        .filter(Boolean);
+    const scannedBarcodes = (barcodeInput?.value || '').split(/\r?\n/)
+        .filter(line => line.trim()).map(line => line.split('\t'));
+    if (scannedBarcodes.some(parts => parts.length > 2 || !normalizeCellIdentifier(parts[0]) || !validCellMass((parts[1] || '').trim()))) {
+        showCellEditorError(form, '粘贴格式无效：每行应为 Barcode，或 Barcode + 活性物质量两列；质量须大于 0，最多 8 位整数、6 位小数。');
+        return;
+    }
 
     if (!packageNumber) {
         showCellEditorError(form, '请先填写测试单号。');
@@ -2135,13 +2139,15 @@ function addCellsToEditor(form) {
     );
     const duplicates = [];
     let addedCount = 0;
-    scannedBarcodes.forEach(barcode => {
+    scannedBarcodes.forEach(parts => {
+        const barcode = normalizeCellIdentifier(parts[0]);
+        const mass = (parts[1] || '').trim();
         if (existingBarcodes.has(barcode)) {
             duplicates.push(barcode);
             return;
         }
         existingBarcodes.add(barcode);
-        createCellEditorRow(form, packageNumber, barcode, testItemId);
+        createCellEditorRow(form, packageNumber, barcode, testItemId, null, mass);
         addedCount++;
     });
 
@@ -2155,9 +2161,32 @@ function addCellsToEditor(form) {
     barcodeInput?.focus();
 }
 
+function validCellMass(value) {
+    return value === '' || (/^\d{1,8}(?:\.\d{1,6})?$/.test(value) && Number(value) > 0);
+}
+
 function initializeCellEditor(form) {
     if (!form) return;
     form._deletedCellIds = new Set();
+    form.addEventListener('paste', function(e) {
+        if (!e.target.matches('.cell-row-mass')) return;
+        e.preventDefault();
+        const values = e.clipboardData.getData('text').replace(/\r/g, '').replace(/\n$/, '').split('\n').map(value => value.trim());
+        const inputs = Array.from(form.querySelectorAll('.cell-row-mass'));
+        const start = inputs.indexOf(e.target);
+        if (values.some(value => !validCellMass(value)) || start + values.length > inputs.length) {
+            showCellEditorError(form, '粘贴失败：请粘贴一列有效质量（大于 0，最多 8 位整数、6 位小数），且行数不能超过当前行及后续电芯数量。');
+            return;
+        }
+        values.forEach((value, index) => { inputs[start + index].value = value; });
+        showCellEditorError(form, '');
+    });
+    form.addEventListener('change', function(e) {
+        if (e.target.matches('.cell-row-mass')) {
+            e.target.value = e.target.value.trim();
+            showCellEditorError(form, validCellMass(e.target.value) ? '' : '活性物质量须大于 0，最多 8 位整数、6 位小数，或留空。');
+        }
+    });
     updateCellEditorState(form);
 
     form.querySelector('.add-cells-to-list-btn')?.addEventListener('click', function() {
@@ -2245,6 +2274,13 @@ function collectCellPayload(form) {
         const packageNumber = normalizeCellIdentifier(row.querySelector('.cell-row-package')?.value);
         const barcode = normalizeCellIdentifier(row.querySelector('.cell-row-barcode')?.value);
         const testItemId = row.querySelector('.cell-row-test-item')?.value || null;
+        const massInput = row.querySelector('.cell-row-mass');
+        const mass = massInput?.value.trim() || '';
+        if (!validCellMass(mass)) {
+            showCellEditorError(form, `Barcode ${barcode} 的活性物质量无效：须大于 0，最多 8 位整数、6 位小数，或留空。`);
+            massInput?.focus();
+            return null;
+        }
         if (!packageNumber || !barcode) {
             showCellEditorError(form, '每个电芯都必须填写测试单号和 Barcode。');
             return null;
@@ -2260,6 +2296,7 @@ function collectCellPayload(form) {
             id: row.dataset.cellId ? Number(row.dataset.cellId) : null,
             test_order_number: packageNumber,
             barcode: barcode,
+            active_material_mass_g: mass || null,
             test_item_id: testItemId ? Number(testItemId) : null,
             sample_ids: linkedSamplesForRow(row).map(sample => sample.id)
         });

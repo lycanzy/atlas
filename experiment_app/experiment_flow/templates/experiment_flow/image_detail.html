@@ -1,0 +1,25 @@
+{% extends 'experiment_flow/image_viewer_base.html' %}
+{% load static %}
+{% block title %}{{ image.filename }} · Atlas{% endblock %}
+{% block page_class %}iv-detail-page{% endblock %}
+{% block content %}
+<main id="main-content" class="iv-detail" tabindex="-1">
+    <header class="iv-detail-toolbar">
+        <a class="iv-back" aria-label="返回列表" href="{% url 'image_gallery' %}?{{ return_query }}#image-{{ sample_id }}-{{ image.number }}"><i class="bi bi-arrow-left" aria-hidden="true"></i><span>返回列表</span></a>
+        <div class="iv-image-info"><h1>{{ image.filename }}</h1><span>{{ sample_id }}</span></div>
+        <span class="iv-position" aria-label="第 {{ image.number }} 张，共 {{ image_count }} 张">{{ image.number }} / {{ image_count }}</span>
+    </header>
+    <div class="iv-stage">
+        {% if previous_number %}
+        <a class="iv-nav iv-previous" id="previous-image" href="{% url 'image_detail' sample_id previous_number %}?{{ search_query }}" aria-label="上一张图片"><i class="bi bi-chevron-left" aria-hidden="true"></i><span>上一张</span></a>
+        {% else %}<button class="iv-nav iv-previous" disabled aria-label="已经是第一张"><i class="bi bi-chevron-left" aria-hidden="true"></i><span>上一张</span></button>{% endif %}
+        <div class="iv-image-area">
+            <img class="iv-full-image" src="{{ image.url }}" alt="{{ sample_id }} 的 {{ image.filename }}" width="1200" height="900">
+        </div>
+        {% if next_number %}
+        <a class="iv-nav iv-next" id="next-image" href="{% url 'image_detail' sample_id next_number %}?{{ search_query }}" aria-label="下一张图片"><i class="bi bi-chevron-right" aria-hidden="true"></i><span>下一张</span></a>
+        {% else %}<button class="iv-nav iv-next" disabled aria-label="已经是最后一张"><i class="bi bi-chevron-right" aria-hidden="true"></i><span>下一张</span></button>{% endif %}
+    </div>
+    <footer class="iv-detail-footer"><span>{% if image.is_demo %}DEMO：生成示意图片，非真实实验数据{% else %}样品图像{% endif %}</span><span><i class="bi bi-arrow-left" aria-hidden="true"></i> <i class="bi bi-arrow-right" aria-hidden="true"></i> 切换图片</span></footer>
+</main>
+{% endblock %}

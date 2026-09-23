@@ -383,29 +383,23 @@ def edit_managed_project(request, project_id):
 
 
 @management_required
-@transaction.atomic
 def add_managed_project(request):
     if request.method == 'POST':
         form = ProjectCreateForm(request.POST)
         if form.is_valid():
             team = form.cleaned_data['team']
-            category = ProjectCategory.objects.filter(group=team).order_by('id').first()
-            if not category:
-                category = ProjectCategory.objects.create(
-                    group=team, project_name=team.group_name, project_code=team.team_code,
+            with transaction.atomic():
+                project = Project.create_for_team(
+                    team=team,
+                    exp_description=form.cleaned_data['exp_description'],
+                    owner=form.cleaned_data['owner'],
                 )
-            project = Project.objects.create(
-                exp_name=category.generate_experiment_name(),
-                exp_description=form.cleaned_data['exp_description'],
-                project=category,
-                owner=form.cleaned_data['owner'],
-            )
-            record_audit_event(
-                request, 'create', project, f'创建项目 {project.exp_name}',
-                {'team': {'before': None, 'after': str(team)},
-                 'owner': {'before': None, 'after': project.owner.username},
-                 'description': {'before': None, 'after': project.exp_description or ''}},
-            )
+                record_audit_event(
+                    request, 'create', project, f'创建项目 {project.exp_name}',
+                    {'team': {'before': None, 'after': str(team)},
+                     'owner': {'before': None, 'after': project.owner.username},
+                     'description': {'before': None, 'after': project.exp_description or ''}},
+                )
             messages.success(request, f'项目 {project.exp_name} 已创建。')
         else:
             messages.error(request, '项目创建失败：' + str(form.errors))
@@ -939,6 +933,14 @@ def save_step_cells(step, payload_json, actor=None):
 
         test_order_number = str(record.get('test_order_number') or '').strip().upper()
         barcode = str(record.get('barcode') or '').strip().upper()
+        mass_present = 'active_material_mass_g' in record
+        raw_mass = record.get('active_material_mass_g')
+        try:
+            mass = Cell._meta.get_field('active_material_mass_g').clean(
+                None if raw_mass is None or str(raw_mass).strip() == '' else str(raw_mass).strip(), None,
+            )
+        except ValidationError as exc:
+            raise ValidationError(f'Barcode {barcode} 的活性物质量无效：请输入大于 0 的 g 数值，最多 8 位整数、6 位小数。') from exc
         raw_test_item_id = record.get('test_item_id')
         if raw_test_item_id in (None, ''):
             test_item_id = None
@@ -976,6 +978,8 @@ def save_step_cells(step, payload_json, actor=None):
             'test_order_number': test_order_number,
             'barcode': barcode,
             'test_item_id': test_item_id,
+            'active_material_mass_g': mass,
+            'mass_present': mass_present,
             'sample_ids_present': sample_ids_present,
             'sample_ids': sample_ids,
         })
@@ -1046,6 +1050,7 @@ def save_step_cells(step, payload_json, actor=None):
                 test_order_number=record['test_order_number'],
                 barcode=record['barcode'],
                 test_item_id=record['test_item_id'],
+                active_material_mass_g=record['active_material_mass_g'],
             )
         else:
             cell = existing_cells[cell_id]
@@ -1053,10 +1058,13 @@ def save_step_cells(step, payload_json, actor=None):
             cell.test_order_number != record['test_order_number']
             or cell.barcode != record['barcode']
             or cell.test_item_id != record['test_item_id']
+            or (record['mass_present'] and cell.active_material_mass_g != record['active_material_mass_g'])
         ):
             cell.test_order_number = record['test_order_number']
             cell.barcode = record['barcode']
             cell.test_item_id = record['test_item_id']
+            if record['mass_present']:
+                cell.active_material_mass_g = record['active_material_mass_g']
             cell.save()
 
         if record['sample_ids_present']:
@@ -2001,27 +2009,11 @@ def add_experiment(request):
                 if not team.team_code:
                     raise ValidationError('请先在后台为该 Team 设置 3 位 Team Code。')
 
-                project = ProjectCategory.objects.filter(group=team).order_by("id").first()
-                if not project:
-                    project = ProjectCategory.objects.create(
-                        group=team,
-                        project_code=team.team_code,
-                        project_name=team.group_name,
-                    )
-                elif project.project_code != team.team_code:
-                    project.project_code = team.team_code
-                    project.save(update_fields=["project_code"])
-
-                exp_name = project.generate_experiment_name()
                 exp_description = request.POST.get('exp_description')
-                new_exp = Project(
-                    exp_name=exp_name,
-                    project=project,
-                    exp_description=exp_description,
-                    owner=request.user  # Automatically set the logged-in user as owner
-                )
                 with transaction.atomic():
-                    new_exp.save()
+                    new_exp = Project.create_for_team(
+                        team=team, exp_description=exp_description, owner=request.user,
+                    )
                     write_audit_event(
                         request, 'create', 'project', f'创建 Project {new_exp.exp_name}',
                         instance=new_exp,
