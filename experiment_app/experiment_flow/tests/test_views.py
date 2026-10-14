@@ -923,6 +923,45 @@ class ViewTests(TestCase):
         self.assertEqual(set(step.parents.all()), {parent_a, parent_b})
         self.assertEqual(step.parent, parent_a)
 
+    def test_ordinary_user_can_add_step_with_cross_team_parent(self):
+        self.client.force_login(self.user1)
+        other_experiment = Experiment.objects.create(project=self.exp2, experiment_code='AA')
+        parent = ExperimentStep.objects.create(experiment=other_experiment, step_name='AA')
+        url = reverse('add_step', args=[self.exp1.id, self.experiment1_item.id])
+
+        response = self.client.get(url)
+        self.assertContains(response, f'<option value="{parent.pk}">{parent.full_step}</option>', html=True)
+        response = self.client.post(url, {
+            'step_name': 'AA', 'status': 'Planned', 'parents': [str(parent.pk)],
+        }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+
+        self.assertTrue(response.json()['success'])
+        step = self.experiment1_item.steps.get()
+        self.assertEqual(list(step.parents.all()), [parent])
+        self.assertEqual(step.parent_id, parent.pk)
+
+    def test_ordinary_user_can_edit_step_to_cross_team_parent(self):
+        self.client.force_login(self.user1)
+        local_parent = ExperimentStep.objects.create(experiment=self.experiment1_item, step_name='AA')
+        step = ExperimentStep.objects.create(experiment=self.experiment1_item, step_name='AA')
+        step.parents.set([local_parent])
+        other_experiment = Experiment.objects.create(project=self.exp2, experiment_code='AA')
+        parent = ExperimentStep.objects.create(experiment=other_experiment, step_name='AA')
+        url = reverse('edit_step', args=[self.exp1.id, self.experiment1_item.id, step.pk])
+
+        response = self.client.get(url)
+        self.assertContains(response, f'<option value="{parent.pk}">{parent.full_step}</option>', html=True)
+        response = self.client.post(url, {
+            'step_name': 'AA', 'status': 'Planned', 'parents': [str(parent.pk)],
+        }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+
+        self.assertTrue(response.json()['success'])
+        step.refresh_from_db()
+        self.assertEqual(list(step.parents.all()), [parent])
+        self.assertEqual(step.parent_id, parent.pk)
+        response = self.client.get(url)
+        self.assertContains(response, f'<option value="{parent.pk}" selected>{parent.full_step}</option>', html=True)
+
     def test_edit_step_replaces_parents(self):
         self.client.login(username="user1", password="password")
 

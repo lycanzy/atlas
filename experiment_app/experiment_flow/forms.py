@@ -244,7 +244,7 @@ class ExperimentStepForm(forms.ModelForm):
             'id': 'id_parents',
             'data-placeholder': '搜索并选择一个或多个前置步骤...'
         }),
-        help_text='可搜索并选择任意实验中的一个或多个历史步骤'
+        help_text='可跨团队搜索并选择任意实验中的一个或多个历史步骤'
     )
 
     owner = forms.ModelChoiceField(
@@ -335,7 +335,9 @@ class ExperimentStepForm(forms.ModelForm):
                 sample_number__isnull=False
             ).count()
         
-        # Allow upstream parents to be any step from any experiment, except itself
+        # Cross-team parent selection is intentional, including for ordinary users.
+        # Access to the step being edited is checked separately by the view.
+        # Allow any experiment's steps except the step itself; reject cycles in clean_parents.
         if self.instance and self.instance.pk:
             # Exclude the step itself when editing
             self.fields['parents'].queryset = ExperimentStep.objects.all().exclude(id=self.instance.id).select_related(
