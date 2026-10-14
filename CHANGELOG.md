@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [v0.1.5-alpha] - 2026-10-14
+
+### 提交记录
+
+- Document and test cross-team predecessor selection
+
 ## [v0.1.4-alpha] - 2026-09-23
 
 ### 提交记录
