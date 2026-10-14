@@ -6,6 +6,12 @@ Bug 修复条目统一以 `[bug fix]` 标记，并说明具体问题及修复后
 
 ## [Unreleased]
 
+## [v0.1.6-alpha] - 2026-10-14
+
+### 提交记录
+
+- docs: clarify bug fix entry in v0.1.5 changelog
+
 ## [v0.1.5-alpha] - 2026-10-14
 
 ### 问题修复
