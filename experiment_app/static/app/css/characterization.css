@@ -1,0 +1,32 @@
+.characterization-page .navbar { flex-wrap: wrap; gap: 12px; }
+.characterization-page .navbar > .ms-auto { flex-wrap: wrap; }
+.cu-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin: 20px 0 32px; }
+.cu-heading h1 { font-size: 28px; font-weight: 700; }
+.cu-heading > button { flex-shrink: 0; }
+.cu-projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 16px; }
+.cu-project { padding: 24px; border: 1px solid #dde3ed; border-radius: 12px; background: white; }
+.cu-project > i { font-size: 28px; color: #315bc5; }
+.cu-project h2 { font-size: 18px; margin: 20px 0 8px; }
+.cu-project p, .cu-hint { font-size: 14px; color: #536174; }
+.cu-project p { margin: 0; }
+#upload-dialog { width: min(640px, calc(100% - 24px)); max-height: calc(100dvh - 32px); overflow-y: auto; border: 1px solid #dde3ed; border-radius: 16px; padding: 28px; color: #17243a; box-shadow: 0 20px 80px #17243a33; }
+#upload-dialog::backdrop { background: #13203988; }
+.cu-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.cu-dialog-heading h2 { font-size: 23px; margin: 0; }
+.cu-dialog-heading .btn-close { padding: 12px; }
+#search-samples { flex-shrink: 0; white-space: nowrap; }
+#upload-search { min-width: 0; }
+#upload-dialog legend.form-label { float: none; width: auto; font-size: 14px; }
+.cu-hint { margin: 8px 0 12px; }
+.cu-sample-results { max-height: 200px; overflow-y: auto; }
+.cu-sample-option { display: block; width: 100%; text-align: left; border: 1px solid #d5deea; border-radius: 6px; background: white; padding: 10px 12px; margin-bottom: 6px; overflow-wrap: anywhere; }
+.cu-sample-option[aria-pressed="true"] { background: #edf3ff; border-color: #315bc5; }
+.cu-sample-option small { display: block; color: #536174; }
+.cu-selected { margin-top: 8px; color: #244b9b; overflow-wrap: anywhere; }
+.cu-destination { display: grid; gap: 6px; padding: 14px; border-radius: 8px; background: #f0f4fa; overflow-wrap: anywhere; }
+.cu-destination span { font-size: 13px; color: #536174; }
+.cu-destination strong { font-size: 14px; }
+.cu-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+#upload-progress { width: 100%; }
+.characterization-page :focus-visible { outline: 3px solid #426cdf; outline-offset: 3px; }
+@media (max-width: 575px) { .characterization-page .container { padding: 16px; } .cu-heading { align-items: flex-start; flex-direction: column; } #upload-dialog { padding: 20px; } }

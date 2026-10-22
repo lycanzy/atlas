@@ -1724,10 +1724,9 @@ class ViewTests(TestCase):
 
         for response in (sidebar_response, no_sidebar_response):
             self.assertContains(response, '>实验</button>')
-            self.assertContains(response, '>表征测试</button>')
+            self.assertContains(response, f'<a href="{reverse("characterization")}" class="btn btn-primary btn-sm">表征测试</a>', html=True)
             self.assertContains(response, '>数据洞察</button>')
             self.assertContains(response, '>管理</button>')
-            self.assertContains(response, '表征测试</button>')
             self.assertNotContains(response, '>设备</button>')
             self.assertNotContains(response, '>原材料</button>')
 

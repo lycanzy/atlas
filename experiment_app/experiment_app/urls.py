@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from experiment_flow import views, image_viewer
+from experiment_flow import views, image_viewer, characterization
 
 urlpatterns = [
     path('login/', views.login_view, name='login'),
@@ -24,6 +24,8 @@ urlpatterns = [
     path('change_password/', views.change_password, name='change_password'),
     path('search/', views.global_search, name='global_search'),
     path('insights/', views.insights, name='insights'),
+    path('characterization/', characterization.characterization_page, name='characterization'),
+    path('api/characterization/upload/', characterization.upload_characterization, name='upload_characterization'),
     path('images/', image_viewer.image_gallery, name='image_gallery'),
     path('image-files/<str:sample_id>/<path:relative_path>', image_viewer.image_file, name='image_file'),
     path('images/<str:sample_id>/<int:image_number>/', image_viewer.image_detail, name='image_detail'),

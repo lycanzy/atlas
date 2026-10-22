@@ -76,7 +76,7 @@
         <!-- Bootstrap primary buttons with right alignment -->
         <div class="ms-auto d-flex gap-2 align-items-center">
             <button onclick="location.href='{% url 'index' %}'" class="btn btn-primary btn-sm">实验</button>
-            <button type="button" class="btn btn-primary btn-sm" disabled aria-disabled="true" title="功能建设中">表征测试</button>
+            <a href="{% url 'characterization' %}" class="btn btn-primary btn-sm">表征测试</a>
             <button onclick="location.href='{% url 'insights' %}'" class="btn btn-primary btn-sm">数据洞察</button>
             <a href="{% url 'image_gallery' %}" class="btn btn-primary btn-sm">图像数据</a>
             {% if user.is_staff or user.is_superuser or user.profile.is_team_owner %}<button onclick="location.href='{% url 'management_dashboard' %}'" class="btn btn-primary btn-sm">管理</button>{% endif %}

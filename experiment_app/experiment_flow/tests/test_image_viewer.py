@@ -2,6 +2,7 @@ import base64
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import parse_qs
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -27,7 +28,10 @@ class ImageViewerTests(TestCase):
             UserProfile.objects.create(user=owner, research_group=team)
             category = ProjectCategory.objects.create(project_name=code, project_code=code, group=team)
             project = Project.objects.create(exp_name=f'{code}001', project=category, owner=owner)
-            experiment = Experiment.objects.create(experiment_code='AA', project=project)
+            experiment = Experiment.objects.create(
+                experiment_code='AA', project=project,
+                experiment_description='硫化物界面稳定性研究 / Interface stability',
+            )
             step = ExperimentStep.objects.create(experiment=experiment, step_name='MX')
             Sample.sync_for_step(step, 2 if code == 'PCA' else 1)
             cls.samples.extend(Sample.objects.filter(step=step).order_by('sample_name'))
@@ -63,7 +67,7 @@ class ImageViewerTests(TestCase):
 
     def test_prefix_pagination_groups_and_case_normalization(self):
         first = self.client.get(reverse('image_gallery'), {'sample_id': ' pca '})
-        self.assertEqual(first.context['query'], 'PCA')
+        self.assertEqual(first.context['query'], 'pca')
         self.assertEqual(first.context['sample_count'], 2)
         self.assertEqual(first.context['page_obj'].paginator.count, 19)
         self.assertEqual(len(first.context['images']), 15)
@@ -71,16 +75,163 @@ class ImageViewerTests(TestCase):
         second = self.client.get(reverse('image_gallery'), {'sample_id': 'pca', 'page': 2})
         self.assertEqual(len(second.context['images']), 4)
         self.assertEqual(len({image['sample_id'] for image in second.context['images']}), 2)
-        self.assertContains(second, 'aria-label="搜索样品编号前缀"')
+        self.assertContains(second, 'aria-label="搜索样品编号、实验描述或步骤描述"')
 
     def test_return_page_after_switching_across_page_boundary(self):
         response = self.client.get(self.detail_url(number=16), {'sample_id': 'pca'})
-        self.assertContains(response, 'sample_id=PCA&amp;page=2')
+        self.assertContains(response, 'sample_id=pca&amp;page=2')
         self.assertContains(response, f'#image-{self.samples[0].sample_name}-16')
         self.assertIsNone(response.context['next_number'])
         self.assertEqual(response.context['previous_number'], 15)
         self.assertContains(response, 'SEM/DEMO_016.png')
         self.assertIsNone(self.client.get(self.detail_url()).context['previous_number'])
+
+    def test_description_substring_matches_only_related_experiments(self):
+        experiment = Experiment.objects.create(
+            experiment_code='AB', project=self.samples[0].step.experiment.project,
+            experiment_description='其他实验',
+        )
+        step = ExperimentStep.objects.create(experiment=experiment, step_name='MX')
+        Sample.sync_for_step(step, 1)
+        unrelated = Sample.objects.get(step=step)
+        folder = self.root / unrelated.sample_name
+        folder.mkdir()
+        (folder / 'image.png').write_bytes(PNG)
+        for query in ('界面稳定', 'iNtErFaCe staB', ' 界面稳定 '):
+            response = self.client.get(reverse('image_gallery'), {'sample_id': query})
+            self.assertEqual(response.context['query'], query.strip())
+            self.assertEqual(response.context['sample_count'], 2)
+            self.assertEqual(response.context['page_obj'].paginator.count, 19)
+            self.assertNotContains(response, unrelated.sample_name)
+        self.assertEqual(self.client.get(reverse('image_gallery'), {
+            'sample_id': '不存在的描述',
+        }).context['sample_count'], 0)
+
+    def test_step_description_search_scope_permissions_and_navigation(self):
+        for sample in (self.samples[0], self.samples[2]):
+            step = sample.step
+            step.step_description = '高温退火处理 / Thermal annealing'
+            step.save()
+        sibling_step = ExperimentStep.objects.create(
+            experiment=self.samples[0].step.experiment, step_name='HT',
+            step_description='室温处理',
+        )
+        Sample.sync_for_step(sibling_step, 1)
+        sibling = Sample.objects.get(step=sibling_step)
+        folder = self.root / sibling.sample_name
+        folder.mkdir()
+        (folder / 'image.png').write_bytes(PNG)
+        for query in ('退火', 'tHeRmAl ann'):
+            response = self.client.get(reverse('image_gallery'), {'sample_id': query})
+            self.assertEqual(response.context['sample_count'], 2)
+            self.assertEqual(response.context['page_obj'].paginator.count, 19)
+            self.assertNotContains(response, sibling.sample_name)
+            detail = self.client.get(self.detail_url(number=16), {'sample_id': query})
+            self.assertEqual(parse_qs(detail.context['return_query']), {
+                'sample_id': [query], 'page': ['2'],
+            })
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('image_gallery'), {'sample_id': '退火'})
+        self.assertEqual(response.context['page_obj'].paginator.count, 20)
+
+    def test_description_search_respects_group_and_project_permissions(self):
+        def count():
+            return self.client.get(reverse('image_gallery'), {
+                'sample_id': '界面稳定',
+            }).context['page_obj'].paginator.count
+
+        self.assertEqual(count(), 19)
+        self.other_project.authorized_users.add(self.user)
+        self.assertEqual(count(), 20)
+        self.other_project.authorized_users.remove(self.user)
+        self.assertEqual(count(), 19)
+        self.client.force_login(self.staff)
+        self.assertEqual(count(), 20)
+
+    def test_multiple_terms_match_same_sample_path_and_only_scan_matches(self):
+        for sample in (self.samples[0], self.samples[2]):
+            experiment = sample.step.experiment
+            experiment.experiment_description = '温度 Temperature 研究'
+            experiment.save()
+            step = sample.step
+            step.step_description = '工艺优化 Optimization'
+            step.save()
+        sibling_step = ExperimentStep.objects.create(
+            experiment=self.samples[0].step.experiment, step_name='HT',
+            step_description='原始对照',
+        )
+        Sample.sync_for_step(sibling_step, 1)
+        sibling = Sample.objects.get(step=sibling_step)
+        folder = self.root / sibling.sample_name
+        folder.mkdir()
+        (folder / 'image.png').write_bytes(PNG)
+        from experiment_flow import image_viewer
+        for query in ('PCA001 温度 优化', '  pca001   温度\t优化 温度 PCA001  ',
+                      'pca001 tEMPerature oPTImization'):
+            with patch('experiment_flow.image_viewer.os.walk', wraps=image_viewer.os.walk) as walk:
+                response = self.client.get(reverse('image_gallery'), {'sample_id': query})
+                self.assertEqual(response.context['page_obj'].paginator.count, 19)
+                self.assertEqual({call.args[0].name for call in walk.call_args_list}, {
+                    self.samples[0].sample_name, self.samples[1].sample_name,
+                })
+        for query in ('PCA001 温度 不存在', f'{sibling.sample_name} 温度 优化',
+                      'CAT001 温度 优化'):
+            response = self.client.get(reverse('image_gallery'), {'sample_id': query})
+            self.assertEqual(response.context['page_obj'].paginator.count, 0)
+            self.assertContains(response, '尝试减少关键词或缩短编号')
+        response = self.client.get(reverse('image_gallery'), {'sample_id': '温度 优化'})
+        self.assertEqual(response.context['page_obj'].paginator.count, 19)
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('image_gallery'), {'sample_id': '温度 优化'})
+        self.assertEqual(response.context['page_obj'].paginator.count, 20)
+        response = self.client.get(reverse('image_gallery'), {'sample_id': 'PCA001 温度 优化'})
+        self.assertEqual(response.context['page_obj'].paginator.count, 19)
+
+    def test_multiple_terms_keep_query_across_pages_and_detail_navigation(self):
+        query = 'pca001 界面稳定 iNterFace'
+        first = self.client.get(reverse('image_gallery'), {'sample_id': query})
+        self.assertEqual(len(first.context['images']), 15)
+        self.assertEqual(parse_qs(first.context['search_query']), {'sample_id': [query]})
+        detail = self.client.get(self.detail_url(number=15), {'sample_id': query})
+        self.assertEqual(detail.context['next_number'], 16)
+        next_detail = self.client.get(self.detail_url(number=16) + '?' + detail.context['search_query'])
+        self.assertEqual(next_detail.context['previous_number'], 15)
+        self.assertEqual(parse_qs(next_detail.context['return_query']), {
+            'sample_id': [query], 'page': ['2'],
+        })
+        second = self.client.get(reverse('image_gallery') + '?' + next_detail.context['return_query'])
+        self.assertEqual(len(second.context['images']), 4)
+        self.assertEqual(second.context['query'], query)
+
+    def test_prefix_and_description_results_are_combined_without_duplicates(self):
+        experiment = self.samples[2].step.experiment
+        experiment.experiment_description = 'PCA 对照实验'
+        experiment.save()
+        own_experiment = self.samples[0].step.experiment
+        own_experiment.experiment_description = 'PCA 界面实验'
+        own_experiment.save()
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('image_gallery'), {'sample_id': 'pca'})
+        self.assertEqual(response.context['sample_count'], 3)
+        self.assertEqual(response.context['page_obj'].paginator.count, 20)
+
+    def test_description_query_survives_detail_navigation_and_pagination(self):
+        query = '界面稳定'
+        response = self.client.get(self.detail_url(number=16), {'sample_id': query})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(parse_qs(response.context['search_query']), {'sample_id': [query]})
+        self.assertEqual(parse_qs(response.context['return_query']), {
+            'sample_id': [query], 'page': ['2'],
+        })
+        self.assertEqual(response.context['previous_number'], 15)
+        gallery = self.client.get(reverse('image_gallery') + '?' + response.context['return_query'])
+        self.assertEqual(len(gallery.context['images']), 4)
+        self.assertContains(gallery, f'#image-{self.samples[0].sample_name}-16'.lstrip('#'))
+        fallback = self.client.get(self.detail_url(), {'sample_id': 'unmatched'})
+        self.assertEqual(fallback.status_code, 200)
+        self.assertEqual(parse_qs(fallback.context['search_query']), {
+            'sample_id': [self.samples[0].sample_name],
+        })
 
     def test_file_endpoint_returns_exact_bytes_and_private_headers(self):
         response = self.client.get(self.file_url())
@@ -103,7 +254,7 @@ class ImageViewerTests(TestCase):
         self.other_project.authorized_users.remove(self.user)
         self.assertEqual(self.client.get(self.file_url(sample)).status_code, 404)
         self.client.force_login(self.staff)
-        self.assertEqual(self.client.get(reverse('image_gallery'), {'sample_id': 'C'}).context['sample_count'], 1)
+        self.assertEqual(self.client.get(reverse('image_gallery'), {'sample_id': 'CAT'}).context['sample_count'], 1)
 
     def test_unsupported_hidden_and_unregistered_files_ignored(self):
         folder = self.root / self.samples[0].sample_name

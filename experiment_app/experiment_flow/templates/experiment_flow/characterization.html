@@ -1,0 +1,54 @@
+{% extends 'experiment_flow/base_no_sidebar.html' %}
+{% load static %}
+{% block title %}表征测试 · Atlas{% endblock %}
+{% block body_class %}characterization-page{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'app/css/characterization.css' %}">
+{% endblock %}
+{% block content %}
+<main id="main-content">
+    <div class="cu-heading">
+        <div><h1>表征测试</h1><p class="text-muted mb-0">选择 Atlas 样品，将测试数据归档到对应项目。</p></div>
+        <button type="button" class="btn btn-primary" id="open-upload"><i class="bi bi-upload" aria-hidden="true"></i> 上传数据</button>
+    </div>
+    {% if not upload_configured %}
+    <div class="alert alert-warning mt-4" role="status">尚未配置数据存储目录。可以预先选择样品和文件，配置完成后即可上传。</div>
+    {% endif %}
+    <div id="upload-result" class="alert alert-success mt-4" role="status" hidden></div>
+    <section class="cu-projects" aria-label="测试项目">
+        {% for test_type in test_types %}<div class="cu-project"><i class="bi bi-folder2" aria-hidden="true"></i><h2>{{ test_type }}</h2><p>按 Sample ID 归档</p></div>{% endfor %}
+    </section>
+</main>
+<dialog id="upload-dialog" aria-labelledby="upload-title">
+    <form id="characterization-upload" action="{% url 'upload_characterization' %}" method="post" enctype="multipart/form-data"
+          data-search-url="{% url 'search_linkable_samples' %}" data-max-files="{{ max_files }}" data-max-bytes="{{ max_bytes }}">
+        {% csrf_token %}
+        <div class="cu-dialog-heading"><h2 id="upload-title">上传表征数据</h2><button type="button" class="btn-close" id="close-upload" aria-label="关闭上传窗口"></button></div>
+        <fieldset id="upload-fields">
+            <label for="upload-search" class="form-label">1. 搜索 Sample</label>
+            <div class="d-flex gap-2"><input type="search" id="upload-search" class="form-control" placeholder="输入至少 2 位样品编号" autocomplete="off"><button type="button" class="btn btn-outline-primary" id="search-samples">搜索</button></div>
+            <p id="sample-search-status" class="cu-hint" role="status">仅显示你有权限访问的样品。</p>
+            <div id="sample-results" class="cu-sample-results" role="group" aria-label="选择样品"></div>
+            <button type="button" id="more-samples" class="btn btn-link" hidden>加载更多</button>
+            <p id="selected-sample" class="cu-selected" role="status">尚未选择 Sample</p>
+            <label for="upload-test-type" class="form-label">2. 测试项目</label>
+            <select id="upload-test-type" name="test_type" class="form-select" required>
+                <option value="">请选择测试项目</option>
+                {% for test_type in test_types %}<option value="{{ test_type }}">{{ test_type }}</option>{% endfor %}
+            </select>
+            <fieldset class="mt-4"><legend class="form-label">3. 选择数据</legend>
+                <div class="d-flex gap-4 mb-3"><label><input type="radio" name="mode" value="files" checked> 文件</label><label><input type="radio" name="mode" value="folder"> 文件夹</label></div>
+                <input type="file" id="upload-files" class="form-control" multiple aria-label="选择一个或多个文件">
+                <input type="file" id="upload-folder" class="form-control" webkitdirectory multiple aria-label="选择一个文件夹" hidden disabled>
+                <p id="file-selection" class="cu-hint" role="status">尚未选择文件</p>
+                <p class="cu-hint">单次最多 {{ max_files }} 个文件、{{ max_bytes|filesizeformat }}。保留原文件名和子目录，不覆盖已有文件。空文件夹不会上传。</p>
+            </fieldset>
+            <div class="cu-destination"><span>保存位置</span><strong id="upload-destination">请选择 Sample 和测试项目</strong></div>
+        </fieldset>
+        <div id="upload-error" class="alert alert-danger mt-3" role="alert" tabindex="-1" hidden></div>
+        <div id="upload-progress-wrap" class="mt-3" hidden><progress id="upload-progress" max="100" value="0" aria-label="上传进度"></progress><p id="upload-status" role="status"></p></div>
+        <div class="cu-actions"><button type="button" id="cancel-upload" class="btn btn-outline-secondary">取消</button><button type="submit" id="submit-upload" class="btn btn-primary" {% if not upload_configured %}disabled{% endif %}>开始上传</button></div>
+    </form>
+</dialog>
+{% endblock %}
+{% block extra_js %}<script src="{% static 'app/js/characterization.js' %}" defer></script>{% endblock %}

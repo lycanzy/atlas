@@ -135,6 +135,11 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 print(STATIC_ROOT)
 MEDIA_ROOT =  BASE_DIR / 'images'
 
+# Private characterization storage. The existing, mounted root must be configured.
+CHARACTERIZATION_DATA_ROOT = os.environ.get('ATLAS_CHARACTERIZATION_DATA_ROOT', '')
+CHARACTERIZATION_UPLOAD_MAX_BYTES = int(os.environ.get('ATLAS_CHARACTERIZATION_UPLOAD_MAX_BYTES', 2 * 1024 ** 3))
+DATA_UPLOAD_MAX_NUMBER_FILES = int(os.environ.get('ATLAS_UPLOAD_MAX_FILES', 100))
+
 # Local image viewer: override on other hosts with ATLAS_IMAGE_DATA_ROOT.
 IMAGE_DATA_ROOT = os.environ.get(
     'ATLAS_IMAGE_DATA_ROOT',

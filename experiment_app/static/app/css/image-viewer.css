@@ -9,6 +9,8 @@
 .iv-search button:hover { background: var(--eta-primary-hover); }
 .iv-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 10px 20px; background: white; border: 1px solid var(--eta-border-soft); border-radius: 4px; margin-bottom: 18px; }
 .iv-summary strong { font-size: 18px; }
+.iv-summary-main { min-width: 0; }
+.iv-experiment-description { margin-top: 6px; font-size: 14px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
 .iv-count { margin-left: 20px; padding-left: 20px; border-left: 1px solid var(--eta-border); color: var(--eta-text-muted); white-space: nowrap; }
 .iv-path { color: var(--eta-text-muted); font-size: 13px; overflow-wrap: anywhere; }
 .iv-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px 20px; }

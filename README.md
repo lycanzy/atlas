@@ -78,6 +78,33 @@ The current UI uses a compact Atlas dashboard style with a left project sidebar,
 - Bootstrap, Bootstrap Icons, jQuery, Select2, and Cytoscape.js
 - Static frontend assets are vendored locally under `experiment_app/static/vendor/`
 
+### 表征数据上传配置
+
+“表征测试”页面支持搜索并选择已有 Sample，选择测试项目后上传文件或一个文件夹。普通用户遵循现有样品访问权限，管理员可访问全部样品；上传会记录在步骤审计日志中。
+
+部署前设置环境变量 `ATLAS_CHARACTERIZATION_DATA_ROOT` 为服务器上**已存在、已挂载且 Django 进程可写**的绝对目录，然后重启服务。不配置时页面仍可打开，但不能上传。不要把该目录暴露为静态资源目录或公开的 Web 目录。
+
+保存结构示例：
+
+```text
+<ATLAS_CHARACTERIZATION_DATA_ROOT>/
+  01 SEM/
+    PCA001AA-MX00-01/
+      image.tif
+      metadata/run.xml
+  02 CP-SEM/
+  03 FIB-SEM/
+  04 xCT/
+  05 XRD/
+```
+
+Sample ID 以数据库中选中样品的实际编号为准。测试项目和样品目录在第一次上传时创建；文件夹上传会去掉用户所选文件夹的最外层名称，保留原文件名与内部子目录。浏览器忽略隐藏文件（如 `.DS_Store`），空文件夹不上传。同名文件不覆盖；发生冲突时整批拒绝，保存失败时清理本次已写文件并保留原有数据。没有断点续传，上传时需要保持页面打开。
+
+- `ATLAS_UPLOAD_MAX_FILES`：单次最多文件数量，默认 `100`（Django multipart 上传限制）。
+- `ATLAS_CHARACTERIZATION_UPLOAD_MAX_BYTES`：单次文件总字节数，默认 `2147483648`（2 GiB）。
+
+反向代理的请求大小和超时、应用服务器超时，以及 Django 临时上传目录的磁盘空间也需要按实际数据量配置；大量文件可分批上传到同一个 Sample 目录。此目录用于表征原始数据归档，与现有 `ATLAS_IMAGE_DATA_ROOT` 图像浏览目录独立。
+
 ### Quick Start
 
 #### Windows one-click setup

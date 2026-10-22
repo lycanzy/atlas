@@ -14,6 +14,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpResponse
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.shortcuts import render
 from django.urls import reverse
 
@@ -73,9 +74,19 @@ def _safe_file(root, sample_id, relative_path):
 
 
 def _matching_images(user, query, root):
-    names = accessible_samples_for_user(user).filter(
-        sample_name__istartswith=query,
-    ).order_by('sample_name').values_list('sample_name', flat=True).distinct()
+    terms = dict.fromkeys(term.lower() for term in query.split())
+    if not terms:
+        return ()
+    samples = accessible_samples_for_user(user)
+    for term in terms:
+        samples = samples.filter(
+            Q(sample_name__istartswith=term)
+            | Q(step__experiment__experiment_description__icontains=term)
+            | Q(step__step_description__icontains=term),
+        )
+    names = samples.order_by('sample_name').values_list(
+        'sample_name', 'step__experiment__experiment_description',
+    ).distinct()
     images = []
 
     def scan_error(error):
@@ -85,7 +96,7 @@ def _matching_images(user, query, root):
         # Check root readability even when there are no matching sample folders.
         with os.scandir(root):
             pass
-        for sample_id in names:
+        for sample_id, experiment_description in names:
             try:
                 folder = _sample_directory(root, sample_id)
             except Http404:
@@ -109,6 +120,7 @@ def _matching_images(user, query, root):
             for number, relative in enumerate(sorted(paths), 1):
                 images.append({
                     'sample_id': sample_id, 'number': number,
+                    'experiment_description': experiment_description or '',
                     'filename': relative,
                     'is_demo': Path(relative).name.startswith('DEMO_'),
                     'url': reverse('image_file', kwargs={
@@ -122,7 +134,7 @@ def _matching_images(user, query, root):
 
 @login_required
 def image_gallery(request):
-    query = request.GET.get('sample_id', '').strip().upper()
+    query = request.GET.get('sample_id', '').strip()
     error = None
     matches = ()
     searched = bool(query)
@@ -145,18 +157,20 @@ def image_gallery(request):
 def image_detail(request, sample_id, image_number):
     if not accessible_samples_for_user(request.user).filter(sample_name=sample_id).exists():
         raise Http404('未找到图片')
+    query = request.GET.get('sample_id', sample_id).strip() or sample_id
     try:
-        catalog = _matching_images(request.user, '', _image_root())
+        root = _image_root()
+        matches = _matching_images(request.user, query, root)
+        images = tuple(image for image in matches if image['sample_id'] == sample_id)
+        if not images and query != sample_id:
+            query = sample_id
+            matches = _matching_images(request.user, query, root)
+            images = tuple(image for image in matches if image['sample_id'] == sample_id)
     except ImageDirectoryUnavailable as exc:
         return HttpResponse(str(exc), status=503, content_type='text/plain; charset=utf-8')
-    images = tuple(image for image in catalog if image['sample_id'] == sample_id)
     if not 1 <= image_number <= len(images):
         raise Http404('未找到图片')
     image = images[image_number - 1]
-    query = request.GET.get('sample_id', sample_id).strip().upper()
-    matches = tuple(image for image in catalog if image['sample_id'].startswith(query))
-    if image not in matches:
-        query, matches = sample_id, images
     page_number = matches.index(image) // PAGE_SIZE + 1
     return render(request, 'experiment_flow/image_detail.html', {
         'sample_id': sample_id, 'image': image, 'image_count': len(images),

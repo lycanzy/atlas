@@ -313,11 +313,7 @@
                     class="btn btn-primary btn-sm"
                     data-url="{% url 'index' %}"
                     onclick="window.location.href=this.dataset.url;">实验</button>
-                <button type="button"
-                    class="btn btn-primary btn-sm"
-                    disabled
-                    aria-disabled="true"
-                    title="功能建设中">表征测试</button>
+                <a href="{% url 'characterization' %}" class="btn btn-primary btn-sm">表征测试</a>
                 <button type="button"
                     class="btn btn-primary btn-sm"
                     data-url="{% url 'insights' %}"

@@ -564,7 +564,7 @@
 .steps-row .table th:nth-child(7),
 .steps-row .table td:nth-child(7) { width: 68px; white-space: nowrap; } /* Samples */
 .steps-row .table th:nth-child(8),
-.steps-row .table td:nth-child(8) { width: 112px; white-space: nowrap; } /* Actions */
+.steps-row .table td:nth-child(8) { width: 144px; white-space: nowrap; } /* Actions */
 
 .step-completed-date {
     color: var(--eta-text-muted);
@@ -797,6 +797,12 @@
                                 </td>
                                 <td class="text-center">
                                     <div class="table-action-group">
+                                        <a class="btn-no-style"
+                                           href="{% url 'image_gallery' %}?sample_id={{ step.full_step|urlencode }}"
+                                           title="表征数据 · {{ step.full_step }}"
+                                           aria-label="查看步骤 {{ step.full_step }} 的表征数据">
+                                            <i class="bi bi-images" aria-hidden="true"></i>
+                                        </a>
                                         <button type="button" class="btn-no-style edit-step-btn"
                                                 title="编辑步骤 {{ step.full_step }}"
                                                 aria-label="编辑步骤 {{ step.full_step }}"
