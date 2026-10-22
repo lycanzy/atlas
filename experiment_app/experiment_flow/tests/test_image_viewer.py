@@ -100,14 +100,14 @@ class ImageViewerTests(TestCase):
         for query in ('界面稳定', 'iNtErFaCe staB', ' 界面稳定 '):
             response = self.client.get(reverse('image_gallery'), {'sample_id': query})
             self.assertEqual(response.context['query'], query.strip())
-            self.assertEqual(response.context['sample_count'], 2)
-            self.assertEqual(response.context['page_obj'].paginator.count, 19)
+            self.assertEqual(response.context['sample_count'], 3)
+            self.assertEqual(response.context['page_obj'].paginator.count, 20)
             self.assertNotContains(response, unrelated.sample_name)
         self.assertEqual(self.client.get(reverse('image_gallery'), {
             'sample_id': '不存在的描述',
         }).context['sample_count'], 0)
 
-    def test_step_description_search_scope_permissions_and_navigation(self):
+    def test_step_description_search_across_teams_and_navigation(self):
         for sample in (self.samples[0], self.samples[2]):
             step = sample.step
             step.step_description = '高温退火处理 / Thermal annealing'
@@ -123,8 +123,8 @@ class ImageViewerTests(TestCase):
         (folder / 'image.png').write_bytes(PNG)
         for query in ('退火', 'tHeRmAl ann'):
             response = self.client.get(reverse('image_gallery'), {'sample_id': query})
-            self.assertEqual(response.context['sample_count'], 2)
-            self.assertEqual(response.context['page_obj'].paginator.count, 19)
+            self.assertEqual(response.context['sample_count'], 3)
+            self.assertEqual(response.context['page_obj'].paginator.count, 20)
             self.assertNotContains(response, sibling.sample_name)
             detail = self.client.get(self.detail_url(number=16), {'sample_id': query})
             self.assertEqual(parse_qs(detail.context['return_query']), {
@@ -134,17 +134,17 @@ class ImageViewerTests(TestCase):
         response = self.client.get(reverse('image_gallery'), {'sample_id': '退火'})
         self.assertEqual(response.context['page_obj'].paginator.count, 20)
 
-    def test_description_search_respects_group_and_project_permissions(self):
+    def test_description_search_across_teams_needs_no_project_grant(self):
         def count():
             return self.client.get(reverse('image_gallery'), {
                 'sample_id': '界面稳定',
             }).context['page_obj'].paginator.count
 
-        self.assertEqual(count(), 19)
+        self.assertEqual(count(), 20)
         self.other_project.authorized_users.add(self.user)
         self.assertEqual(count(), 20)
         self.other_project.authorized_users.remove(self.user)
-        self.assertEqual(count(), 19)
+        self.assertEqual(count(), 20)
         self.client.force_login(self.staff)
         self.assertEqual(count(), 20)
 
@@ -174,13 +174,15 @@ class ImageViewerTests(TestCase):
                 self.assertEqual({call.args[0].name for call in walk.call_args_list}, {
                     self.samples[0].sample_name, self.samples[1].sample_name,
                 })
-        for query in ('PCA001 温度 不存在', f'{sibling.sample_name} 温度 优化',
-                      'CAT001 温度 优化'):
+        for query in ('PCA001 温度 不存在', f'{sibling.sample_name} 温度 优化'):
             response = self.client.get(reverse('image_gallery'), {'sample_id': query})
             self.assertEqual(response.context['page_obj'].paginator.count, 0)
             self.assertContains(response, '尝试减少关键词或缩短编号')
+        response = self.client.get(reverse('image_gallery'), {'sample_id': 'CAT001 温度 优化'})
+        self.assertEqual(response.context['page_obj'].paginator.count, 1)
+        self.assertEqual(response.context['images'][0]['sample_id'], self.samples[2].sample_name)
         response = self.client.get(reverse('image_gallery'), {'sample_id': '温度 优化'})
-        self.assertEqual(response.context['page_obj'].paginator.count, 19)
+        self.assertEqual(response.context['page_obj'].paginator.count, 20)
         self.client.force_login(self.staff)
         response = self.client.get(reverse('image_gallery'), {'sample_id': '温度 优化'})
         self.assertEqual(response.context['page_obj'].paginator.count, 20)
@@ -225,7 +227,7 @@ class ImageViewerTests(TestCase):
         })
         self.assertEqual(response.context['previous_number'], 15)
         gallery = self.client.get(reverse('image_gallery') + '?' + response.context['return_query'])
-        self.assertEqual(len(gallery.context['images']), 4)
+        self.assertEqual(len(gallery.context['images']), 5)
         self.assertContains(gallery, f'#image-{self.samples[0].sample_name}-16'.lstrip('#'))
         fallback = self.client.get(self.detail_url(), {'sample_id': 'unmatched'})
         self.assertEqual(fallback.status_code, 200)
@@ -242,19 +244,40 @@ class ImageViewerTests(TestCase):
         self.assertEqual(b''.join(response.streaming_content), PNG)
         response.close()
 
-    def test_other_group_hidden_even_via_direct_url(self):
+    def test_other_group_search_detail_and_file_need_no_project_grant(self):
         sample = self.samples[2]
-        for url in (self.detail_url(sample), self.file_url(sample)):
-            self.assertEqual(self.client.get(url).status_code, 404)
-        self.assertEqual(self.client.get(reverse('image_gallery'), {'sample_id': 'CAT'}).context['sample_count'], 0)
-        self.other_project.authorized_users.add(self.user)
+        self.assertFalse(self.other_project.authorized_users.filter(pk=self.user.pk).exists())
+        self.assertEqual(self.client.get(self.detail_url(sample)).status_code, 200)
+        self.assertEqual(self.client.get(reverse('image_gallery'), {'sample_id': 'CAT'}).context['sample_count'], 1)
         response = self.client.get(self.file_url(sample))
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(b''.join(response.streaming_content), PNG)
         response.close()
-        self.other_project.authorized_users.remove(self.user)
-        self.assertEqual(self.client.get(self.file_url(sample)).status_code, 404)
-        self.client.force_login(self.staff)
-        self.assertEqual(self.client.get(reverse('image_gallery'), {'sample_id': 'CAT'}).context['sample_count'], 1)
+
+    def test_users_without_team_can_browse_all_teams(self):
+        user = User.objects.create_user(username='no-team')
+        self.client.force_login(user)
+        for has_profile in (False, True):
+            if has_profile:
+                UserProfile.objects.create(user=user)
+            response = self.client.get(reverse('image_gallery'), {'sample_id': '界面稳定'})
+            self.assertEqual(response.context['page_obj'].paginator.count, 20)
+            for sample in (self.samples[0], self.samples[2]):
+                self.assertEqual(self.client.get(self.detail_url(sample)).status_code, 200)
+                response = self.client.get(self.file_url(sample))
+                self.assertEqual(response.status_code, 200)
+                response.close()
+
+    def test_unregistered_and_step_less_samples_are_not_exposed(self):
+        Sample.objects.create(sample_name='ORPHAN')
+        for name in ('UNKNOWN', 'ORPHAN'):
+            folder = self.root / name
+            folder.mkdir()
+            (folder / 'data.png').write_bytes(PNG)
+            response = self.client.get(reverse('image_gallery'), {'sample_id': name})
+            self.assertEqual(response.context['sample_count'], 0)
+            self.assertEqual(self.client.get(reverse('image_detail', args=[name, 1])).status_code, 404)
+            self.assertEqual(self.client.get(reverse('image_file', args=[name, 'data.png'])).status_code, 404)
 
     def test_unsupported_hidden_and_unregistered_files_ignored(self):
         folder = self.root / self.samples[0].sample_name
@@ -296,7 +319,7 @@ class ImageViewerTests(TestCase):
             response = self.client.get(reverse('image_gallery'), {'sample_id': 'PCA', 'page': page})
             self.assertEqual(response.status_code, 200)
             self.assertLessEqual(len(response.context['images']), 15)
-        self.assertEqual(self.client.get(reverse('image_gallery'), {'sample_id': 'CA'}).context['sample_count'], 0)
+        self.assertEqual(self.client.get(reverse('image_gallery'), {'sample_id': 'UNKNOWN'}).context['sample_count'], 0)
         self.assertEqual(self.client.get(self.detail_url(number=0)).status_code, 404)
         self.assertEqual(self.client.get(self.detail_url(number=17)).status_code, 404)
 

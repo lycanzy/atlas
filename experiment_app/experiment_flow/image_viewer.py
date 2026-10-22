@@ -1,4 +1,4 @@
-"""Read-only image browsing for existing, authorized Atlas samples.
+"""Read-only image browsing across all teams for authenticated Atlas users.
 
 The configured root contains one directory per full Sample ID. This initial
 local implementation scans metadata per request; image bytes are only opened
@@ -18,7 +18,7 @@ from django.db.models import Q
 from django.shortcuts import render
 from django.urls import reverse
 
-from .views import accessible_samples_for_user
+from .models import Sample
 
 PAGE_SIZE = 15
 IMAGE_TYPES = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
@@ -73,11 +73,17 @@ def _safe_file(root, sample_id, relative_path):
     return candidate
 
 
-def _matching_images(user, query, root):
+def _image_samples():
+    # Characterization browsing is shared across teams; other sample permissions
+    # remain scoped by accessible_samples_for_user in views.py.
+    return Sample.objects.filter(step__isnull=False)
+
+
+def _matching_images(query, root):
     terms = dict.fromkeys(term.lower() for term in query.split())
     if not terms:
         return ()
-    samples = accessible_samples_for_user(user)
+    samples = _image_samples()
     for term in terms:
         samples = samples.filter(
             Q(sample_name__istartswith=term)
@@ -141,7 +147,7 @@ def image_gallery(request):
     # Initial/blank visits must not touch the image directory or sample catalog.
     if searched:
         try:
-            matches = _matching_images(request.user, query, _image_root())
+            matches = _matching_images(query, _image_root())
         except ImageDirectoryUnavailable as exc:
             error = str(exc)
     page = Paginator(matches, PAGE_SIZE).get_page(request.GET.get('page'))
@@ -155,16 +161,16 @@ def image_gallery(request):
 
 @login_required
 def image_detail(request, sample_id, image_number):
-    if not accessible_samples_for_user(request.user).filter(sample_name=sample_id).exists():
+    if not _image_samples().filter(sample_name=sample_id).exists():
         raise Http404('未找到图片')
     query = request.GET.get('sample_id', sample_id).strip() or sample_id
     try:
         root = _image_root()
-        matches = _matching_images(request.user, query, root)
+        matches = _matching_images(query, root)
         images = tuple(image for image in matches if image['sample_id'] == sample_id)
         if not images and query != sample_id:
             query = sample_id
-            matches = _matching_images(request.user, query, root)
+            matches = _matching_images(query, root)
             images = tuple(image for image in matches if image['sample_id'] == sample_id)
     except ImageDirectoryUnavailable as exc:
         return HttpResponse(str(exc), status=503, content_type='text/plain; charset=utf-8')
@@ -183,7 +189,7 @@ def image_detail(request, sample_id, image_number):
 
 @login_required
 def image_file(request, sample_id, relative_path):
-    if not accessible_samples_for_user(request.user).filter(sample_name=sample_id).exists():
+    if not _image_samples().filter(sample_name=sample_id).exists():
         raise Http404('图片不存在')
     try:
         path = _safe_file(_image_root(), sample_id, relative_path)

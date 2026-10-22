@@ -50,7 +50,7 @@
     <section class="iv-empty" aria-live="polite">
         <i class="bi bi-images" aria-hidden="true"></i>
         <h2>{% if directory_error %}图片目录暂不可用{% else %}没有匹配的图片{% endif %}</h2>
-        <p>{% if directory_error %}{{ directory_error }}{% else %}尝试减少关键词或缩短编号。仅显示你有权限查看的样品目录中的图片。{% endif %}</p>
+        <p>{% if directory_error %}{{ directory_error }}{% else %}尝试减少关键词或缩短编号。{% endif %}</p>
         <a href="{% url 'image_gallery' %}">重新搜索</a>
     </section>
     {% endif %}
