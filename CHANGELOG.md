@@ -6,6 +6,12 @@ Bug 修复条目统一以 `[bug fix]` 标记，并说明具体问题及修复后
 
 ## [Unreleased]
 
+## [v0.1.9-alpha] - 2026-10-22
+
+### 提交记录
+
+- Allow authenticated users to browse images across teams
+
 ## [v0.1.8-alpha] - 2026-10-22
 
 ### 提交记录
