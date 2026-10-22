@@ -6,9 +6,16 @@ Bug 修复条目统一以 `[bug fix]` 标记，并说明具体问题及修复后
 
 ## [Unreleased]
 
+## [v0.1.7-alpha] - 2026-10-22
+
 ### 新增
 
 - 步骤操作栏新增“表征数据”按钮，点击后进入图像数据页面并自动按当前步骤编号搜索。
+
+
+### 提交记录
+
+- Add characterization uploads and improve image search
 
 ## [v0.1.6-alpha] - 2026-10-14
 
